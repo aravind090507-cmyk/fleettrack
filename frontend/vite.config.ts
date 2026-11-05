@@ -12,7 +12,7 @@ export default defineConfig(async () => {
   }
 
   return {
-    base: './', // Relative path ensures seamless deployment on GitHub Pages or any hosting
+    base: '/',
     plugins,
     server: {
       port: 5173,
