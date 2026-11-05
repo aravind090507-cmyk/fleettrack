@@ -12,16 +12,12 @@ import {
   Vehicle,
 } from '../types';
 
+// Automatically clean up any stale custom URLs from localStorage to ensure native integrated routing
+if (typeof window !== 'undefined') {
+  localStorage.removeItem('fleet_backend_url');
+}
+
 export const getApiBaseUrl = (): string => {
-  const custom = localStorage.getItem('fleet_backend_url');
-  if (custom && custom.trim()) {
-    const trimmed = custom.trim().replace(/\/$/, '');
-    // If the app is served over HTTPS (e.g. Vercel) but custom url is insecure http://, browser will block it
-    if (typeof window !== 'undefined' && window.location.protocol === 'https:' && trimmed.startsWith('http://')) {
-      return '';
-    }
-    return trimmed;
-  }
   return import.meta.env.VITE_API_BASE_URL || '';
 };
 

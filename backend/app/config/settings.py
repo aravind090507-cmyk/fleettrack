@@ -5,16 +5,30 @@ Loads values from environment variables and .env file.
 from __future__ import annotations
 
 import json
+import os
 from functools import lru_cache
+from pathlib import Path
 from typing import List
 
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+def get_default_database_url() -> str:
+    """Return unified absolute database URL preventing multi-directory collisions."""
+    env_url = os.environ.get("DATABASE_URL")
+    if env_url:
+        return env_url
+    if os.environ.get("VERCEL"):
+        return "sqlite+aiosqlite:////tmp/fleettrack.db"
+    backend_dir = Path(__file__).resolve().parent.parent.parent
+    db_file = (backend_dir / "fleettrack.db").resolve().as_posix()
+    return f"sqlite+aiosqlite:///{db_file}"
+
+
 class Settings(BaseSettings):
-    # Database — defaults to SQLite for zero-install local development
-    DATABASE_URL: str = "sqlite+aiosqlite:///./fleettrack.db"
+    # Database — defaults to unified absolute SQLite file
+    DATABASE_URL: str = get_default_database_url()
 
     # Redis — gracefully degrades to in-memory fallback if unavailable
     REDIS_URL: str = "redis://localhost:6379/0"

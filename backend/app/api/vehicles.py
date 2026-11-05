@@ -157,5 +157,26 @@ async def delete_vehicle(
 
 
 async def seed_demo_vehicles(db: AsyncSession):
-    """Optional demonstration seeds."""
-    pass
+    """Seed standard fleet vehicle assets if not already present."""
+    demo_vehicles = [
+        ("VAN-01", "KA-01-AB-1234", "Mercedes-Benz Sprinter 3500", "VAN"),
+        ("TRUCK-02", "MH-02-CD-5678", "Tata Ace Gold Logistics", "TRUCK"),
+        ("VAN-03", "TN-03-EF-9012", "Toyota Probox Delivery Wagon", "VAN"),
+        ("TRUCK-04", "DL-04-GH-3456", "Mahindra Bolero Maxi Truck", "TRUCK"),
+        ("BIKE-05", "SAMPLE P1", "Royal Enfield Hunter 350", "MOTORCYCLE"),
+    ]
+
+    for short_id, reg, model, v_type in demo_vehicles:
+        stmt = select(Vehicle).where(Vehicle.registration_number == reg)
+        res = await db.execute(stmt)
+        existing = res.scalar_one_or_none()
+        if not existing:
+            v = Vehicle(
+                registration_number=reg,
+                model=model,
+                vehicle_type=v_type,
+                status="AVAILABLE",
+                battery_or_fuel_level=100.0,
+            )
+            db.add(v)
+    await db.commit()

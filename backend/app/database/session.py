@@ -39,7 +39,9 @@ async def get_db():
                 await seed_demo_users(init_session)
                 await seed_demo_vehicles(init_session)
             _db_initialized = True
-        except Exception:
+        except Exception as e:
+            import logging
+            logging.getLogger("fleettrack.db").warning("DB init or seed warning: %s", e)
             _db_initialized = True
 
     async with AsyncSessionLocal() as session:

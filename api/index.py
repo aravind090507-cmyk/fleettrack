@@ -20,5 +20,8 @@ for path in [backend_dir, root_dir]:
 if os.environ.get("VERCEL") and not os.environ.get("DATABASE_URL"):
     os.environ["DATABASE_URL"] = "sqlite+aiosqlite:////tmp/fleettrack.db"
 
+# Import models to register ORM mappers
+import app.models  # noqa: F401
+
 # Import the core FastAPI application
 from app.main import app  # noqa: E402

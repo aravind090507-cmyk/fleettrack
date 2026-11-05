@@ -115,5 +115,31 @@ async def get_me(current_user: User = Depends(get_current_user)):
 
 
 async def seed_demo_users(db: AsyncSession):
-    """Optional demonstration seeds."""
-    pass
+    """Seed standard demo accounts if not already present."""
+    from app.security.passwords import hash_password
+
+    demo_accounts = [
+        ("driver1@fleetcorp.com", "Password123!", "DRIVER", "Ramesh Kumar (Driver)"),
+        ("driver2@fleetcorp.com", "Password123!", "DRIVER", "Priya Sharma (Driver)"),
+        ("manager@fleetcorp.com", "Password123!", "FLEET_MANAGER", "Operations Fleet Manager"),
+        ("admin@fleetcorp.com", "Password123!", "ADMIN", "Enterprise System Admin"),
+    ]
+
+    for email, pwd, role, name in demo_accounts:
+        stmt = select(User).where(User.email == email)
+        res = await db.execute(stmt)
+        existing = res.scalar_one_or_none()
+        if not existing:
+            u = User(
+                email=email,
+                name=name,
+                password_hash=hash_password(pwd),
+                role=role,
+                is_active=True,
+            )
+            db.add(u)
+        else:
+            # Update password hash so demo password always works
+            existing.password_hash = hash_password(pwd)
+            existing.is_active = True
+    await db.commit()

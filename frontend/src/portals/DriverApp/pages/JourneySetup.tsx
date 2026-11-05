@@ -347,7 +347,7 @@ export const JourneySetup: React.FC = () => {
       const newJourney = {
         id: res.journey_id,
         vehicle_id: selectedVehicleId,
-        driver_id: '',
+        driver_id: res.journey_id,
         origin_name: originName,
         origin_lat: originCoords[0],
         origin_lng: originCoords[1],
@@ -366,6 +366,18 @@ export const JourneySetup: React.FC = () => {
       const trackingUrl = `${window.location.origin}/track/${res.tracking_token}`;
       setJourney(newJourney, trackingUrl, res.tracking_token);
     } catch (err: any) {
+      if (err.response?.status === 409) {
+        // Automatically restore active journey if one was already running
+        try {
+          const activeList = await journeysApi.getActive();
+          if (activeList && activeList.length > 0) {
+            const active = activeList[0];
+            const trackingUrl = `${window.location.origin}/track/${active.id}`;
+            setJourney(active, trackingUrl);
+            return;
+          }
+        } catch {}
+      }
       setError(err.response?.data?.detail || 'Failed to start journey. Check network.');
     } finally {
       setIsLoading(false);
