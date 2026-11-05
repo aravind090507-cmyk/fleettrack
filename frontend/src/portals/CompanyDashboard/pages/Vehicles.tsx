@@ -18,17 +18,21 @@ export const Vehicles: React.FC = () => {
   const [model, setModel] = useState('');
   const [type, setType] = useState('VAN');
 
-  const loadVehicles = () => {
-    setLoading(true);
+  const loadVehicles = (showSpinner = false) => {
+    if (showSpinner) setLoading(true);
     vehiclesApi
       .list(statusFilter || undefined)
       .then((res) => setVehicles(res.items))
       .catch((e) => console.error(e))
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (showSpinner) setLoading(false);
+      });
   };
 
   useEffect(() => {
-    loadVehicles();
+    loadVehicles(true);
+    const interval = setInterval(() => loadVehicles(false), 3500);
+    return () => clearInterval(interval);
   }, [statusFilter]);
 
   const handleCreateVehicle = async (e: React.FormEvent) => {

@@ -14,7 +14,7 @@ interface UseGeolocationOptions {
 
 export function useGeolocation({
   enableHighAccuracy = true,
-  maximumAge = 5000,
+  maximumAge = 1000,
   timeout = 10000,
   maxAccuracyMeters = 200.0, // High tolerance for indoor GPS
   simulated = false,
@@ -29,6 +29,7 @@ export function useGeolocation({
   const watchIdRef = useRef<number | null>(null);
   const periodicTimerRef = useRef<any>(null);
   const simTimerRef = useRef<any>(null);
+  const hasPositionRef = useRef<boolean>(false);
   const simCoordsRef = useRef<{ lat: number; lng: number; heading: number }>({
     lat: initialCoords.lat,
     lng: initialCoords.lng,
@@ -52,6 +53,7 @@ export function useGeolocation({
         timestamp: new Date(timestamp).toISOString(),
       };
 
+      hasPositionRef.current = true;
       setPosition(ping);
       setError(null);
       setIsSimulatingFallback(false);
@@ -109,7 +111,7 @@ export function useGeolocation({
       if (onLocationUpdate) {
         onLocationUpdate(ping);
       }
-    }, 2000);
+    }, 1500);
   }, [destinationCoords, initialCoords, onLocationUpdate]);
 
   const startWatching = useCallback(() => {
@@ -145,7 +147,7 @@ export function useGeolocation({
         setPosition(initialPing);
         if (onLocationUpdate) onLocationUpdate(initialPing);
       },
-      { enableHighAccuracy: true, timeout: 5000, maximumAge: 5000 }
+      { enableHighAccuracy: true, timeout: 5000, maximumAge: 1000 }
     );
 
     // Continuous watchPosition for live movement
@@ -169,21 +171,21 @@ export function useGeolocation({
       }
     );
 
-    // Periodic heartbeat poll
+    // Periodic heartbeat poll every 1.5 seconds for instant real-time telemetry
     if (periodicTimerRef.current) clearInterval(periodicTimerRef.current);
     periodicTimerRef.current = setInterval(() => {
       navigator.geolocation.getCurrentPosition(
         (pos) => handlePosition(pos.coords, pos.timestamp),
         (_err) => {
           // If indoor GPS is struggling and no position yet, keep simulation running
-          if (!position && !simTimerRef.current) {
+          if (!hasPositionRef.current && !simTimerRef.current) {
             startSimulatedMovement();
           }
         },
-        { enableHighAccuracy: true, timeout: 4000, maximumAge: 5000 }
+        { enableHighAccuracy: true, timeout: 3000, maximumAge: 1000 }
       );
-    }, 3000);
-  }, [enableHighAccuracy, handlePosition, initialCoords, maximumAge, onLocationUpdate, position, simulated, startSimulatedMovement, timeout]);
+    }, 1500);
+  }, [enableHighAccuracy, handlePosition, initialCoords, maximumAge, onLocationUpdate, simulated, startSimulatedMovement, timeout]);
 
   const stopWatching = useCallback(() => {
     if (watchIdRef.current !== null) {

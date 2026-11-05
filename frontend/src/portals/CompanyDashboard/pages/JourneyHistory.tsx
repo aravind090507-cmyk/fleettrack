@@ -12,12 +12,21 @@ export const JourneyHistory: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const navigate = useNavigate();
 
-  useEffect(() => {
+  const loadHistory = (showSpinner = false) => {
+    if (showSpinner) setLoading(true);
     journeysApi
       .getHistory(0, 50)
       .then((data) => setHistory(data))
       .catch((e) => console.error(e))
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (showSpinner) setLoading(false);
+      });
+  };
+
+  useEffect(() => {
+    loadHistory(true);
+    const interval = setInterval(() => loadHistory(false), 3500);
+    return () => clearInterval(interval);
   }, []);
 
   return (

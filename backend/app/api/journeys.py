@@ -2,11 +2,13 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+from jose import jwt
 
 from app.database.session import get_db
 from app.models.journey import Journey
@@ -136,7 +138,6 @@ async def get_active_journeys(
     journeys = result.scalars().all()
 
     items = []
-    from jose import jwt
     from app.config.settings import get_settings
     settings = get_settings()
 
@@ -193,7 +194,6 @@ async def get_journey_history(
     journeys = result.scalars().all()
 
     items = []
-    from jose import jwt
     from app.config.settings import get_settings
     settings = get_settings()
 
@@ -320,7 +320,6 @@ async def record_trip_event(
     if not journey:
         # Cross-container self-heal: restore active journey so emergency incident is preserved
         now_dt = datetime.now(timezone.utc)
-        from app.models.vehicle import Vehicle
         v_res = await db.execute(select(Vehicle).limit(1))
         veh = v_res.scalar_one_or_none()
         vid = veh.id if veh else f"veh-{current_user.id[:8]}"

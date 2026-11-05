@@ -238,7 +238,16 @@ export const ActiveJourney: React.FC = () => {
       stopWatching();
       useDriverStore.getState().setJourney(null);
     } catch (e: any) {
-      alert('Failed to end journey: ' + (e.response?.data?.detail || e.message));
+      console.warn('Network issue ending journey on backend:', e);
+      // Gracefully conclude journey locally if offline or network connection issue
+      const confirmForce = window.confirm(
+        'Server notice: ' + (e.response?.data?.detail || e.message) +
+        '\n\nWould you like to complete and close this journey anyway?'
+      );
+      if (confirmForce) {
+        stopWatching();
+        useDriverStore.getState().setJourney(null);
+      }
     }
   };
 
