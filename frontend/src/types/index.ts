@@ -99,6 +99,7 @@ export interface ActiveVehicleTelemetry {
   latest_speed: number | null;
   latest_heading: number | null;
   latest_recorded_at: string | null;
+  latest_event_type?: string | null;
 }
 
 export interface ActiveJourneyTelemetry {

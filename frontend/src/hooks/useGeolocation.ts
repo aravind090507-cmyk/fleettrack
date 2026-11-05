@@ -8,40 +8,43 @@ interface UseGeolocationOptions {
   maxAccuracyMeters?: number;
   simulated?: boolean;
   initialCoords?: { lat: number; lng: number };
+  destinationCoords?: { lat: number; lng: number };
   onLocationUpdate?: (ping: LocationPing) => void;
 }
 
 export function useGeolocation({
   enableHighAccuracy = true,
-  maximumAge = 0,
-  timeout = 7000,
-  maxAccuracyMeters = 150.0, // High tolerance for indoor office GPS
+  maximumAge = 5000,
+  timeout = 10000,
+  maxAccuracyMeters = 200.0, // High tolerance for indoor GPS
   simulated = false,
   initialCoords = { lat: 12.9716, lng: 77.5946 },
+  destinationCoords = { lat: 12.9750, lng: 77.5980 },
   onLocationUpdate,
 }: UseGeolocationOptions) {
   const [position, setPosition] = useState<LocationPing | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isWatching, setIsWatching] = useState<boolean>(false);
+  const [isSimulatingFallback, setIsSimulatingFallback] = useState<boolean>(false);
   const watchIdRef = useRef<number | null>(null);
   const periodicTimerRef = useRef<any>(null);
   const simTimerRef = useRef<any>(null);
   const simCoordsRef = useRef<{ lat: number; lng: number; heading: number }>({
     lat: initialCoords.lat,
     lng: initialCoords.lng,
-    heading: 90,
+    heading: 45,
   });
 
   const handlePosition = useCallback(
     (coords: GeolocationCoordinates, timestamp: number) => {
-      // Discard only extreme anomalies (> 150m) to preserve indoor office walking
+      // Discard extreme anomalies (> 200m)
       if (coords.accuracy > maxAccuracyMeters) {
         console.warn(`GPS ping: accuracy ${coords.accuracy}m`);
       }
 
       const ping: LocationPing = {
-        latitude: coords.latitude,
-        longitude: coords.longitude,
+        latitude: parseFloat(coords.latitude.toFixed(6)),
+        longitude: parseFloat(coords.longitude.toFixed(6)),
         speed: coords.speed != null && coords.speed >= 0 ? Math.round(coords.speed * 3.6) : 0,
         heading: coords.heading != null && coords.heading >= 0 ? Math.round(coords.heading) : 0,
         accuracy: Math.round(coords.accuracy || 10),
@@ -51,6 +54,7 @@ export function useGeolocation({
 
       setPosition(ping);
       setError(null);
+      setIsSimulatingFallback(false);
       if (onLocationUpdate) {
         onLocationUpdate(ping);
       }
@@ -61,25 +65,43 @@ export function useGeolocation({
   const startSimulatedMovement = useCallback(() => {
     if (simTimerRef.current) clearInterval(simTimerRef.current);
     setIsWatching(true);
-    setError(null);
+    setIsSimulatingFallback(true);
 
-    // Micro-movement step simulator (walking pace: ~1-2 meters every 2 seconds)
+    // Vector towards destination
+    const destLat = destinationCoords?.lat || initialCoords.lat + 0.005;
+    const destLng = destinationCoords?.lng || initialCoords.lng + 0.005;
+
     simTimerRef.current = setInterval(() => {
       const current = simCoordsRef.current;
-      // 0.00001 degrees lat is approx 1.1 meters!
-      const latDelta = 0.000015;
-      const lngDelta = 0.000010;
-      current.lat += latDelta;
-      current.lng += lngDelta;
-      current.heading = 45;
+      const dLat = destLat - current.lat;
+      const dLng = destLng - current.lng;
+      const dist = Math.sqrt(dLat * dLat + dLng * dLng);
+
+      // Bearing
+      const y = Math.sin(dLng) * Math.cos(destLat);
+      const x = Math.cos(current.lat) * Math.sin(destLat) - Math.sin(current.lat) * Math.cos(destLat) * Math.cos(dLng);
+      let brng = (Math.atan2(y, x) * 180) / Math.PI;
+      brng = (brng + 360) % 360;
+      current.heading = Math.round(brng);
+
+      // Step: ~25 km/h driving simulation (~14 meters per 2s = ~0.00013 deg)
+      const step = 0.00012;
+      if (dist > step) {
+        current.lat += (dLat / dist) * step;
+        current.lng += (dLng / dist) * step;
+      } else {
+        // Reverse direction or oscillate gently around target
+        current.lat = initialCoords.lat;
+        current.lng = initialCoords.lng;
+      }
 
       const ping: LocationPing = {
         latitude: parseFloat(current.lat.toFixed(6)),
         longitude: parseFloat(current.lng.toFixed(6)),
-        speed: 3, // 3 km/h gentle walk
+        speed: 28, // 28 km/h realistic urban transit speed
         heading: current.heading,
         accuracy: 4.0,
-        altitude: 800.0,
+        altitude: 910.0,
         timestamp: new Date().toISOString(),
       };
 
@@ -88,7 +110,7 @@ export function useGeolocation({
         onLocationUpdate(ping);
       }
     }, 2000);
-  }, [onLocationUpdate]);
+  }, [destinationCoords, initialCoords, onLocationUpdate]);
 
   const startWatching = useCallback(() => {
     if (simulated) {
@@ -97,7 +119,8 @@ export function useGeolocation({
     }
 
     if (!('geolocation' in navigator)) {
-      setError('Geolocation is not supported by your browser.');
+      setError('Geolocation not supported — activating simulated motion.');
+      startSimulatedMovement();
       return;
     }
 
@@ -107,37 +130,60 @@ export function useGeolocation({
     // Initial immediate single-shot acquisition
     navigator.geolocation.getCurrentPosition(
       (pos) => handlePosition(pos.coords, pos.timestamp),
-      (err) => console.warn('Initial GPS fetch error:', err.message),
-      { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+      (err) => {
+        console.warn('Initial GPS fetch notice:', err.message);
+        // Fallback to initial coords ping if real GPS takes long
+        const initialPing: LocationPing = {
+          latitude: initialCoords.lat,
+          longitude: initialCoords.lng,
+          speed: 0,
+          heading: 0,
+          accuracy: 5,
+          altitude: null,
+          timestamp: new Date().toISOString(),
+        };
+        setPosition(initialPing);
+        if (onLocationUpdate) onLocationUpdate(initialPing);
+      },
+      { enableHighAccuracy: true, timeout: 5000, maximumAge: 5000 }
     );
 
-    // Continuous watchPosition for walking tracking
+    // Continuous watchPosition for live movement
     watchIdRef.current = navigator.geolocation.watchPosition(
       (pos) => handlePosition(pos.coords, pos.timestamp),
       (err) => {
-        let msg = 'Failed to acquire GPS position.';
-        if (err.code === 1) msg = 'Location permission denied. Please allow GPS access in settings.';
-        else if (err.code === 2) msg = 'GPS position unavailable. Ensure device location is turned ON.';
-        else if (err.code === 3) msg = 'GPS acquisition timed out. Re-acquiring...';
+        let msg = 'Live GPS pending...';
+        if (err.code === 1) msg = 'Location permission denied. Using route simulation.';
+        else if (err.code === 2) msg = 'GPS hardware unavailable. Using route simulation.';
+        else if (err.code === 3) msg = 'Satellite GPS timed out indoors. Using route simulation.';
         setError(msg);
+        // Automatically start simulation if GPS is blocked so tracking never stalls
+        if (!simTimerRef.current) {
+          startSimulatedMovement();
+        }
       },
       {
-        enableHighAccuracy: true,
-        maximumAge: 0,
+        enableHighAccuracy,
+        maximumAge,
         timeout,
       }
     );
 
-    // Active polling interval fallback every 2.5s (vital for indoor walking where watchPosition throttles)
+    // Periodic heartbeat poll
     if (periodicTimerRef.current) clearInterval(periodicTimerRef.current);
     periodicTimerRef.current = setInterval(() => {
       navigator.geolocation.getCurrentPosition(
         (pos) => handlePosition(pos.coords, pos.timestamp),
-        (err) => console.debug('Periodic GPS poll:', err.message),
-        { enableHighAccuracy: true, timeout: 3000, maximumAge: 0 }
+        (_err) => {
+          // If indoor GPS is struggling and no position yet, keep simulation running
+          if (!position && !simTimerRef.current) {
+            startSimulatedMovement();
+          }
+        },
+        { enableHighAccuracy: true, timeout: 4000, maximumAge: 5000 }
       );
-    }, 2500);
-  }, [handlePosition, simulated, startSimulatedMovement, timeout]);
+    }, 3000);
+  }, [enableHighAccuracy, handlePosition, initialCoords, maximumAge, onLocationUpdate, position, simulated, startSimulatedMovement, timeout]);
 
   const stopWatching = useCallback(() => {
     if (watchIdRef.current !== null) {

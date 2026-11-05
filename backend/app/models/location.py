@@ -1,7 +1,7 @@
 """Location ORM model — stores individual GPS telemetry pings."""
 from __future__ import annotations
 
-from sqlalchemy import BigInteger, Column, DateTime, Float, ForeignKey, String, func
+from sqlalchemy import BigInteger, Column, DateTime, Float, ForeignKey, Integer, String, func
 from sqlalchemy.orm import relationship
 
 from app.database.base import Base
@@ -10,7 +10,7 @@ from app.database.base import Base
 class Location(Base):
     __tablename__ = "locations"
 
-    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    id = Column(Integer().with_variant(BigInteger, "postgresql"), primary_key=True, autoincrement=True)
     journey_id = Column(String(36), ForeignKey("journeys.id"), nullable=False, index=True)
 
     latitude = Column(Float, nullable=False)

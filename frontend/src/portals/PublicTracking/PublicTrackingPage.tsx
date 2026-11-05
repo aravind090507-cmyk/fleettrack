@@ -28,12 +28,24 @@ export const PublicTrackingPage: React.FC = () => {
       setTrackingInfo(info);
       if (info.latest_location) {
         setCurrentLocation(info.latest_location);
+      } else {
+        // Fallback to origin location while journey is initiating
+        setCurrentLocation({
+          latitude: info.origin_lat,
+          longitude: info.origin_lng,
+          speed: 0,
+          heading: 0,
+          accuracy: 5,
+          recorded_at: info.started_at,
+        });
       }
 
       if (trail && trail.length > 0) {
         setRouteHistory(trail.map((t: any) => [t.latitude, t.longitude] as [number, number]));
       } else if (info.latest_location) {
         setRouteHistory([[info.latest_location.latitude, info.latest_location.longitude]]);
+      } else {
+        setRouteHistory([[info.origin_lat, info.origin_lng]]);
       }
     } catch (err: any) {
       if (err.response?.status === 410 || err.response?.status === 404) {

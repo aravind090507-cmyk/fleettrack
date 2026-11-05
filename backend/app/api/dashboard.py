@@ -73,7 +73,7 @@ async def get_active_vehicles_with_telemetry(
         select(Vehicle)
         .options(
             selectinload(Vehicle.assigned_driver),
-            selectinload(Vehicle.journeys),
+            selectinload(Vehicle.journeys).selectinload(Journey.trip_events),
         )
         .order_by(Vehicle.registration_number.asc())
     )
@@ -129,6 +129,12 @@ async def get_active_vehicles_with_telemetry(
                 heading = 0.0
                 rec_at = active_j.started_at
 
+        # Resolve latest event for vehicle (SOS, BREAKDOWN, BREAK_START)
+        latest_ev_type = None
+        if active_j and active_j.trip_events:
+            sorted_evs = sorted(active_j.trip_events, key=lambda e: e.created_at)
+            latest_ev_type = sorted_evs[-1].event_type
+
         output.append(
             ActiveVehicleResponse(
                 vehicle_id=v.id,
@@ -144,6 +150,7 @@ async def get_active_vehicles_with_telemetry(
                 latest_speed=speed,
                 latest_heading=heading,
                 latest_recorded_at=rec_at,
+                latest_event_type=latest_ev_type,
             )
         )
 
@@ -172,7 +179,8 @@ async def get_active_journeys_dashboard(
 
     output = []
     for j in journeys:
-        latest_loc = j.locations[-1] if j.locations else None
+        sorted_locs = sorted(j.locations, key=lambda l: l.recorded_at) if j.locations else []
+        latest_loc = sorted_locs[-1] if sorted_locs else None
         latest_ping_dto = None
         if latest_loc:
             latest_ping_dto = LocationPing(
@@ -190,12 +198,13 @@ async def get_active_journeys_dashboard(
                 longitude=j.origin_lng,
                 speed=0.0,
                 heading=0.0,
-                accuracy=0.0,
+                accuracy=5.0,
                 altitude=0.0,
                 timestamp=j.started_at,
             )
 
-        latest_event = j.trip_events[-1] if j.trip_events else None
+        sorted_events = sorted(j.trip_events, key=lambda e: e.created_at) if j.trip_events else []
+        latest_event = sorted_events[-1] if sorted_events else None
 
         output.append(
             ActiveJourneyResponse(

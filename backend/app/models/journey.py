@@ -37,4 +37,4 @@ class Journey(Base):
     driver = relationship("User", back_populates="journeys", foreign_keys=[driver_id])
     locations = relationship("Location", back_populates="journey", order_by="Location.recorded_at")
     tracking_links = relationship("TrackingLink", back_populates="journey")
-    trip_events = relationship("TripEvent", back_populates="journey")
+    trip_events = relationship("TripEvent", back_populates="journey", order_by="TripEvent.created_at")

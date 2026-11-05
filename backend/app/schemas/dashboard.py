@@ -30,6 +30,7 @@ class ActiveVehicleResponse(BaseModel):
     latest_speed: Optional[float] = None
     latest_heading: Optional[float] = None
     latest_recorded_at: Optional[datetime] = None
+    latest_event_type: Optional[str] = None
 
 
 class TripAlertResponse(BaseModel):

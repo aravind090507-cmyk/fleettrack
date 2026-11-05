@@ -62,6 +62,15 @@ async def get_public_tracking_info(
             accuracy=latest_loc.accuracy,
             recorded_at=latest_loc.recorded_at,
         )
+    else:
+        latest_loc_dto = LatestLocation(
+            latitude=journey.origin_lat,
+            longitude=journey.origin_lng,
+            speed=0.0,
+            heading=0.0,
+            accuracy=5.0,
+            recorded_at=journey.started_at,
+        )
 
     return TrackingInfoResponse(
         journey_id=journey.id,
@@ -136,6 +145,15 @@ async def get_public_tracking_location(
             accuracy=latest_loc.accuracy,
             recorded_at=latest_loc.recorded_at,
         )
+    else:
+        latest_loc_dto = LatestLocation(
+            latitude=journey.origin_lat,
+            longitude=journey.origin_lng,
+            speed=0.0,
+            heading=0.0,
+            accuracy=5.0,
+            recorded_at=journey.started_at,
+        )
 
     return TrackingLocationResponse(
         journey_id=journey.id,
@@ -170,6 +188,18 @@ async def get_public_tracking_trail(
     )
     res = await db.execute(stmt)
     locations = res.scalars().all()
+
+    if not locations:
+        return [
+            LatestLocation(
+                latitude=journey.origin_lat,
+                longitude=journey.origin_lng,
+                speed=0.0,
+                heading=0.0,
+                accuracy=5.0,
+                recorded_at=journey.started_at,
+            )
+        ]
 
     return [
         LatestLocation(

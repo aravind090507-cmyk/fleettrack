@@ -84,22 +84,50 @@ function MapController({
 }
 
 // Function to generate rotated SVG marker for vehicles
-function createVehicleIcon(status: string, heading: number = 0, isSelected: boolean = false) {
+function createVehicleIcon(
+  status: string,
+  heading: number = 0,
+  isSelected: boolean = false,
+  eventType?: string | null
+) {
   let bgColor = '#10b981'; // green for in transit
-  if (status === 'OFFLINE') bgColor = '#f43f5e';
+  if (eventType === 'SOS') bgColor = '#ef4444';
+  else if (eventType === 'BREAKDOWN') bgColor = '#f59e0b';
+  else if (eventType === 'BREAK_START') bgColor = '#eab308';
+  else if (status === 'OFFLINE') bgColor = '#f43f5e';
   else if (status === 'MAINTENANCE') bgColor = '#f59e0b';
   else if (status === 'AVAILABLE') bgColor = '#3b82f6';
 
-  const strokeColor = isSelected ? '#ffffff' : '#0f172a';
-  const scale = isSelected ? 1.3 : 1.0;
+  const isEmergency = eventType === 'SOS';
+  const strokeColor = isSelected || isEmergency ? '#ffffff' : '#0f172a';
+  const scale = isSelected || isEmergency ? 1.35 : 1.0;
 
-  const pulseRing = isSelected || status === 'IN_TRANSIT'
-    ? `<div style="position: absolute; width: 44px; height: 44px; border-radius: 50%; background-color: rgba(16, 185, 129, 0.35); animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>`
-    : '';
+  const pulseColor = isEmergency
+    ? 'rgba(239, 68, 68, 0.6)'
+    : eventType === 'BREAKDOWN'
+    ? 'rgba(245, 158, 11, 0.5)'
+    : 'rgba(16, 185, 129, 0.35)';
+
+  const pulseRing =
+    isSelected || status === 'IN_TRANSIT' || isEmergency
+      ? `<div style="position: absolute; width: 44px; height: 44px; border-radius: 50%; background-color: ${pulseColor}; animation: ping ${
+          isEmergency ? '1s' : '2s'
+        } cubic-bezier(0, 0, 0.2, 1) infinite;"></div>`
+      : '';
+
+  const badgeHtml =
+    eventType === 'SOS'
+      ? `<div style="position: absolute; top: -10px; right: -10px; background: #ef4444; color: white; font-size: 9px; font-weight: 900; padding: 1px 5px; border-radius: 9999px; border: 1.5px solid white; z-index: 5; box-shadow: 0 2px 6px rgba(0,0,0,0.6); animation: bounce 1s infinite;">SOS</div>`
+      : eventType === 'BREAKDOWN'
+      ? `<div style="position: absolute; top: -10px; right: -10px; background: #f59e0b; color: white; font-size: 9px; font-weight: 900; padding: 1px 5px; border-radius: 9999px; border: 1.5px solid white; z-index: 5; box-shadow: 0 2px 6px rgba(0,0,0,0.6);">FIX</div>`
+      : eventType === 'BREAK_START'
+      ? `<div style="position: absolute; top: -10px; right: -10px; background: #eab308; color: #0f172a; font-size: 9px; font-weight: 900; padding: 1px 5px; border-radius: 9999px; border: 1.5px solid white; z-index: 5; box-shadow: 0 2px 6px rgba(0,0,0,0.6);">REST</div>`
+      : '';
 
   const html = `
     <div style="position: relative; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;">
       ${pulseRing}
+      ${badgeHtml}
       <div style="transform: rotate(${heading}deg) scale(${scale}); width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; transition: transform 0.3s ease; position: relative; z-index: 2;">
         <svg width="34" height="34" viewBox="0 0 24 24" fill="${bgColor}" stroke="${strokeColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="filter: drop-shadow(0 4px 6px rgba(0,0,0,0.6));">
           <polygon points="12 2 19 21 12 17 5 21 12 2"/>
@@ -298,7 +326,7 @@ export const FleetMap: React.FC<FleetMapProps> = ({
             const lastPos = journeyPath.length > 0
               ? journeyPath[journeyPath.length - 1]
               : [selectedTransit.origin_lat!, selectedTransit.origin_lng!] as [number, number];
-            const icon = createVehicleIcon(selectedTransit.status || 'COMPLETED', 0, true);
+            const icon = createVehicleIcon(selectedTransit.status || 'COMPLETED', 0, true, selectedTransit.latest_event_type);
             return (
               <Marker position={lastPos} icon={icon}>
                 <Popup className="custom-leaflet-popup">
@@ -325,7 +353,7 @@ export const FleetMap: React.FC<FleetMapProps> = ({
             v.vehicle_id === selectedVehicleId ||
             (selectedTransit && (selectedTransit as any).vehicle_id === v.vehicle_id)
           );
-          const icon = createVehicleIcon(v.status, v.latest_heading || 0, isSelected);
+          const icon = createVehicleIcon(v.status, v.latest_heading || 0, isSelected, v.latest_event_type);
 
           return (
             <Marker
@@ -344,6 +372,25 @@ export const FleetMap: React.FC<FleetMapProps> = ({
                       {v.status}
                     </span>
                   </div>
+
+                  {v.latest_event_type && (
+                    <div
+                      className={`mb-2 p-1.5 rounded-lg text-xs font-bold text-center border text-white ${
+                        v.latest_event_type === 'SOS'
+                          ? 'bg-rose-600 border-rose-700 animate-pulse'
+                          : v.latest_event_type === 'BREAKDOWN'
+                          ? 'bg-amber-600 border-amber-700'
+                          : 'bg-yellow-500 text-slate-950 border-yellow-600'
+                      }`}
+                    >
+                      {v.latest_event_type === 'SOS'
+                        ? '🚨 EMERGENCY SOS ACTIVE'
+                        : v.latest_event_type === 'BREAKDOWN'
+                        ? '⚠️ BREAKDOWN REPORTED'
+                        : '☕ ON REST BREAK'}
+                    </div>
+                  )}
+
                   <p className="text-xs text-slate-600 mb-1">{v.model}</p>
                   <p className="text-xs text-slate-700">
                     <strong>Driver:</strong> {v.assigned_driver_name || 'Unassigned'}

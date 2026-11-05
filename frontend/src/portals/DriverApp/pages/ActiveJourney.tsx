@@ -30,6 +30,7 @@ export const ActiveJourney: React.FC = () => {
     currentJourney,
     trackingUrl,
     simulatedMode,
+    toggleSimulatedMode,
     setGPSStatus,
     setLastPing,
     setOfflineQueueCount,
@@ -97,12 +98,16 @@ export const ActiveJourney: React.FC = () => {
     [currentJourney, setGPSStatus, setLastPing, setOfflineQueueCount]
   );
 
-  // Active GPS watcher hook
+  // Active GPS watcher hook with automatic smart fallback
   const { position, error: gpsError, startWatching, stopWatching } = useGeolocation({
     simulated: simulatedMode,
     initialCoords: {
       lat: currentJourney?.origin_lat || 12.9716,
       lng: currentJourney?.origin_lng || 77.5946,
+    },
+    destinationCoords: {
+      lat: currentJourney?.destination_lat || 12.9750,
+      lng: currentJourney?.destination_lng || 77.5980,
     },
     onLocationUpdate: handleLocationPing,
   });
@@ -110,7 +115,23 @@ export const ActiveJourney: React.FC = () => {
   useEffect(() => {
     startWatching();
     return () => stopWatching();
-  }, [startWatching, stopWatching]);
+  }, [startWatching, stopWatching, simulatedMode]);
+
+  // Immediately send initial origin ping on mount if pingCount is 0
+  useEffect(() => {
+    if (currentJourney && pingCount === 0) {
+      const initPing: LocationPing = {
+        latitude: currentJourney.origin_lat,
+        longitude: currentJourney.origin_lng,
+        speed: 0,
+        heading: 0,
+        accuracy: 5,
+        altitude: null,
+        timestamp: new Date().toISOString(),
+      };
+      handleLocationPing(initPing);
+    }
+  }, [currentJourney, handleLocationPing, pingCount]);
 
   // Copy tracking link to clipboard
   const handleCopyLink = () => {
@@ -271,16 +292,29 @@ export const ActiveJourney: React.FC = () => {
         </div>
       </Card>
 
-      {/* Driver Map Preview with Live Ping Indicator */}
+      {/* Driver Map Preview with Live Ping Indicator & Simulator Toggle */}
       <div className="space-y-1.5">
         <div className="flex items-center justify-between px-1 text-[11px]">
           <span className="font-bold text-slate-300 flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
             Live GPS Telemetry
           </span>
-          <span className="font-mono text-emerald-400 font-bold bg-emerald-950/80 px-2 py-0.5 rounded-full border border-emerald-800">
-            {pingCount} pings sent
-          </span>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={toggleSimulatedMode}
+              className={`px-2 py-0.5 rounded-full text-[10px] font-bold border transition cursor-pointer flex items-center gap-1 ${
+                simulatedMode
+                  ? 'bg-emerald-600 text-white border-emerald-500 shadow-sm'
+                  : 'bg-slate-900 text-slate-400 border-slate-700 hover:text-white'
+              }`}
+            >
+              <span>{simulatedMode ? '🚗 Sim Drive ON' : '📡 Device GPS'}</span>
+            </button>
+            <span className="font-mono text-emerald-400 font-bold bg-emerald-950/80 px-2 py-0.5 rounded-full border border-emerald-800">
+              {pingCount} pings sent
+            </span>
+          </div>
         </div>
         <div className="h-44 w-full rounded-2xl overflow-hidden border border-slate-800 shadow-xl">
           <DriverMap position={position} />

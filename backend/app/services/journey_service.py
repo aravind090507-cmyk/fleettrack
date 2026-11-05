@@ -87,7 +87,20 @@ async def create_journey(
     )
     db.add(tracking_link)
 
-    # 4. Update Vehicle status to IN_TRANSIT
+    # 4. Insert initial Location telemetry breadcrumb at Origin point
+    initial_location = Location(
+        journey_id=journey.id,
+        latitude=origin_lat,
+        longitude=origin_lng,
+        speed=0.0,
+        heading=0.0,
+        accuracy=5.0,
+        altitude=0.0,
+        recorded_at=now,
+    )
+    db.add(initial_location)
+
+    # 5. Update Vehicle status to IN_TRANSIT
     await db.execute(
         update(Vehicle)
         .where(Vehicle.id == vehicle_id)
@@ -97,14 +110,22 @@ async def create_journey(
     await db.commit()
     await db.refresh(journey)
 
-    # 5. Cache token mapping in Redis with TTL
+    # 6. Cache token mapping and initial location in Redis with TTL
     await redis_svc.set_tracking_token(
         token_hash=token_hash,
         journey_id=journey.id,
         expire_hours=settings.TRACKING_LINK_EXPIRE_HOURS
     )
+    await redis_svc.set_latest_vehicle_location(
+        vehicle_id=vehicle_id,
+        lat=origin_lat,
+        lng=origin_lng,
+        speed=0.0,
+        heading=0.0,
+        timestamp=now.isoformat(),
+    )
 
-    # 6. Formulate public tracking URL
+    # 7. Formulate public tracking URL
     tracking_url = f"{settings.BASE_URL}/track/{raw_token}"
     return journey, raw_token, tracking_url
 
