@@ -33,13 +33,17 @@ export const useDriverStore = create<DriverState>((set) => ({
   journeyDuration: 0,
   simulatedMode: false,
 
-  setJourney: (journey, trackingUrl, trackingToken) =>
+  setJourney: (journey, trackingUrl, trackingToken) => {
+    if (trackingToken) {
+      localStorage.setItem('fleet_active_token', trackingToken);
+    }
     set({
       currentJourney: journey,
       trackingUrl: trackingUrl || null,
       trackingToken: trackingToken || null,
       gpsStatus: journey ? 'acquiring' : 'idle',
-    }),
+    });
+  },
 
   setGPSStatus: (gpsStatus) => set({ gpsStatus }),
   setLastPing: (lastPing) => set({ lastPing }),
@@ -48,7 +52,8 @@ export const useDriverStore = create<DriverState>((set) => ({
   setJourneyDuration: (journeyDuration) => set({ journeyDuration }),
   toggleSimulatedMode: () => set((state) => ({ simulatedMode: !state.simulatedMode })),
 
-  clearJourney: () =>
+  clearJourney: () => {
+    localStorage.removeItem('fleet_active_token');
     set({
       currentJourney: null,
       trackingUrl: null,
@@ -56,5 +61,6 @@ export const useDriverStore = create<DriverState>((set) => ({
       gpsStatus: 'idle',
       lastPing: null,
       journeyDuration: 0,
-    }),
+    });
+  },
 }));

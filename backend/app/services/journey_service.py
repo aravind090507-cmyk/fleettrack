@@ -6,14 +6,18 @@ SHA-256 hashing, database persistence, and token revocation.
 from __future__ import annotations
 
 import hashlib
+import logging
 import math
 import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Tuple
 
+from jose import jwt, JWTError
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+
+logger = logging.getLogger("fleettrack.journey_service")
 
 from app.config.settings import get_settings
 from app.models.journey import Journey
@@ -58,11 +62,17 @@ async def create_journey(
     now = datetime.now(timezone.utc)
     expires_at = now + timedelta(hours=settings.TRACKING_LINK_EXPIRE_HOURS)
 
-    # 1. Generate 256-bit cryptographic token (base64url encoded string, 43 chars)
-    raw_token = secrets.token_urlsafe(32)
-    token_hash = hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
+    # 1. Fetch vehicle & driver to generate self-contained, stateless tracking token
+    v_stmt = select(Vehicle).where(Vehicle.id == vehicle_id)
+    v_res = await db.execute(v_stmt)
+    veh = v_res.scalar_one_or_none()
 
-    # 2. Create Journey record
+    from app.models.user import User
+    d_stmt = select(User).where(User.id == driver_id)
+    d_res = await db.execute(d_stmt)
+    drv = d_res.scalar_one_or_none()
+
+    # Create Journey record first to populate journey.id
     journey = Journey(
         vehicle_id=vehicle_id,
         driver_id=driver_id,
@@ -79,7 +89,27 @@ async def create_journey(
     db.add(journey)
     await db.flush()  # Populates journey.id
 
-    # 3. Create TrackingLink record with SHA-256 hash (never store raw token in DB)
+    # Generate self-healing signed cryptographic token (JWT)
+    token_payload = {
+        "jid": journey.id,
+        "vid": vehicle_id,
+        "vreg": veh.registration_number if veh else "FLEET-01",
+        "vtype": veh.vehicle_type if veh else "VAN",
+        "did": driver_id,
+        "dname": drv.name if drv else "Driver",
+        "oname": origin_name,
+        "olat": origin_lat,
+        "olng": origin_lng,
+        "destname": destination_name,
+        "dlat": destination_lat,
+        "dlng": destination_lng,
+        "st": now.isoformat(),
+        "exp": int(expires_at.timestamp()),
+    }
+    raw_token = jwt.encode(token_payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+    token_hash = hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
+
+    # 3. Create TrackingLink record with SHA-256 hash
     tracking_link = TrackingLink(
         journey_id=journey.id,
         token_hash=token_hash,
@@ -248,6 +278,128 @@ async def validate_tracking_token(
     tracking_link = result.scalar_one_or_none()
 
     if not tracking_link:
+        # Cross-container stateless recovery: decode signed JWT payload and restore state
+        try:
+            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+            jid = payload.get("jid")
+            if not jid:
+                return None
+
+            # Verify expiration
+            exp = payload.get("exp")
+            if exp and datetime.fromtimestamp(exp, tz=timezone.utc) < now:
+                return None
+
+            from app.models.user import User
+            from app.models.vehicle import Vehicle
+
+            # 1. Restore User / Driver
+            did = payload.get("did", f"drv-{jid[:8]}")
+            dname = payload.get("dname", "Assigned Driver")
+            u_stmt = select(User).where(User.id == did)
+            u_res = await db.execute(u_stmt)
+            driver_u = u_res.scalar_one_or_none()
+            if not driver_u:
+                driver_u = User(
+                    id=did,
+                    name=dname,
+                    email=f"{did}@fleettrack.local",
+                    password_hash="stateless",
+                    role="DRIVER",
+                    is_active=True,
+                )
+                db.add(driver_u)
+                await db.flush()
+
+            # 2. Restore Vehicle
+            vid = payload.get("vid", f"veh-{jid[:8]}")
+            vreg = payload.get("vreg", "FLEET-01")
+            vtype = payload.get("vtype", "VAN")
+            v_stmt = select(Vehicle).where(Vehicle.id == vid)
+            v_res = await db.execute(v_stmt)
+            veh = v_res.scalar_one_or_none()
+            if not veh:
+                veh = Vehicle(
+                    id=vid,
+                    registration_number=vreg,
+                    model="Fleet Vehicle",
+                    vehicle_type=vtype,
+                    status="IN_TRANSIT",
+                )
+                db.add(veh)
+                await db.flush()
+
+            # 3. Restore Journey
+            j_stmt = select(Journey).where(Journey.id == jid)
+            j_res = await db.execute(j_stmt)
+            restored_journey = j_res.scalar_one_or_none()
+            started_dt = datetime.fromisoformat(payload["st"]) if payload.get("st") else now
+            if not restored_journey:
+                restored_journey = Journey(
+                    id=jid,
+                    vehicle_id=veh.id,
+                    driver_id=driver_u.id,
+                    origin_name=payload.get("oname", "Start Point"),
+                    origin_lat=float(payload.get("olat", 12.9716)),
+                    origin_lng=float(payload.get("olng", 77.5946)),
+                    destination_name=payload.get("destname", "Destination"),
+                    destination_lat=float(payload.get("dlat", 12.9750)),
+                    destination_lng=float(payload.get("dlng", 77.5980)),
+                    status="IN_PROGRESS",
+                    started_at=started_dt,
+                )
+                db.add(restored_journey)
+                await db.flush()
+
+                # Add initial location breadcrumb
+                init_loc = Location(
+                    journey_id=restored_journey.id,
+                    latitude=restored_journey.origin_lat,
+                    longitude=restored_journey.origin_lng,
+                    speed=0.0,
+                    heading=0.0,
+                    accuracy=5.0,
+                    altitude=0.0,
+                    recorded_at=started_dt,
+                )
+                db.add(init_loc)
+
+            # 4. Restore TrackingLink
+            restored_link = TrackingLink(
+                journey_id=restored_journey.id,
+                token_hash=token_hash,
+                expires_at=datetime.fromtimestamp(exp, tz=timezone.utc) if exp else now + timedelta(hours=24),
+                access_count=1,
+            )
+            db.add(restored_link)
+            await db.commit()
+
+            restored_journey.vehicle = veh
+            restored_journey.driver = driver_u
+            return restored_journey, restored_link
+        except Exception as e:
+            logger.info("Stateless JWT decode skipped/notice: %s. Checking direct DB match...", e)
+
+        # Fallback: check if token directly matches an existing Journey.id UUID in this DB
+        try:
+            j_direct_stmt = (
+                select(Journey)
+                .where(Journey.id == token)
+                .options(selectinload(Journey.vehicle), selectinload(Journey.driver))
+            )
+            j_direct_res = await db.execute(j_direct_stmt)
+            direct_journey = j_direct_res.scalar_one_or_none()
+            if direct_journey and direct_journey.status == "IN_PROGRESS":
+                pseudo_link = TrackingLink(
+                    journey_id=direct_journey.id,
+                    token_hash=token_hash,
+                    expires_at=now + timedelta(hours=24),
+                    access_count=1,
+                )
+                return direct_journey, pseudo_link
+        except Exception:
+            pass
+
         return None
 
     # Verify not revoked

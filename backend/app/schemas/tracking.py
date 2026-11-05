@@ -17,8 +17,10 @@ class LatestLocation(BaseModel):
 
 class TrackingInfoResponse(BaseModel):
     journey_id: str
+    vehicle_id: Optional[str] = None
     vehicle_registration: str
     vehicle_type: str
+    driver_id: Optional[str] = None
     driver_name: str
     origin_name: str
     destination_name: str

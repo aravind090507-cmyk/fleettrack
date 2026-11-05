@@ -62,8 +62,10 @@ export interface LatestLocation {
 
 export interface TrackingInfo {
   journey_id: string;
+  vehicle_id?: string;
   vehicle_registration: string;
   vehicle_type: string;
+  driver_id?: string;
   driver_name: string;
   origin_name: string;
   destination_name: string;

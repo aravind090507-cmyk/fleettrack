@@ -386,8 +386,9 @@ export const JourneySetup: React.FC = () => {
           const activeList = await journeysApi.getActive();
           if (activeList && activeList.length > 0) {
             const active = activeList[0];
-            const trackingUrl = `${window.location.origin}/track/${active.id}`;
-            setJourney(active, trackingUrl);
+            const token = (active as any).tracking_token || active.id;
+            const trackingUrl = `${window.location.origin}/track/${token}`;
+            setJourney(active, trackingUrl, token);
             return;
           }
         } catch {}

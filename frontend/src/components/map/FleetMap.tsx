@@ -401,6 +401,16 @@ export const FleetMap: React.FC<FleetMapProps> = ({
                   <p className="text-[10px] text-slate-500 mt-1">
                     Updated: {v.latest_recorded_at ? new Date(v.latest_recorded_at).toLocaleTimeString() : 'N/A'}
                   </p>
+
+                  {v.current_journey_id && onSelectVehicle && (
+                    <button
+                      type="button"
+                      onClick={() => onSelectVehicle(v.vehicle_id)}
+                      className="mt-2 w-full py-1.5 px-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer shadow-sm"
+                    >
+                      <span>📍 View Live Trip Details</span>
+                    </button>
+                  )}
                 </div>
               </Popup>
             </Marker>

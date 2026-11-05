@@ -48,6 +48,8 @@ class JourneyResponse(BaseModel):
     created_at: datetime
     vehicle_registration: Optional[str] = None
     driver_name: Optional[str] = None
+    tracking_token: Optional[str] = None
+    tracking_url: Optional[str] = None
 
     model_config = {"from_attributes": True}
 

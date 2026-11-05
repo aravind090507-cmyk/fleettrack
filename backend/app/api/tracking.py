@@ -74,8 +74,10 @@ async def get_public_tracking_info(
 
     return TrackingInfoResponse(
         journey_id=journey.id,
+        vehicle_id=journey.vehicle_id,
         vehicle_registration=journey.vehicle.registration_number,
         vehicle_type=journey.vehicle.vehicle_type,
+        driver_id=journey.driver_id,
         driver_name=journey.driver.name,
         origin_name=journey.origin_name,
         destination_name=journey.destination_name,

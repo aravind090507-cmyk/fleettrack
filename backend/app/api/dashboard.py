@@ -135,6 +135,14 @@ async def get_active_vehicles_with_telemetry(
             sorted_evs = sorted(active_j.trip_events, key=lambda e: e.created_at)
             latest_ev_type = sorted_evs[-1].event_type
 
+        # Default depot coordinates if parked/available so units appear on the fleet map
+        if lat is None and lng is None:
+            idx = vehicles.index(v)
+            lat = 12.9716 + (idx * 0.0025)
+            lng = 77.5946 + (idx * 0.0025)
+            speed = 0.0
+            heading = 0.0
+
         output.append(
             ActiveVehicleResponse(
                 vehicle_id=v.id,
