@@ -43,21 +43,22 @@ async def start_new_journey(
     """
     # 1. Resolve or dynamically auto-create vehicle asset
     vehicle = None
-    if payload.vehicle_id:
+    if payload.vehicle_id and payload.vehicle_id != "custom":
         stmt = select(Vehicle).where(Vehicle.id == payload.vehicle_id)
         result = await db.execute(stmt)
         vehicle = result.scalar_one_or_none()
 
-    reg_val = (payload.vehicle_registration or payload.vehicle_id or "").strip().upper()
-    if not vehicle and reg_val:
-        stmt = select(Vehicle).where(Vehicle.registration_number == reg_val)
+    custom_reg = (payload.vehicle_registration or "").strip().upper()
+    if not vehicle and custom_reg:
+        stmt = select(Vehicle).where(Vehicle.registration_number == custom_reg)
         result = await db.execute(stmt)
         vehicle = result.scalar_one_or_none()
 
     # If vehicle does not exist, create it on-the-fly from driver input
     if not vehicle:
+        import random
         from datetime import datetime
-        final_reg = reg_val if reg_val else f"VAN-{datetime.now().strftime('%M%S')}"
+        final_reg = custom_reg if custom_reg else f"FT-{random.randint(100, 999)}-{datetime.now().strftime('%S')}"
         vehicle = Vehicle(
             registration_number=final_reg,
             model=payload.vehicle_model or "Fleet Unit",

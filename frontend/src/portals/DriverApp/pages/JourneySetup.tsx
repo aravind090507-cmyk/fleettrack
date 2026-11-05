@@ -348,7 +348,7 @@ export const JourneySetup: React.FC = () => {
         description,
       };
 
-      if (vehicleInputMode === 'custom' || !selectedVehicleId || vehicles.length === 0) {
+      if (vehicleInputMode === 'custom' || selectedVehicleId === 'custom' || !selectedVehicleId || vehicles.length === 0) {
         payload.vehicle_registration = (customPlate || 'KA-01-AB-1234').trim().toUpperCase();
         payload.vehicle_model = (customModel || 'Fleet Vehicle').trim();
         payload.vehicle_type = customType;
@@ -422,28 +422,28 @@ export const JourneySetup: React.FC = () => {
       <Card
         title="Vehicle / Device Unit"
         action={
-          <div className="flex items-center gap-1 bg-slate-950 p-0.5 rounded-lg border border-slate-800 text-[11px]">
-            <button
-              type="button"
-              onClick={() => setVehicleInputMode('picker')}
-              className={`px-2 py-0.5 rounded-md font-bold transition cursor-pointer ${
-                vehicleInputMode === 'picker'
-                  ? 'bg-emerald-600 text-white'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              Fleet List
-            </button>
+          <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800 text-[11px]">
             <button
               type="button"
               onClick={() => setVehicleInputMode('custom')}
-              className={`px-2 py-0.5 rounded-md font-bold transition cursor-pointer ${
+              className={`px-2.5 py-1 rounded-md font-bold transition cursor-pointer ${
                 vehicleInputMode === 'custom'
-                  ? 'bg-emerald-600 text-white'
+                  ? 'bg-emerald-600 text-white shadow'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
-              Type Details
+              ✏️ Enter Details
+            </button>
+            <button
+              type="button"
+              onClick={() => setVehicleInputMode('picker')}
+              className={`px-2.5 py-1 rounded-md font-bold transition cursor-pointer ${
+                vehicleInputMode === 'picker'
+                  ? 'bg-emerald-600 text-white shadow'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              📋 Fleet List
             </button>
           </div>
         }
@@ -452,9 +452,16 @@ export const JourneySetup: React.FC = () => {
           <div className="space-y-2">
             <select
               value={selectedVehicleId}
-              onChange={(e) => setSelectedVehicleId(e.target.value)}
+              onChange={(e) => {
+                if (e.target.value === 'custom') {
+                  setVehicleInputMode('custom');
+                } else {
+                  setSelectedVehicleId(e.target.value);
+                }
+              }}
               className="w-full px-3 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500 font-medium cursor-pointer"
             >
+              <option value="custom">✏️ + Enter Custom Vehicle (Plate No & Model)...</option>
               {vehicles.map((v) => (
                 <option key={v.id} value={v.id}>
                   {v.registration_number} — {v.model} ({v.vehicle_type})
@@ -466,7 +473,7 @@ export const JourneySetup: React.FC = () => {
               onClick={() => setVehicleInputMode('custom')}
               className="text-[11px] text-emerald-400 hover:underline block font-semibold cursor-pointer"
             >
-              Or type custom vehicle plate & details directly &rarr;
+              ✏️ Need custom plate or personal vehicle? Click here to type details &rarr;
             </button>
           </div>
         ) : (
