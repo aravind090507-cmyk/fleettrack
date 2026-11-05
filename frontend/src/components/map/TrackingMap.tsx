@@ -69,16 +69,22 @@ export const TrackingMap: React.FC<TrackingMapProps> = ({
   destination,
   routeHistory = [],
 }) => {
-  const currentPos: [number, number] = currentLocation
-    ? [currentLocation.latitude, currentLocation.longitude]
-    : [origin.lat, origin.lng];
+  const safeOriginLat = origin?.lat ?? 12.9716;
+  const safeOriginLng = origin?.lng ?? 77.5946;
+  const safeDestLat = destination?.lat ?? safeOriginLat;
+  const safeDestLng = destination?.lng ?? safeOriginLng;
+
+  const currentPos: [number, number] =
+    currentLocation && !isNaN(currentLocation.latitude) && !isNaN(currentLocation.longitude)
+      ? [currentLocation.latitude, currentLocation.longitude]
+      : [safeOriginLat, safeOriginLng];
 
   const vehicleIcon = createPulseVehicleIcon(currentLocation?.heading || 0);
 
   // Combine route coordinates: Origin -> Route History -> Current Position
   const polylineCoords: [number, number][] = [
-    [origin.lat, origin.lng],
-    ...routeHistory,
+    [safeOriginLat, safeOriginLng],
+    ...routeHistory.filter(([lat, lng]) => !isNaN(lat) && !isNaN(lng)),
     currentPos,
   ];
 
@@ -99,19 +105,19 @@ export const TrackingMap: React.FC<TrackingMapProps> = ({
         <MapPanFollower center={currentPos} />
 
         {/* Origin Marker */}
-        <Marker position={[origin.lat, origin.lng]} icon={originIcon}>
+        <Marker position={[safeOriginLat, safeOriginLng]} icon={originIcon}>
           <Popup>
             <div className="p-1 text-slate-900 font-semibold text-xs">
-              <strong>Origin:</strong> {origin.name}
+              <strong>Origin:</strong> {origin?.name || 'Start Point'}
             </div>
           </Popup>
         </Marker>
 
         {/* Destination Marker */}
-        <Marker position={[destination.lat, destination.lng]} icon={destinationIcon}>
+        <Marker position={[safeDestLat, safeDestLng]} icon={destinationIcon}>
           <Popup>
             <div className="p-1 text-slate-900 font-semibold text-xs">
-              <strong>Destination:</strong> {destination.name}
+              <strong>Destination:</strong> {destination?.name || 'Destination'}
             </div>
           </Popup>
         </Marker>

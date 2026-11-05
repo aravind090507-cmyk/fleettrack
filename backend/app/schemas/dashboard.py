@@ -32,6 +32,18 @@ class ActiveVehicleResponse(BaseModel):
     latest_recorded_at: Optional[datetime] = None
 
 
+class TripAlertResponse(BaseModel):
+    id: str
+    journey_id: str
+    vehicle_registration: Optional[str] = None
+    driver_name: Optional[str] = None
+    event_type: str
+    latitude: float
+    longitude: float
+    metadata_json: dict = {}
+    created_at: datetime
+
+
 class ActiveJourneyResponse(BaseModel):
     journey_id: str
     vehicle_id: str
@@ -49,3 +61,5 @@ class ActiveJourneyResponse(BaseModel):
     duration_seconds: int
     total_distance_km: float
     latest_location: Optional[LocationPing] = None
+    latest_event_type: Optional[str] = None
+    latest_event_at: Optional[datetime] = None

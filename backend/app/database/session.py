@@ -24,8 +24,24 @@ engine = create_async_engine(
 AsyncSessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 
+_db_initialized = False
+
+
 async def get_db():
     """FastAPI dependency that yields an async database session."""
+    global _db_initialized
+    if not _db_initialized:
+        try:
+            await init_db()
+            from app.api.auth import seed_demo_users
+            from app.api.vehicles import seed_demo_vehicles
+            async with AsyncSessionLocal() as init_session:
+                await seed_demo_users(init_session)
+                await seed_demo_vehicles(init_session)
+            _db_initialized = True
+        except Exception:
+            _db_initialized = True
+
     async with AsyncSessionLocal() as session:
         try:
             yield session

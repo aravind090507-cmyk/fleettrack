@@ -7,6 +7,7 @@ import {
   LatestLocation,
   LocationPing,
   TrackingInfo,
+  TripAlert,
   User,
   Vehicle,
 } from '../types';
@@ -14,7 +15,12 @@ import {
 export const getApiBaseUrl = (): string => {
   const custom = localStorage.getItem('fleet_backend_url');
   if (custom && custom.trim()) {
-    return custom.trim().replace(/\/$/, '');
+    const trimmed = custom.trim().replace(/\/$/, '');
+    // If the app is served over HTTPS (e.g. Vercel) but custom url is insecure http://, browser will block it
+    if (typeof window !== 'undefined' && window.location.protocol === 'https:' && trimmed.startsWith('http://')) {
+      return '';
+    }
+    return trimmed;
   }
   return import.meta.env.VITE_API_BASE_URL || '';
 };
@@ -199,6 +205,10 @@ export const dashboardApi = {
   getActiveJourneys: async () => {
     const { data } = await api.get('/api/dashboard/active-journeys');
     return data as ActiveJourneyTelemetry[];
+  },
+  getRecentEvents: async (limit = 20) => {
+    const { data } = await api.get(`/api/dashboard/events?limit=${limit}`);
+    return data as TripAlert[];
   },
 };
 

@@ -363,7 +363,8 @@ export const JourneySetup: React.FC = () => {
         vehicle_registration: res.vehicle_registration,
       };
 
-      setJourney(newJourney, res.tracking_url, res.tracking_token);
+      const trackingUrl = `${window.location.origin}/track/${res.tracking_token}`;
+      setJourney(newJourney, trackingUrl, res.tracking_token);
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to start journey. Check network.');
     } finally {

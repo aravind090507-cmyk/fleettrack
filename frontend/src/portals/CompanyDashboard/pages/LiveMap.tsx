@@ -1,8 +1,29 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Search, Navigation, Filter, Radio, Route, Car, X, RefreshCw, Clock, ArrowRight, Gauge } from 'lucide-react';
+import {
+  Search,
+  Navigation,
+  Filter,
+  Radio,
+  Route,
+  Car,
+  X,
+  RefreshCw,
+  Clock,
+  ArrowRight,
+  Gauge,
+  AlertTriangle,
+  Coffee,
+  Wrench,
+  ExternalLink,
+} from 'lucide-react';
 import { dashboardApi, journeysApi, locationApi } from '../../../services/api';
-import { ActiveJourneyTelemetry, ActiveVehicleTelemetry, WebSocketMessage } from '../../../types';
+import {
+  ActiveJourneyTelemetry,
+  ActiveVehicleTelemetry,
+  TripAlert,
+  WebSocketMessage,
+} from '../../../types';
 import { FleetMap, SelectedTransitInfo } from '../../../components/map/FleetMap';
 import { useWebSocket } from '../../../hooks/useWebSocket';
 import { useAuthStore } from '../../../store/authStore';
@@ -14,6 +35,8 @@ export const LiveMap: React.FC = () => {
 
   const [vehicles, setVehicles] = useState<ActiveVehicleTelemetry[]>([]);
   const [activeJourneys, setActiveJourneys] = useState<ActiveJourneyTelemetry[]>([]);
+  const [recentEvents, setRecentEvents] = useState<TripAlert[]>([]);
+  const [dismissedAlertId, setDismissedAlertId] = useState<string | null>(null);
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
   const [selectedTransit, setSelectedTransit] = useState<SelectedTransitInfo | null>(null);
   const [journeyPath, setJourneyPath] = useState<[number, number][]>([]);
@@ -28,12 +51,14 @@ export const LiveMap: React.FC = () => {
   // Load telemetry data from backend
   const loadFleetData = useCallback(async () => {
     try {
-      const [vData, jData] = await Promise.all([
+      const [vData, jData, eData] = await Promise.all([
         dashboardApi.getActiveVehicles(),
         dashboardApi.getActiveJourneys(),
+        dashboardApi.getRecentEvents().catch(() => [] as TripAlert[]),
       ]);
       setVehicles(vData);
       setActiveJourneys(jData);
+      setRecentEvents(eData);
 
       // If a transit is currently selected, update its path
       const current = selectedTransitRef.current;
@@ -107,6 +132,8 @@ export const LiveMap: React.FC = () => {
       driver_name: transit.driver_name,
       status: transit.status,
       total_distance_km: transit.total_distance_km,
+      latest_event_type: transit.latest_event_type,
+      latest_speed: transit.latest_location?.speed,
     });
     setSelectedVehicleId(transit.vehicle_id);
 
@@ -183,7 +210,7 @@ export const LiveMap: React.FC = () => {
         if (current && (current.journey_id === jId || (current as any).vehicle_id === vId)) {
           setJourneyPath((prev) => [...prev, [msg.latitude, msg.longitude]]);
         }
-      } else if (msg.type === 'JOURNEY_FINISHED' || msg.type === 'JOURNEY_COMPLETED') {
+      } else if (msg.type === 'JOURNEY_FINISHED' || msg.type === 'JOURNEY_COMPLETED' || msg.type === 'TRIP_EVENT') {
         loadFleetData();
       }
     },
@@ -196,6 +223,15 @@ export const LiveMap: React.FC = () => {
     url: wsUrl,
     onMessage: handleWebSocketMessage,
   });
+
+  // Most critical unread incident across fleet (SOS takes highest precedence)
+  const criticalAlert = useMemo(() => {
+    return recentEvents.find(
+      (ev) =>
+        ev.id !== dismissedAlertId &&
+        (ev.event_type === 'SOS' || ev.event_type === 'BREAKDOWN' || ev.event_type === 'BREAK_START')
+    );
+  }, [recentEvents, dismissedAlertId]);
 
   const filteredVehicles = vehicles.filter(
     (v) =>
@@ -230,10 +266,142 @@ export const LiveMap: React.FC = () => {
           journeyPath={journeyPath}
         />
 
-        {/* Selected Transit Active Floating HUD */}
+        {/* 1. Real-time Clickable Active Trips Bar across top of map */}
+        <div className="absolute top-4 left-4 right-96 z-20 flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none pointer-events-auto">
+          {activeJourneys.length === 0 ? (
+            <div className="px-3.5 py-1.5 bg-slate-900/90 border border-slate-800 rounded-full text-xs font-semibold text-slate-400 backdrop-blur-md shadow-lg flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-slate-600" />
+              <span>No active trips running — Ready for dispatches</span>
+            </div>
+          ) : (
+            activeJourneys.map((j) => {
+              const isSelected = selectedTransit?.journey_id === j.journey_id || selectedTransit?.id === j.journey_id;
+              const isSos = j.latest_event_type === 'SOS';
+              const isBreakdown = j.latest_event_type === 'BREAKDOWN';
+              const isBreak = j.latest_event_type === 'BREAK_START';
+
+              return (
+                <button
+                  key={j.journey_id}
+                  onClick={() => handleSelectTransit(j)}
+                  className={`flex-shrink-0 flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-bold transition-all shadow-xl backdrop-blur-md cursor-pointer ${
+                    isSelected
+                      ? 'bg-emerald-950/95 border-emerald-400 text-white ring-2 ring-emerald-500/50 scale-105'
+                      : isSos
+                      ? 'bg-rose-950/90 border-rose-500 text-rose-200 animate-pulse'
+                      : isBreakdown
+                      ? 'bg-amber-950/90 border-amber-500 text-amber-200'
+                      : isBreak
+                      ? 'bg-yellow-950/90 border-yellow-500 text-yellow-200'
+                      : 'bg-slate-900/90 border-slate-800 hover:border-emerald-500 text-slate-200 hover:bg-slate-800'
+                  }`}
+                >
+                  <span
+                    className={`w-2 h-2 rounded-full ${
+                      isSos
+                        ? 'bg-rose-500 animate-ping'
+                        : isBreakdown
+                        ? 'bg-amber-400 animate-bounce'
+                        : isBreak
+                        ? 'bg-yellow-400'
+                        : 'bg-emerald-400 animate-pulse'
+                    }`}
+                  />
+                  <span className="font-mono">{j.vehicle_registration}</span>
+                  <span className="text-[10px] text-slate-400 font-normal truncate max-w-[70px]">{j.driver_name}</span>
+                  {isSos && (
+                    <span className="bg-rose-600 text-white px-1.5 py-0.2 rounded text-[9px] uppercase font-black">
+                      SOS
+                    </span>
+                  )}
+                  {isBreakdown && (
+                    <span className="bg-amber-600 text-white px-1.5 py-0.2 rounded text-[9px] uppercase font-black">
+                      BROKEN
+                    </span>
+                  )}
+                  {isBreak && (
+                    <span className="bg-yellow-600 text-slate-950 px-1.5 py-0.2 rounded text-[9px] uppercase font-black">
+                      BREAK
+                    </span>
+                  )}
+                  <span className="font-mono text-[10px] text-emerald-400 font-bold bg-slate-950/90 px-1.5 py-0.5 rounded-md border border-slate-800">
+                    {j.latest_location?.speed || 0} km/h
+                  </span>
+                </button>
+              );
+            })
+          )}
+        </div>
+
+        {/* 2. Critical Incident Alert Banner (SOS / Breakdown / Break) */}
+        {criticalAlert && (
+          <div className="absolute top-16 left-4 right-96 z-20 animate-in fade-in slide-in-from-top-3 duration-300 pointer-events-auto">
+            <div
+              className={`p-3 rounded-2xl border shadow-2xl backdrop-blur-xl flex items-center justify-between gap-3 ${
+                criticalAlert.event_type === 'SOS'
+                  ? 'bg-rose-950/95 border-rose-500 text-rose-200 animate-pulse ring-2 ring-rose-500/50'
+                  : criticalAlert.event_type === 'BREAKDOWN'
+                  ? 'bg-amber-950/95 border-amber-500 text-amber-200 ring-1 ring-amber-500/50'
+                  : 'bg-yellow-950/95 border-yellow-500 text-yellow-200'
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                {criticalAlert.event_type === 'SOS' ? (
+                  <AlertTriangle className="w-5 h-5 text-rose-400 animate-bounce shrink-0" />
+                ) : criticalAlert.event_type === 'BREAKDOWN' ? (
+                  <Wrench className="w-5 h-5 text-amber-400 shrink-0" />
+                ) : (
+                  <Coffee className="w-5 h-5 text-yellow-400 shrink-0" />
+                )}
+                <div className="text-xs">
+                  <strong className="uppercase font-black block tracking-wider">
+                    {criticalAlert.event_type === 'SOS'
+                      ? '🚨 CRITICAL SOS EMERGENCY BROADCAST'
+                      : criticalAlert.event_type === 'BREAKDOWN'
+                      ? '⚠️ DRIVER REPORTED VEHICLE BREAKDOWN'
+                      : '☕ DRIVER ON REST BREAK'}
+                  </strong>
+                  <span>
+                    Unit <strong>{criticalAlert.vehicle_registration || 'Vehicle'}</strong> • Driver{' '}
+                    <strong>{criticalAlert.driver_name || 'Driver'}</strong>
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const matchingJourney = activeJourneys.find((j) => j.journey_id === criticalAlert.journey_id);
+                    if (matchingJourney) {
+                      handleSelectTransit(matchingJourney);
+                    }
+                  }}
+                  className="px-3 py-1 bg-white text-slate-900 font-bold rounded-xl text-xs hover:bg-slate-200 shadow-md flex items-center gap-1 cursor-pointer transition"
+                >
+                  <span>Locate Trip</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDismissedAlertId(criticalAlert.id)}
+                  className="p-1 text-slate-400 hover:text-white rounded-lg cursor-pointer"
+                  title="Dismiss alert banner"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 3. Selected Transit Active Floating HUD */}
         {selectedTransit && (
-          <div className="absolute top-4 left-4 z-20 max-w-md w-full animate-in fade-in slide-in-from-top-2 duration-300">
-            <div className="bg-slate-900/95 border border-emerald-500/40 backdrop-blur-xl p-4 rounded-2xl shadow-2xl space-y-3">
+          <div
+            className={`absolute left-4 z-20 max-w-sm w-full animate-in fade-in slide-in-from-top-2 duration-300 pointer-events-auto ${
+              criticalAlert ? 'top-32' : 'top-16'
+            }`}
+          >
+            <div className="bg-slate-900/95 border border-emerald-500/50 backdrop-blur-xl p-4 rounded-2xl shadow-2xl space-y-3">
               <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
                 <div className="flex items-center gap-2">
                   <div className="w-7 h-7 rounded-lg bg-emerald-950 border border-emerald-800 flex items-center justify-center text-emerald-400">
@@ -248,10 +416,21 @@ export const LiveMap: React.FC = () => {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  {selectedTransit.status === 'COMPLETED' ? (
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-950/80 text-blue-400 border border-blue-800 flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
-                      COMPLETED TRIP
+                  {selectedTransit.latest_event_type === 'SOS' ? (
+                    <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-rose-950 text-rose-300 border border-rose-600 animate-pulse">
+                      🚨 SOS ACTIVE
+                    </span>
+                  ) : selectedTransit.latest_event_type === 'BREAKDOWN' ? (
+                    <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-950 text-amber-300 border border-amber-600">
+                      ⚠️ BREAKDOWN
+                    </span>
+                  ) : selectedTransit.latest_event_type === 'BREAK_START' ? (
+                    <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-yellow-950 text-yellow-300 border border-yellow-600">
+                      ☕ ON BREAK
+                    </span>
+                  ) : selectedTransit.status === 'COMPLETED' ? (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-950/80 text-blue-400 border border-blue-800">
+                      COMPLETED
                     </span>
                   ) : (
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-950/80 text-emerald-400 border border-emerald-800 flex items-center gap-1">
@@ -261,7 +440,7 @@ export const LiveMap: React.FC = () => {
                   )}
                   <button
                     onClick={handleClearTransit}
-                    className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+                    className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
                     title="Close Transit View"
                   >
                     <X className="w-4 h-4" />
@@ -270,7 +449,7 @@ export const LiveMap: React.FC = () => {
               </div>
 
               {/* Origin -> Destination Route Display */}
-              <div className="grid grid-cols-2 gap-3 bg-slate-950/80 p-2.5 rounded-xl border border-slate-800/80 text-xs">
+              <div className="grid grid-cols-2 gap-2 bg-slate-950/80 p-2.5 rounded-xl border border-slate-800/80 text-xs">
                 <div>
                   <span className="text-[10px] text-emerald-400 font-bold uppercase block flex items-center gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
@@ -293,10 +472,12 @@ export const LiveMap: React.FC = () => {
                   <Gauge className="w-3.5 h-3.5 text-emerald-400" />
                   <span>
                     GPS Breadcrumbs:{' '}
-                    <strong className="text-white font-mono">{journeyPath.length} recorded pings</strong>
+                    <strong className="text-white font-mono">{journeyPath.length} pings</strong>
                   </span>
                 </div>
-                <span className="text-slate-500 font-mono text-[10px]">Auto-refreshing 2s</span>
+                <span className="text-emerald-400 font-mono font-bold">
+                  {selectedTransit.latest_speed || 0} km/h
+                </span>
               </div>
             </div>
           </div>
@@ -318,7 +499,7 @@ export const LiveMap: React.FC = () => {
                   : 'bg-emerald-950/50 text-emerald-300 border-emerald-700'
               }`}
             >
-              {isConnected ? 'LIVE WS' : 'AUTO-POLLING 2s'}
+              {isConnected ? 'LIVE WS' : 'AUTO-POLLING 2.5s'}
             </span>
           </div>
 
@@ -326,7 +507,7 @@ export const LiveMap: React.FC = () => {
           <div className="grid grid-cols-2 gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs">
             <button
               onClick={() => setActiveTab('transits')}
-              className={`py-1.5 rounded-lg font-bold flex items-center justify-center gap-1.5 transition ${
+              className={`py-1.5 rounded-lg font-bold flex items-center justify-center gap-1.5 transition cursor-pointer ${
                 activeTab === 'transits'
                   ? 'bg-emerald-600 text-white shadow-md'
                   : 'text-slate-400 hover:text-slate-200'
@@ -337,7 +518,7 @@ export const LiveMap: React.FC = () => {
             </button>
             <button
               onClick={() => setActiveTab('vehicles')}
-              className={`py-1.5 rounded-lg font-bold flex items-center justify-center gap-1.5 transition ${
+              className={`py-1.5 rounded-lg font-bold flex items-center justify-center gap-1.5 transition cursor-pointer ${
                 activeTab === 'vehicles'
                   ? 'bg-slate-800 text-white shadow-md'
                   : 'text-slate-400 hover:text-slate-200'
@@ -352,7 +533,7 @@ export const LiveMap: React.FC = () => {
             <Search className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
             <input
               type="text"
-              placeholder={activeTab === 'transits' ? 'Search transit destination, driver...' : 'Search registration, model...'}
+              placeholder={activeTab === 'transits' ? 'Search destination, driver, vehicle...' : 'Search registration, model...'}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full pl-9 pr-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
@@ -372,6 +553,10 @@ export const LiveMap: React.FC = () => {
             ) : (
               filteredJourneys.map((j) => {
                 const isSelected = selectedTransit?.journey_id === j.journey_id || selectedTransit?.id === j.journey_id;
+                const isSos = j.latest_event_type === 'SOS';
+                const isBreakdown = j.latest_event_type === 'BREAKDOWN';
+                const isBreak = j.latest_event_type === 'BREAK_START';
+
                 return (
                   <div
                     key={j.journey_id}
@@ -379,15 +564,33 @@ export const LiveMap: React.FC = () => {
                     className={`p-3 rounded-xl cursor-pointer transition-all ${
                       isSelected
                         ? 'bg-emerald-950/60 border border-emerald-500/80 shadow-lg shadow-emerald-950/50'
+                        : isSos
+                        ? 'bg-rose-950/40 border border-rose-800/70 hover:bg-rose-950/60'
+                        : isBreakdown
+                        ? 'bg-amber-950/40 border border-amber-800/70 hover:bg-amber-950/60'
                         : 'hover:bg-slate-800/60 border border-transparent bg-slate-950/40'
                     }`}
                   >
                     <div className="flex items-center justify-between mb-1.5">
                       <span className="font-bold text-sm text-white font-mono">{j.vehicle_registration}</span>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800 uppercase flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                        In Transit
-                      </span>
+                      {isSos ? (
+                        <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-rose-950 text-rose-300 border border-rose-600 animate-pulse">
+                          🚨 SOS ACTIVE
+                        </span>
+                      ) : isBreakdown ? (
+                        <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-950 text-amber-300 border border-amber-600">
+                          ⚠️ BREAKDOWN
+                        </span>
+                      ) : isBreak ? (
+                        <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-yellow-950 text-yellow-300 border border-yellow-600">
+                          ☕ ON BREAK
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800 uppercase flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                          In Transit
+                        </span>
+                      )}
                     </div>
 
                     <div className="space-y-1 mb-2 text-xs">

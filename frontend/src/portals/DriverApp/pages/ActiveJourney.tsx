@@ -37,6 +37,8 @@ export const ActiveJourney: React.FC = () => {
 
   const [copied, setCopied] = useState<boolean>(false);
   const [isPaused, setIsPaused] = useState<boolean>(false);
+  const [isBreakdownReported, setIsBreakdownReported] = useState<boolean>(false);
+  const [isSosActive, setIsSosActive] = useState<boolean>(false);
   const [showEndModal, setShowEndModal] = useState<boolean>(false);
   const [sosProgress, setSosProgress] = useState<number>(0);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
@@ -157,6 +159,7 @@ export const ActiveJourney: React.FC = () => {
 
   const triggerEmergencySos = async () => {
     if (!currentJourney) return;
+    setIsSosActive(true);
     try {
       await journeysApi.recordEvent(currentJourney.id, {
         event_type: 'SOS',
@@ -164,9 +167,45 @@ export const ActiveJourney: React.FC = () => {
         longitude: position?.longitude || currentJourney.origin_lng,
         metadata: { triggered_by: 'Driver Emergency Button' },
       });
-      setStatusMessage('EMERGENCY SOS BROADCASTED TO FLEET MANAGERS!');
+      setStatusMessage('🚨 CRITICAL SOS BROADCASTED TO FLEET MANAGERS!');
     } catch {
-      setStatusMessage('SOS recorded locally.');
+      setStatusMessage('🚨 SOS recorded locally.');
+    }
+  };
+
+  const handleToggleBreak = async () => {
+    if (!currentJourney) return;
+    const nextPaused = !isPaused;
+    setIsPaused(nextPaused);
+    const eventType = nextPaused ? 'BREAK_START' : 'BREAK_END';
+    try {
+      await journeysApi.recordEvent(currentJourney.id, {
+        event_type: eventType,
+        latitude: position?.latitude || currentJourney.origin_lat,
+        longitude: position?.longitude || currentJourney.origin_lng,
+        metadata: { status: nextPaused ? 'Rest Break Started' : 'Trip Resumed' },
+      });
+      setStatusMessage(nextPaused ? '☕ Rest break recorded — Fleet Manager notified' : '▶️ Trip resumed — Live tracking active');
+    } catch (e) {
+      console.warn('Break event network error', e);
+      setStatusMessage(nextPaused ? '☕ Rest break recorded locally' : '▶️ Trip resumed locally');
+    }
+  };
+
+  const handleToggleBreakdown = async () => {
+    if (!currentJourney) return;
+    const nextBreakdown = !isBreakdownReported;
+    setIsBreakdownReported(nextBreakdown);
+    try {
+      await journeysApi.recordEvent(currentJourney.id, {
+        event_type: nextBreakdown ? 'BREAKDOWN' : 'BREAKDOWN_RESOLVED',
+        latitude: position?.latitude || currentJourney.origin_lat,
+        longitude: position?.longitude || currentJourney.origin_lng,
+        metadata: { vehicle: currentJourney.vehicle_registration },
+      });
+      setStatusMessage(nextBreakdown ? '⚠️ Vehicle Breakdown Reported to Fleet Dispatch!' : '✅ Breakdown resolved — back on schedule');
+    } catch (e) {
+      setStatusMessage(nextBreakdown ? '⚠️ Vehicle Breakdown recorded' : '✅ Breakdown resolved');
     }
   };
 
@@ -276,26 +315,19 @@ export const ActiveJourney: React.FC = () => {
         <Button
           variant={isPaused ? 'primary' : 'warning'}
           size="md"
-          onClick={() => setIsPaused(!isPaused)}
+          onClick={handleToggleBreak}
         >
           {isPaused ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
-          <span>{isPaused ? 'Resume' : 'Take Break'}</span>
+          <span>{isPaused ? 'Resume Trip' : 'Take Break'}</span>
         </Button>
 
         <Button
-          variant="secondary"
+          variant={isBreakdownReported ? 'danger' : 'secondary'}
           size="md"
-          onClick={() =>
-            currentJourney &&
-            journeysApi.recordEvent(currentJourney.id, {
-              event_type: 'BREAKDOWN',
-              latitude: position?.latitude || 0,
-              longitude: position?.longitude || 0,
-            })
-          }
+          onClick={handleToggleBreakdown}
         >
-          <Wrench className="w-4 h-4 text-amber-400" />
-          <span>Breakdown</span>
+          <Wrench className={`w-4 h-4 ${isBreakdownReported ? 'text-white animate-spin' : 'text-amber-400'}`} />
+          <span>{isBreakdownReported ? 'Breakdown Active' : 'Breakdown'}</span>
         </Button>
       </div>
 

@@ -17,6 +17,8 @@ export interface SelectedTransitInfo {
   driver_name?: string;
   status?: string;
   total_distance_km?: number;
+  latest_event_type?: string | null;
+  latest_speed?: number | null;
 }
 
 // Helper component to auto-pan or fit bounds

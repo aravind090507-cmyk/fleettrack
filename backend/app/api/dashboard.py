@@ -14,7 +14,7 @@ from app.models.location import Location
 from app.models.trip_event import TripEvent
 from app.models.user import User
 from app.models.vehicle import Vehicle
-from app.schemas.dashboard import ActiveJourneyResponse, ActiveVehicleResponse, OverviewResponse
+from app.schemas.dashboard import ActiveJourneyResponse, ActiveVehicleResponse, OverviewResponse, TripAlertResponse
 from app.schemas.location import LocationPing
 from app.security.dependencies import require_fleet_manager
 from app.services.redis_service import get_redis_service
@@ -155,7 +155,7 @@ async def get_active_journeys_dashboard(
     current_user: User = Depends(require_fleet_manager),
     db: AsyncSession = Depends(get_db),
 ):
-    """Retrieve all active dispatches with vehicle, driver, and live coordinates."""
+    """Retrieve all active dispatches with vehicle, driver, live coordinates, and latest status event."""
     stmt = (
         select(Journey)
         .where(Journey.status == "IN_PROGRESS")
@@ -163,6 +163,7 @@ async def get_active_journeys_dashboard(
             selectinload(Journey.vehicle),
             selectinload(Journey.driver),
             selectinload(Journey.locations),
+            selectinload(Journey.trip_events),
         )
         .order_by(Journey.started_at.desc())
     )
@@ -194,13 +195,15 @@ async def get_active_journeys_dashboard(
                 timestamp=j.started_at,
             )
 
+        latest_event = j.trip_events[-1] if j.trip_events else None
+
         output.append(
             ActiveJourneyResponse(
                 journey_id=j.id,
                 vehicle_id=j.vehicle_id,
-                vehicle_registration=j.vehicle.registration_number,
+                vehicle_registration=j.vehicle.registration_number if j.vehicle else "UNKNOWN",
                 driver_id=j.driver_id,
-                driver_name=j.driver.name,
+                driver_name=j.driver.name if j.driver else "Driver",
                 origin_name=j.origin_name,
                 origin_lat=j.origin_lat,
                 origin_lng=j.origin_lng,
@@ -212,6 +215,54 @@ async def get_active_journeys_dashboard(
                 duration_seconds=j.duration_seconds,
                 total_distance_km=j.total_distance_km,
                 latest_location=latest_ping_dto,
+                latest_event_type=latest_event.event_type if latest_event else None,
+                latest_event_at=latest_event.created_at if latest_event else None,
+            )
+        )
+
+    return output
+
+
+@router.get("/events", response_model=List[TripAlertResponse])
+async def get_recent_fleet_events(
+    limit: int = 20,
+    current_user: User = Depends(require_fleet_manager),
+    db: AsyncSession = Depends(get_db),
+):
+    """Retrieve recent fleet incidents (SOS, BREAKDOWN, BREAK_START, etc.)."""
+    stmt = (
+        select(TripEvent)
+        .options(
+            selectinload(TripEvent.journey).selectinload(Journey.vehicle),
+            selectinload(TripEvent.journey).selectinload(Journey.driver),
+        )
+        .order_by(TripEvent.created_at.desc())
+        .limit(limit)
+    )
+    result = await db.execute(stmt)
+    events = result.scalars().all()
+
+    output = []
+    for ev in events:
+        v_reg = None
+        d_name = None
+        if ev.journey:
+            if ev.journey.vehicle:
+                v_reg = ev.journey.vehicle.registration_number
+            if ev.journey.driver:
+                d_name = ev.journey.driver.name
+
+        output.append(
+            TripAlertResponse(
+                id=ev.id,
+                journey_id=ev.journey_id,
+                vehicle_registration=v_reg,
+                driver_name=d_name,
+                event_type=ev.event_type,
+                latitude=ev.latitude,
+                longitude=ev.longitude,
+                metadata_json=ev.metadata_json or {},
+                created_at=ev.created_at,
             )
         )
 

@@ -118,6 +118,20 @@ export interface ActiveJourneyTelemetry {
   duration_seconds: number;
   total_distance_km: number;
   latest_location: LocationPing | null;
+  latest_event_type?: string | null;
+  latest_event_at?: string | null;
+}
+
+export interface TripAlert {
+  id: string;
+  journey_id: string;
+  vehicle_registration?: string | null;
+  driver_name?: string | null;
+  event_type: string;
+  latitude: number;
+  longitude: number;
+  metadata_json?: Record<string, any>;
+  created_at: string;
 }
 
 export interface OfflineGPSRecord {

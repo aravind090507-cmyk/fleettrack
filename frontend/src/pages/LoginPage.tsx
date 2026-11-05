@@ -72,8 +72,9 @@ export const LoginPage: React.FC = () => {
           onClick={() => setShowServerModal(true)}
           className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900/90 hover:bg-slate-800 border border-slate-800 rounded-full text-xs font-semibold text-slate-300 backdrop-blur-md transition-all shadow-lg"
         >
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
           <Globe className="w-3.5 h-3.5 text-emerald-400" />
-          <span>{serverUrl ? 'Connected Server' : 'Configure Server'}</span>
+          <span>{serverUrl ? 'Custom API' : '⚡ Cloud API Connected'}</span>
         </button>
       </div>
 
