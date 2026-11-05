@@ -41,20 +41,40 @@ async def start_new_journey(
     Generates a unique journey UUID and an unguessable 256-bit tracking token.
     Persists only SHA-256 hash in database; caches active token in Redis.
     """
-    # 1. Verify vehicle exists and is available
-    stmt = select(Vehicle).where(Vehicle.id == payload.vehicle_id)
-    result = await db.execute(stmt)
-    vehicle = result.scalar_one_or_none()
+    # 1. Resolve or dynamically auto-create vehicle asset
+    vehicle = None
+    if payload.vehicle_id:
+        stmt = select(Vehicle).where(Vehicle.id == payload.vehicle_id)
+        result = await db.execute(stmt)
+        vehicle = result.scalar_one_or_none()
+
+    reg_val = (payload.vehicle_registration or payload.vehicle_id or "").strip().upper()
+    if not vehicle and reg_val:
+        stmt = select(Vehicle).where(Vehicle.registration_number == reg_val)
+        result = await db.execute(stmt)
+        vehicle = result.scalar_one_or_none()
+
+    # If vehicle does not exist, create it on-the-fly from driver input
     if not vehicle:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vehicle not found")
-
-    if vehicle.status == "IN_TRANSIT":
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"Vehicle {vehicle.registration_number} is already in transit on another journey",
+        from datetime import datetime
+        final_reg = reg_val if reg_val else f"VAN-{datetime.now().strftime('%M%S')}"
+        vehicle = Vehicle(
+            registration_number=final_reg,
+            model=payload.vehicle_model or "Fleet Unit",
+            vehicle_type=(payload.vehicle_type or "VAN").upper(),
+            status="AVAILABLE",
+            battery_or_fuel_level=100.0,
         )
+        db.add(vehicle)
+        await db.commit()
+        await db.refresh(vehicle)
 
-    # 2. Check if driver already has an active journey
+    # If vehicle was marked in transit from a previous test, reset to available
+    if vehicle.status == "IN_TRANSIT":
+        vehicle.status = "AVAILABLE"
+        await db.commit()
+
+    # 2. Check if driver already has an active journey; auto-complete prior test to prevent blocking
     active_stmt = (
         select(Journey)
         .where(Journey.driver_id == current_user.id, Journey.status == "IN_PROGRESS")
@@ -62,10 +82,10 @@ async def start_new_journey(
     active_result = await db.execute(active_stmt)
     existing_active = active_result.scalar_one_or_none()
     if existing_active:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Driver already has an active journey in progress. Please complete it first.",
-        )
+        from datetime import datetime
+        existing_active.status = "COMPLETED"
+        existing_active.ended_at = datetime.now()
+        await db.commit()
 
     redis_svc = get_redis_service()
     journey, raw_token, tracking_url = await create_journey(

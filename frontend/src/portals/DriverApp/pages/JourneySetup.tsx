@@ -98,6 +98,12 @@ export const JourneySetup: React.FC = () => {
   // Pin Placement Method Dropdown State: 'tap' | 'search' | 'coords'
   const [placementMode, setPlacementMode] = useState<'tap' | 'search' | 'coords'>('tap');
 
+  // Vehicle Selection Mode: 'picker' | 'custom'
+  const [vehicleInputMode, setVehicleInputMode] = useState<'picker' | 'custom'>('picker');
+  const [customPlate, setCustomPlate] = useState<string>('KA-01-AB-1234');
+  const [customModel, setCustomModel] = useState<string>('Delivery Van');
+  const [customType, setCustomType] = useState<string>('VAN');
+
   // Interactive Pinning Coordinates
   const [originCoords, setOriginCoords] = useState<[number, number]>([12.9716, 77.5946]);
   const [destCoords, setDestCoords] = useState<[number, number]>([12.9717, 77.5947]);
@@ -325,16 +331,14 @@ export const JourneySetup: React.FC = () => {
 
   const handleStartJourney = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedVehicleId) {
-      setError('Please select or add a vehicle first.');
-      return;
+    if (vehicleInputMode === 'picker' && !selectedVehicleId && vehicles.length > 0) {
+      setSelectedVehicleId(vehicles[0].id);
     }
     setError(null);
     setIsLoading(true);
 
     try {
-      const res = await journeysApi.start({
-        vehicle_id: selectedVehicleId,
+      const payload: any = {
         origin_name: originName,
         origin_lat: originCoords[0],
         origin_lng: originCoords[1],
@@ -342,11 +346,21 @@ export const JourneySetup: React.FC = () => {
         destination_lat: destCoords[0],
         destination_lng: destCoords[1],
         description,
-      });
+      };
+
+      if (vehicleInputMode === 'custom' || !selectedVehicleId || vehicles.length === 0) {
+        payload.vehicle_registration = (customPlate || 'KA-01-AB-1234').trim().toUpperCase();
+        payload.vehicle_model = (customModel || 'Fleet Vehicle').trim();
+        payload.vehicle_type = customType;
+      } else {
+        payload.vehicle_id = selectedVehicleId;
+      }
+
+      const res = await journeysApi.start(payload);
 
       const newJourney = {
         id: res.journey_id,
-        vehicle_id: selectedVehicleId,
+        vehicle_id: res.vehicle_registration,
         driver_id: res.journey_id,
         origin_name: originName,
         origin_lat: originCoords[0],
@@ -404,35 +418,114 @@ export const JourneySetup: React.FC = () => {
         </div>
       )}
 
-      {/* Vehicle Asset Picker */}
+      {/* Vehicle Asset Picker & Direct Input */}
       <Card
         title="Vehicle / Device Unit"
         action={
-          <button
-            type="button"
-            onClick={() => setShowAddVehicle(true)}
-            className="text-xs text-emerald-400 font-bold flex items-center gap-1 hover:text-emerald-300"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Add Unit</span>
-          </button>
+          <div className="flex items-center gap-1 bg-slate-950 p-0.5 rounded-lg border border-slate-800 text-[11px]">
+            <button
+              type="button"
+              onClick={() => setVehicleInputMode('picker')}
+              className={`px-2 py-0.5 rounded-md font-bold transition cursor-pointer ${
+                vehicleInputMode === 'picker'
+                  ? 'bg-emerald-600 text-white'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              Fleet List
+            </button>
+            <button
+              type="button"
+              onClick={() => setVehicleInputMode('custom')}
+              className={`px-2 py-0.5 rounded-md font-bold transition cursor-pointer ${
+                vehicleInputMode === 'custom'
+                  ? 'bg-emerald-600 text-white'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              Type Details
+            </button>
+          </div>
         }
       >
-        <select
-          value={selectedVehicleId}
-          onChange={(e) => setSelectedVehicleId(e.target.value)}
-          className="w-full px-3 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500 font-medium"
-        >
-          {vehicles.length === 0 ? (
-            <option value="">No vehicles found — click "+ Add Unit" above</option>
-          ) : (
-            vehicles.map((v) => (
-              <option key={v.id} value={v.id}>
-                {v.registration_number} — {v.model} ({v.vehicle_type})
-              </option>
-            ))
-          )}
-        </select>
+        {vehicleInputMode === 'picker' && vehicles.length > 0 ? (
+          <div className="space-y-2">
+            <select
+              value={selectedVehicleId}
+              onChange={(e) => setSelectedVehicleId(e.target.value)}
+              className="w-full px-3 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500 font-medium cursor-pointer"
+            >
+              {vehicles.map((v) => (
+                <option key={v.id} value={v.id}>
+                  {v.registration_number} — {v.model} ({v.vehicle_type})
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={() => setVehicleInputMode('custom')}
+              className="text-[11px] text-emerald-400 hover:underline block font-semibold cursor-pointer"
+            >
+              Or type custom vehicle plate & details directly &rarr;
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-3 pt-1">
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                  Plate / Registration *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. KA-01-AB-1234"
+                  value={customPlate}
+                  onChange={(e) => setCustomPlate(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white uppercase font-mono font-bold focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                  Vehicle Type
+                </label>
+                <select
+                  value={customType}
+                  onChange={(e) => setCustomType(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer"
+                >
+                  <option value="VAN">Van</option>
+                  <option value="TRUCK">Truck</option>
+                  <option value="CAR">Car</option>
+                  <option value="MOTORCYCLE">Motorcycle / Bike</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                Model / Vehicle Name
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. Delivery Van or Mercedes Sprinter"
+                value={customModel}
+                onChange={(e) => setCustomModel(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+              />
+            </div>
+
+            {vehicles.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setVehicleInputMode('picker')}
+                className="text-[11px] text-slate-400 hover:text-emerald-400 hover:underline block font-semibold cursor-pointer"
+              >
+                &larr; Switch back to fleet vehicle list
+              </button>
+            )}
+          </div>
+        )}
       </Card>
 
       {/* Pin Selection Mode Dropdown Card */}

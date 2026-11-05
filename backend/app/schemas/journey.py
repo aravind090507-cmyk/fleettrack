@@ -7,7 +7,10 @@ from pydantic import BaseModel, Field
 
 
 class JourneyStartRequest(BaseModel):
-    vehicle_id: str
+    vehicle_id: Optional[str] = None
+    vehicle_registration: Optional[str] = None
+    vehicle_model: Optional[str] = "Fleet Vehicle"
+    vehicle_type: Optional[str] = "VAN"
     origin_name: str = Field(..., min_length=1)
     origin_lat: float = Field(..., ge=-90.0, le=90.0)
     origin_lng: float = Field(..., ge=-180.0, le=180.0)

@@ -102,7 +102,10 @@ export const vehiclesApi = {
 // --- Journeys Endpoints ---
 export const journeysApi = {
   start: async (journeyData: {
-    vehicle_id: string;
+    vehicle_id?: string;
+    vehicle_registration?: string;
+    vehicle_model?: string;
+    vehicle_type?: string;
     origin_name: string;
     origin_lat: number;
     origin_lng: number;
