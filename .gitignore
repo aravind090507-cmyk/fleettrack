@@ -1,0 +1,56 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+.venv/
+backend/venv/
+fleettrack-ai/backend/venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+
+# Node / Frontend
+node_modules/
+frontend/node_modules/
+fleettrack-ai/frontend/node_modules/
+.parcel-cache/
+.cache/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment Variables & Secrets
+.env
+.env.local
+.env.production
+!.env.example
+
+# Databases
+*.db
+*.sqlite
+*.sqlite3
+backend/fleet_tracking.db
+fleettrack-ai/backend/fleet_tracking.db
+
+# Logs
+*.log
+logs/
+
+# Operating System & IDE
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+
+# Scratch & Temporary
+css_b64.txt
+test.txt
+cloudflared.exe

@@ -1,0 +1,48 @@
+"""
+Async SQLAlchemy engine and session management.
+Supports both SQLite (local dev) and PostgreSQL (production).
+"""
+from __future__ import annotations
+
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+
+from app.config.settings import get_settings
+
+settings = get_settings()
+
+# Connection args differ by backend
+connect_args = {}
+if settings.DATABASE_URL.startswith("sqlite"):
+    connect_args = {"check_same_thread": False}
+
+engine = create_async_engine(
+    settings.DATABASE_URL,
+    echo=False,
+    connect_args=connect_args,
+)
+
+AsyncSessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+
+async def get_db():
+    """FastAPI dependency that yields an async database session."""
+    async with AsyncSessionLocal() as session:
+        try:
+            yield session
+        finally:
+            await session.close()
+
+
+async def init_db():
+    """Create all tables from ORM models. Called once at startup."""
+    from app.database.base import Base
+    # Import all models so they register with Base.metadata
+    import app.models.user  # noqa: F401
+    import app.models.vehicle  # noqa: F401
+    import app.models.journey  # noqa: F401
+    import app.models.location  # noqa: F401
+    import app.models.tracking_link  # noqa: F401
+    import app.models.trip_event  # noqa: F401
+
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
