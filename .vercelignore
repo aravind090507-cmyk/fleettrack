@@ -1,0 +1,17 @@
+# Vercel Deployment Ignore
+# Ensure Vercel packages only the React/Vite frontend and ignores backend/python artifacts
+
+backend/
+api/
+infrastructure/
+docs/
+.pytest_cache/
+tests/
+Dockerfile
+docker-compose.yml
+Procfile
+requirements.txt
+fleettrack.db
+*.py
+*.sqlite
+*.sqlite3

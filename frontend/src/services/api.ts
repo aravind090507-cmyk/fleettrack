@@ -18,11 +18,19 @@ if (typeof window !== 'undefined') {
 }
 
 export const getApiBaseUrl = (): string => {
-  return (
+  const envUrl = (
     import.meta.env.VITE_API_URL ||
     import.meta.env.VITE_API_BASE_URL ||
     ''
   ).replace(/\/$/, '');
+  if (envUrl) return envUrl;
+
+  // When running on Vercel preview or production deployments, default to Railway backend
+  if (typeof window !== 'undefined' && window.location.hostname.includes('vercel.app')) {
+    return 'https://fleettrack-production-dba9.up.railway.app';
+  }
+
+  return '';
 };
 
 const api = axios.create({

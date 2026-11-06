@@ -2,7 +2,24 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "buildCommand": "npm run build",
   "outputDirectory": "frontend/dist",
+  "framework": null,
   "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://fleettrack-production-dba9.up.railway.app/api/:path*"
+    },
+    {
+      "source": "/health",
+      "destination": "https://fleettrack-production-dba9.up.railway.app/health"
+    },
+    {
+      "source": "/docs",
+      "destination": "https://fleettrack-production-dba9.up.railway.app/docs"
+    },
+    {
+      "source": "/openapi.json",
+      "destination": "https://fleettrack-production-dba9.up.railway.app/openapi.json"
+    },
     {
       "source": "/(.*)",
       "destination": "/index.html"
