@@ -22,6 +22,8 @@ class JourneyStartRequest(BaseModel):
 
 class JourneyStartResponse(BaseModel):
     journey_id: str
+    vehicle_id: str
+    driver_id: str
     tracking_token: str
     tracking_url: str
     status: str

@@ -157,13 +157,23 @@ async def get_active_vehicles_with_telemetry(
             sorted_evs = sorted(active_j.trip_events, key=lambda e: e.created_at)
             latest_ev_type = sorted_evs[-1].event_type
 
-        # Default depot coordinates if parked/available so units appear on the fleet map
+        # If vehicle has no active journey or Redis cache, resolve its most recent historical location
         if lat is None and lng is None:
-            idx = vehicles.index(v)
-            lat = 12.9716 + (idx * 0.0025)
-            lng = 77.5946 + (idx * 0.0025)
-            speed = 0.0
-            heading = 0.0
+            last_loc_stmt = (
+                select(Location)
+                .join(Journey, Location.journey_id == Journey.id)
+                .where(Journey.vehicle_id == v.id)
+                .order_by(Location.recorded_at.desc())
+                .limit(1)
+            )
+            last_loc_res = await db.execute(last_loc_stmt)
+            last_loc = last_loc_res.scalar_one_or_none()
+            if last_loc:
+                lat = last_loc.latitude
+                lng = last_loc.longitude
+                speed = 0.0
+                heading = last_loc.heading or 0.0
+                rec_at = last_loc.recorded_at
 
         output.append(
             ActiveVehicleResponse(
@@ -210,30 +220,45 @@ async def get_active_journeys_dashboard(
     journeys = result.scalars().all()
 
     output = []
+    redis_svc = get_redis_service()
     for j in journeys:
-        sorted_locs = sorted(j.locations, key=lambda l: l.recorded_at) if j.locations else []
-        latest_loc = sorted_locs[-1] if sorted_locs else None
+        # Check Redis first for sub-millisecond live telemetry
+        redis_loc = await redis_svc.get_latest_vehicle_location(j.vehicle_id)
         latest_ping_dto = None
-        if latest_loc:
+        if redis_loc:
+            from datetime import datetime
             latest_ping_dto = LocationPing(
-                latitude=latest_loc.latitude,
-                longitude=latest_loc.longitude,
-                speed=latest_loc.speed,
-                heading=latest_loc.heading,
-                accuracy=latest_loc.accuracy,
-                altitude=latest_loc.altitude,
-                timestamp=latest_loc.recorded_at,
+                latitude=redis_loc["latitude"],
+                longitude=redis_loc["longitude"],
+                speed=redis_loc.get("speed") or 0.0,
+                heading=redis_loc.get("heading") or 0.0,
+                accuracy=0.0,
+                altitude=0.0,
+                timestamp=datetime.fromisoformat(redis_loc["timestamp"]) if redis_loc.get("timestamp") else j.started_at,
             )
         else:
-            latest_ping_dto = LocationPing(
-                latitude=j.origin_lat,
-                longitude=j.origin_lng,
-                speed=0.0,
-                heading=0.0,
-                accuracy=5.0,
-                altitude=0.0,
-                timestamp=j.started_at,
-            )
+            sorted_locs = sorted(j.locations, key=lambda l: l.recorded_at) if j.locations else []
+            latest_loc = sorted_locs[-1] if sorted_locs else None
+            if latest_loc:
+                latest_ping_dto = LocationPing(
+                    latitude=latest_loc.latitude,
+                    longitude=latest_loc.longitude,
+                    speed=latest_loc.speed,
+                    heading=latest_loc.heading,
+                    accuracy=latest_loc.accuracy,
+                    altitude=latest_loc.altitude,
+                    timestamp=latest_loc.recorded_at,
+                )
+            else:
+                latest_ping_dto = LocationPing(
+                    latitude=j.origin_lat,
+                    longitude=j.origin_lng,
+                    speed=0.0,
+                    heading=0.0,
+                    accuracy=5.0,
+                    altitude=0.0,
+                    timestamp=j.started_at,
+                )
 
         sorted_events = sorted(j.trip_events, key=lambda e: e.created_at) if j.trip_events else []
         latest_event = sorted_events[-1] if sorted_events else None

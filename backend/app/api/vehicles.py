@@ -96,7 +96,10 @@ async def create_vehicle(
     db.add(vehicle)
     await db.commit()
     await db.refresh(vehicle)
-    return VehicleResponse.model_validate(vehicle)
+    resp = VehicleResponse.model_validate(vehicle)
+    if assigned_id == current_user.id:
+        resp.assigned_driver_name = current_user.name
+    return resp
 
 
 @router.get("/{vehicle_id}", response_model=VehicleResponse)

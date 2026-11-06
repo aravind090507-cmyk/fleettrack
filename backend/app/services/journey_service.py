@@ -158,8 +158,8 @@ async def create_journey(
         timestamp=now.isoformat(),
     )
 
-    # 7. Formulate public tracking URL
-    tracking_url = f"{settings.BASE_URL}/track/{raw_token}"
+    # 7. Formulate public tracking URL (relative path, dynamic domain resolution on client)
+    tracking_url = f"/track/{raw_token}"
     return journey, raw_token, tracking_url
 
 

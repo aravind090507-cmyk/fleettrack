@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import {
   Share2,
@@ -33,6 +33,7 @@ export const ActiveJourney: React.FC = () => {
   const {
     currentJourney,
     trackingUrl,
+    trackingToken,
     simulatedMode,
     toggleSimulatedMode,
     setGPSStatus,
@@ -51,6 +52,22 @@ export const ActiveJourney: React.FC = () => {
   const [sosProgress, setSosProgress] = useState<number>(0);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [pingCount, setPingCount] = useState<number>(0);
+
+  // Guarantee clean public tracking URL (never hardcoded localhost on mobile)
+  const effectiveTrackingUrl = useMemo(() => {
+    const rawToken = trackingToken || (currentJourney as any)?.tracking_token || localStorage.getItem('fleet_active_token');
+    if (rawToken) {
+      return `${window.location.origin}/track/${rawToken}`;
+    }
+    if (trackingUrl) {
+      if (trackingUrl.startsWith('http') && !trackingUrl.includes('localhost')) {
+        return trackingUrl;
+      }
+      const path = trackingUrl.replace(/^https?:\/\/[^\/]+/, '');
+      return `${window.location.origin}${path.startsWith('/') ? '' : '/'}${path}`;
+    }
+    return '';
+  }, [trackingToken, trackingUrl, currentJourney]);
 
   const sosTimerRef = useRef<any>(null);
 
@@ -155,20 +172,20 @@ export const ActiveJourney: React.FC = () => {
 
   // Copy tracking link to clipboard
   const handleCopyLink = () => {
-    if (!trackingUrl) return;
-    navigator.clipboard.writeText(trackingUrl);
+    if (!effectiveTrackingUrl) return;
+    navigator.clipboard.writeText(effectiveTrackingUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
   };
 
   // Native share sheet if available
   const handleNativeShare = () => {
-    if (!trackingUrl) return;
+    if (!effectiveTrackingUrl) return;
     if (navigator.share) {
       navigator.share({
         title: `Live Fleet Tracking — ${currentJourney?.vehicle_registration}`,
         text: `Track my delivery progress live:`,
-        url: trackingUrl,
+        url: effectiveTrackingUrl,
       });
     } else {
       handleCopyLink();
@@ -377,7 +394,7 @@ export const ActiveJourney: React.FC = () => {
                 <input
                   type="text"
                   readOnly
-                  value={trackingUrl || ''}
+                  value={effectiveTrackingUrl || ''}
                   className="w-full bg-transparent text-xs text-emerald-400 font-mono truncate px-2 focus:outline-none"
                 />
                 <button
@@ -540,12 +557,12 @@ export const ActiveJourney: React.FC = () => {
       )}
 
       {/* QR Code Sharing Modal */}
-      {showQrModal && trackingUrl && (
+      {showQrModal && effectiveTrackingUrl && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-xs w-full space-y-4 shadow-2xl text-center">
             <h3 className="text-base font-bold text-white">Scan Live Tracking Link</h3>
             <div className="p-4 bg-white rounded-2xl flex items-center justify-center mx-auto shadow-inner w-fit">
-              <QRCodeSVG value={trackingUrl} size={180} level="M" />
+              <QRCodeSVG value={effectiveTrackingUrl} size={180} level="M" />
             </div>
             <p className="text-[11px] text-slate-400 leading-tight">
               Anyone scanning this code can monitor delivery progress in real time.

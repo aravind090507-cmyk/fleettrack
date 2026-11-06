@@ -155,10 +155,11 @@ async def ingest_location_ping(
 
     # 6. Push directly to active WebSocket subscribers
     await ws_mgr.broadcast_to_journey(journey.id, payload)
-    await ws_mgr.broadcast_to_fleet({
+    fleet_payload = {
+        **payload,
         "type": "VEHICLE_MOVED",
-        **payload
-    }, company_id=journey.company_id)
+    }
+    await ws_mgr.broadcast_to_fleet(fleet_payload, company_id=journey.company_id)
 
     return loc
 

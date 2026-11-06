@@ -34,13 +34,18 @@ export const useDriverStore = create<DriverState>((set) => ({
   simulatedMode: false,
 
   setJourney: (journey, trackingUrl, trackingToken) => {
-    if (trackingToken) {
-      localStorage.setItem('fleet_active_token', trackingToken);
+    const resolvedToken = trackingToken || (journey as any)?.tracking_token || localStorage.getItem('fleet_active_token') || null;
+    let resolvedUrl = trackingUrl;
+    if (resolvedToken && (!resolvedUrl || resolvedUrl.includes('localhost') || resolvedUrl.startsWith('/'))) {
+      resolvedUrl = `${window.location.origin}/track/${resolvedToken}`;
+    }
+    if (resolvedToken) {
+      localStorage.setItem('fleet_active_token', resolvedToken);
     }
     set({
       currentJourney: journey,
-      trackingUrl: trackingUrl || null,
-      trackingToken: trackingToken || null,
+      trackingUrl: resolvedUrl || null,
+      trackingToken: resolvedToken || null,
       gpsStatus: journey ? 'acquiring' : 'idle',
     });
   },

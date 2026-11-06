@@ -338,13 +338,34 @@ export const JourneySetup: React.FC = () => {
     setIsLoading(true);
 
     try {
+      let finalOriginLat = originCoords[0];
+      let finalOriginLng = originCoords[1];
+      let finalDestLat = destCoords[0];
+      let finalDestLng = destCoords[1];
+
+      // If user typed coordinates in manual coords mode, respect inputs directly
+      if (placementMode === 'coords') {
+        const parsedStartLat = parseFloat(startLatInput);
+        const parsedStartLng = parseFloat(startLngInput);
+        const parsedDestLat = parseFloat(destLatInput);
+        const parsedDestLng = parseFloat(destLngInput);
+        if (!isNaN(parsedStartLat) && !isNaN(parsedStartLng)) {
+          finalOriginLat = parsedStartLat;
+          finalOriginLng = parsedStartLng;
+        }
+        if (!isNaN(parsedDestLat) && !isNaN(parsedDestLng)) {
+          finalDestLat = parsedDestLat;
+          finalDestLng = parsedDestLng;
+        }
+      }
+
       const payload: any = {
         origin_name: originName,
-        origin_lat: originCoords[0],
-        origin_lng: originCoords[1],
+        origin_lat: finalOriginLat,
+        origin_lng: finalOriginLng,
         destination_name: destinationName,
-        destination_lat: destCoords[0],
-        destination_lng: destCoords[1],
+        destination_lat: finalDestLat,
+        destination_lng: finalDestLng,
         description,
       };
 
@@ -360,14 +381,14 @@ export const JourneySetup: React.FC = () => {
 
       const newJourney = {
         id: res.journey_id,
-        vehicle_id: res.vehicle_registration,
-        driver_id: res.journey_id,
+        vehicle_id: (res as any).vehicle_id || payload.vehicle_id || '',
+        driver_id: (res as any).driver_id || '',
         origin_name: originName,
-        origin_lat: originCoords[0],
-        origin_lng: originCoords[1],
+        origin_lat: finalOriginLat,
+        origin_lng: finalOriginLng,
         destination_name: destinationName,
-        destination_lat: destCoords[0],
-        destination_lng: destCoords[1],
+        destination_lat: finalDestLat,
+        destination_lng: finalDestLng,
         status: 'IN_PROGRESS' as const,
         description,
         total_distance_km: 0,

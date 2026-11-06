@@ -130,6 +130,8 @@ async def start_new_journey(
 
     return JourneyStartResponse(
         journey_id=journey.id,
+        vehicle_id=vehicle.id,
+        driver_id=current_user.id,
         tracking_token=raw_token,
         tracking_url=tracking_url,
         status=journey.status,

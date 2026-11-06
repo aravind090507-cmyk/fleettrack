@@ -86,11 +86,13 @@ class ConnectionManager:
         dead_sockets = []
         sockets = []
         async with self._lock:
-            if company_id and company_id in self.fleet_company_subscribers:
-                sockets.extend(self.fleet_company_subscribers[company_id])
+            if company_id:
+                if company_id in self.fleet_company_subscribers:
+                    sockets.extend(self.fleet_company_subscribers[company_id])
             else:
                 for comp_sockets in self.fleet_company_subscribers.values():
                     sockets.extend(comp_sockets)
+            # Global manager consoles receive all fleet events
             sockets.extend(self.fleet_subscribers)
 
         text_data = json.dumps(message)

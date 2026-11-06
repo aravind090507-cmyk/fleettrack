@@ -18,8 +18,10 @@ export const DriverApp: React.FC = () => {
       .then((activeList) => {
         if (activeList.length > 0) {
           const active = activeList[0];
-          // Restore active journey into store
-          setJourney(active);
+          const token = (active as any).tracking_token || localStorage.getItem('fleet_active_token') || undefined;
+          const trackingUrl = token ? `${window.location.origin}/track/${token}` : undefined;
+          // Restore active journey into store with resolved public tracking link
+          setJourney(active, trackingUrl, token);
         }
       })
       .catch((err) => {

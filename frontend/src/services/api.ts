@@ -121,6 +121,8 @@ export const journeysApi = {
     const { data } = await api.post('/api/journeys/start', journeyData);
     return data as {
       journey_id: string;
+      vehicle_id: string;
+      driver_id: string;
       tracking_token: string;
       tracking_url: string;
       status: string;
