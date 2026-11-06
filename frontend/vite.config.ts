@@ -2,13 +2,15 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
 // https://vitejs.dev/config/
-export default defineConfig(async () => {
+export default defineConfig(async ({ command }) => {
   const plugins = [react()];
-  try {
-    const basicSsl = (await import('@vitejs/plugin-basic-ssl')).default;
-    plugins.push(basicSsl());
-  } catch {
-    // Graceful fallback if basic-ssl is not yet installed
+  if (command === 'serve') {
+    try {
+      const basicSsl = (await import('@vitejs/plugin-basic-ssl')).default;
+      plugins.push(basicSsl());
+    } catch {
+      // Graceful fallback if basic-ssl is not installed
+    }
   }
 
   return {
