@@ -54,6 +54,7 @@ async def create_journey(
     destination_lng: float,
     description: Optional[str],
     redis_svc: RedisService,
+    company_id: Optional[str] = None,
 ) -> Tuple[Journey, str, str]:
     """
     Initiates a new journey, creates an unguessable 256-bit token,
@@ -74,6 +75,7 @@ async def create_journey(
 
     # Create Journey record first to populate journey.id
     journey = Journey(
+        company_id=company_id,
         vehicle_id=vehicle_id,
         driver_id=driver_id,
         origin_name=origin_name,
@@ -92,6 +94,7 @@ async def create_journey(
     # Generate self-healing signed cryptographic token (JWT)
     token_payload = {
         "jid": journey.id,
+        "cid": company_id,
         "vid": vehicle_id,
         "vreg": veh.registration_number if veh else "FLEET-01",
         "vtype": veh.vehicle_type if veh else "VAN",
@@ -245,7 +248,7 @@ async def end_journey(
         "journey_id": journey.id,
         "vehicle_id": journey.vehicle_id,
         "ended_at": now.isoformat()
-    })
+    }, company_id=journey.company_id)
 
     return journey
 
@@ -330,13 +333,20 @@ async def validate_tracking_token(
                 await db.flush()
 
             # 3. Restore Journey
+            cid = payload.get("cid")
             j_stmt = select(Journey).where(Journey.id == jid)
             j_res = await db.execute(j_stmt)
             restored_journey = j_res.scalar_one_or_none()
-            started_dt = datetime.fromisoformat(payload["st"]) if payload.get("st") else now
+            started_dt = now
+            if payload.get("st"):
+                try:
+                    started_dt = datetime.fromisoformat(payload["st"].replace("Z", "+00:00"))
+                except Exception:
+                    started_dt = now
             if not restored_journey:
                 restored_journey = Journey(
                     id=jid,
+                    company_id=cid,
                     vehicle_id=veh.id,
                     driver_id=driver_u.id,
                     origin_name=payload.get("oname", "Start Point"),
@@ -374,9 +384,20 @@ async def validate_tracking_token(
             db.add(restored_link)
             await db.commit()
 
-            restored_journey.vehicle = veh
-            restored_journey.driver = driver_u
-            return restored_journey, restored_link
+            # Re-fetch with eager loaded relationships to avoid DetachedInstanceError
+            rf_stmt = (
+                select(Journey)
+                .where(Journey.id == jid)
+                .options(selectinload(Journey.vehicle), selectinload(Journey.driver))
+            )
+            rf_res = await db.execute(rf_stmt)
+            final_journey = rf_res.scalar_one_or_none()
+            if not final_journey:
+                final_journey = restored_journey
+                final_journey.vehicle = veh
+                final_journey.driver = driver_u
+
+            return final_journey, restored_link
         except Exception as e:
             logger.info("Stateless JWT decode skipped/notice: %s. Checking direct DB match...", e)
 

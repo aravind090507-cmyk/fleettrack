@@ -29,28 +29,48 @@ async def get_fleet_overview(
     db: AsyncSession = Depends(get_db),
 ):
     """Aggregate high-level operational fleet metrics."""
+    cid = current_user.company_id
+
     # 1. Total vehicles
-    v_res = await db.execute(select(func.count(Vehicle.id)))
+    v_stmt = select(func.count(Vehicle.id))
+    if cid:
+        v_stmt = v_stmt.where(Vehicle.company_id == cid)
+    v_res = await db.execute(v_stmt)
     total_vehicles = v_res.scalar_one()
 
     # 2. In transit
-    it_res = await db.execute(select(func.count(Vehicle.id)).where(Vehicle.status == "IN_TRANSIT"))
+    it_stmt = select(func.count(Vehicle.id)).where(Vehicle.status == "IN_TRANSIT")
+    if cid:
+        it_stmt = it_stmt.where(Vehicle.company_id == cid)
+    it_res = await db.execute(it_stmt)
     in_transit = it_res.scalar_one()
 
     # 3. Offline vehicles
-    off_res = await db.execute(select(func.count(Vehicle.id)).where(Vehicle.status == "OFFLINE"))
+    off_stmt = select(func.count(Vehicle.id)).where(Vehicle.status == "OFFLINE")
+    if cid:
+        off_stmt = off_stmt.where(Vehicle.company_id == cid)
+    off_res = await db.execute(off_stmt)
     offline_vehicles = off_res.scalar_one()
 
     # 4. Active journeys
-    aj_res = await db.execute(select(func.count(Journey.id)).where(Journey.status == "IN_PROGRESS"))
+    aj_stmt = select(func.count(Journey.id)).where(Journey.status == "IN_PROGRESS")
+    if cid:
+        aj_stmt = aj_stmt.where(Journey.company_id == cid)
+    aj_res = await db.execute(aj_stmt)
     active_journeys = aj_res.scalar_one()
 
     # 5. Completed journeys
-    cj_res = await db.execute(select(func.count(Journey.id)).where(Journey.status == "COMPLETED"))
+    cj_stmt = select(func.count(Journey.id)).where(Journey.status == "COMPLETED")
+    if cid:
+        cj_stmt = cj_stmt.where(Journey.company_id == cid)
+    cj_res = await db.execute(cj_stmt)
     completed_journeys = cj_res.scalar_one()
 
-    # 6. Active SOS alerts (within last 2 hours)
-    sos_res = await db.execute(select(func.count(TripEvent.id)).where(TripEvent.event_type == "SOS"))
+    # 6. Active SOS alerts (scoped by company)
+    sos_stmt = select(func.count(TripEvent.id)).join(Journey, TripEvent.journey_id == Journey.id).where(TripEvent.event_type == "SOS")
+    if cid:
+        sos_stmt = sos_stmt.where(Journey.company_id == cid)
+    sos_res = await db.execute(sos_stmt)
     active_sos = sos_res.scalar_one()
 
     return OverviewResponse(
@@ -77,6 +97,8 @@ async def get_active_vehicles_with_telemetry(
         )
         .order_by(Vehicle.registration_number.asc())
     )
+    if current_user.company_id:
+        stmt = stmt.where(Vehicle.company_id == current_user.company_id)
     result = await db.execute(stmt)
     vehicles = result.scalars().all()
 
@@ -182,6 +204,8 @@ async def get_active_journeys_dashboard(
         )
         .order_by(Journey.started_at.desc())
     )
+    if current_user.company_id:
+        stmt = stmt.where(Journey.company_id == current_user.company_id)
     result = await db.execute(stmt)
     journeys = result.scalars().all()
 
@@ -249,6 +273,7 @@ async def get_recent_fleet_events(
     """Retrieve recent fleet incidents (SOS, BREAKDOWN, BREAK_START, etc.)."""
     stmt = (
         select(TripEvent)
+        .join(Journey, TripEvent.journey_id == Journey.id)
         .options(
             selectinload(TripEvent.journey).selectinload(Journey.vehicle),
             selectinload(TripEvent.journey).selectinload(Journey.driver),
@@ -256,6 +281,8 @@ async def get_recent_fleet_events(
         .order_by(TripEvent.created_at.desc())
         .limit(limit)
     )
+    if current_user.company_id:
+        stmt = stmt.where(Journey.company_id == current_user.company_id)
     result = await db.execute(stmt)
     events = result.scalars().all()
 

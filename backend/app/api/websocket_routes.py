@@ -117,14 +117,17 @@ async def websocket_live_fleet(websocket: WebSocket, token: str = ""):
         await websocket.close(code=4403, reason="Forbidden: manager access required")
         return
 
-    # Accept connection
-    await ws_mgr.connect_fleet(websocket)
+    cid = payload.get("cid")
+
+    # Accept connection scoped to company
+    await ws_mgr.connect_fleet(websocket, company_id=cid)
 
     # Send acknowledgment
     await websocket.send_text(json.dumps({
         "type": "FLEET_STREAM_CONNECTED",
         "authenticated_as": payload.get("name"),
         "role": role,
+        "company_id": cid,
     }))
 
     try:
@@ -133,7 +136,7 @@ async def websocket_live_fleet(websocket: WebSocket, token: str = ""):
             if data == "ping":
                 await websocket.send_text("pong")
     except WebSocketDisconnect:
-        await ws_mgr.disconnect_fleet(websocket)
+        await ws_mgr.disconnect_fleet(websocket, company_id=cid)
     except Exception as e:
         logger.error("Fleet WebSocket error: %s", e)
-        await ws_mgr.disconnect_fleet(websocket)
+        await ws_mgr.disconnect_fleet(websocket, company_id=cid)

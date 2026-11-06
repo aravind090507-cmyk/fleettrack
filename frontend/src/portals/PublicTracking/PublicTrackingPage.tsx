@@ -14,6 +14,9 @@ export const PublicTrackingPage: React.FC = () => {
   const [routeHistory, setRouteHistory] = useState<[number, number][]>([]);
   const [isEnded, setIsEnded] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [networkError, setNetworkError] = useState<string | null>(null);
+  const [lastPingTime, setLastPingTime] = useState<number>(Date.now());
+  const [secondsSinceLastPing, setSecondsSinceLastPing] = useState<number>(0);
 
   // Synchronize and poll telemetry
   const fetchLiveState = useCallback(async () => {
@@ -26,6 +29,9 @@ export const PublicTrackingPage: React.FC = () => {
       ]);
 
       setTrackingInfo(info);
+      setNetworkError(null);
+      setLastPingTime(Date.now());
+
       if (info.latest_location) {
         setCurrentLocation(info.latest_location);
       } else {
@@ -48,13 +54,25 @@ export const PublicTrackingPage: React.FC = () => {
         setRouteHistory([[info.origin_lat, info.origin_lng]]);
       }
     } catch (err: any) {
-      if (err.response?.status === 410 || err.response?.status === 404) {
+      if (err.response?.status === 410) {
         setIsEnded(true);
+      } else if (err.response?.status === 404) {
+        setIsEnded(true);
+      } else {
+        setNetworkError('Reconnecting to fleet tracking service...');
       }
     } finally {
       setIsLoading(false);
     }
   }, [token, isEnded]);
+
+  // Keep track of time elapsed since last ping
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setSecondsSinceLastPing(Math.floor((Date.now() - lastPingTime) / 1000));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [lastPingTime]);
 
   // Initial load
   useEffect(() => {
@@ -100,7 +118,7 @@ export const PublicTrackingPage: React.FC = () => {
   }
 
   // If the journey has concluded or token expired
-  if (isEnded || !trackingInfo) {
+  if (isEnded) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6 text-center select-none">
         <div className="max-w-md w-full bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl space-y-5">
@@ -130,6 +148,34 @@ export const PublicTrackingPage: React.FC = () => {
     );
   }
 
+  // If temporary connection issue while trackingInfo is not yet loaded
+  if (!trackingInfo) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6 text-center select-none">
+        <div className="max-w-md w-full bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl space-y-5">
+          <div className="w-16 h-16 rounded-2xl bg-amber-950/80 border border-amber-800 text-amber-400 flex items-center justify-center mx-auto shadow-xl">
+            <Radio className="w-8 h-8 animate-pulse" />
+          </div>
+          <h2 className="text-xl font-bold text-white">Connecting to Fleet Dispatch</h2>
+          <p className="text-xs text-slate-400">
+            {networkError || 'Establishing secure telemetry channel with driver unit...'}
+          </p>
+          <button
+            onClick={() => {
+              setIsLoading(true);
+              fetchLiveState();
+            }}
+            className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition shadow-lg"
+          >
+            Retry Connection
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const isSignalLost = secondsSinceLastPing > 15;
+
   return (
     <div className="flex flex-col h-screen bg-slate-950 text-slate-100 overflow-hidden relative">
       {/* Top Floating Header */}
@@ -146,11 +192,22 @@ export const PublicTrackingPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="bg-slate-900/90 border border-slate-800/80 backdrop-blur-md px-3 py-1.5 rounded-full shadow-xl pointer-events-auto flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-          <span className="text-[10px] font-bold tracking-wide uppercase text-emerald-400">
-            {isConnected ? 'LIVE WEBSOCKET' : 'REAL-TIME SYNC (2.5s)'}
-          </span>
+        <div className="flex items-center gap-2 pointer-events-auto">
+          {isSignalLost ? (
+            <div className="bg-amber-950/90 border border-amber-800/80 backdrop-blur-md px-3 py-1.5 rounded-full shadow-xl flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+              <span className="text-[10px] font-bold tracking-wide uppercase text-amber-400">
+                SIGNAL LOST ({secondsSinceLastPing}s ago)
+              </span>
+            </div>
+          ) : (
+            <div className="bg-slate-900/90 border border-slate-800/80 backdrop-blur-md px-3 py-1.5 rounded-full shadow-xl flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+              <span className="text-[10px] font-bold tracking-wide uppercase text-emerald-400">
+                {isConnected ? 'LIVE WEBSOCKET' : 'REAL-TIME SYNC (2.5s)'}
+              </span>
+            </div>
+          )}
         </div>
       </header>
 

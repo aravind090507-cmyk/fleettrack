@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { History, Calendar, CheckCircle, MapPin, ArrowRight } from 'lucide-react';
+import { History, Calendar, CheckCircle, MapPin, ArrowRight, Download } from 'lucide-react';
 import { journeysApi } from '../../../services/api';
 import { Journey } from '../../../types';
 import { Card } from '../../../components/ui/Card';
@@ -23,6 +23,31 @@ export const JourneyHistory: React.FC = () => {
       });
   };
 
+  const exportToCsv = () => {
+    if (history.length === 0) return;
+    const headers = ['Journey ID', 'Vehicle', 'Driver', 'Origin', 'Destination', 'Date', 'Duration (mins)', 'Distance (km)', 'Status'];
+    const rows = history.map((j) => [
+      j.id,
+      j.vehicle_registration || '',
+      j.driver_name || '',
+      `"${(j.origin_name || '').replace(/"/g, '""')}"`,
+      `"${(j.destination_name || '').replace(/"/g, '""')}"`,
+      new Date(j.started_at).toISOString(),
+      Math.floor(j.duration_seconds / 60),
+      j.total_distance_km,
+      j.status,
+    ]);
+
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `fleettrack_journey_history_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   useEffect(() => {
     loadHistory(true);
     const interval = setInterval(() => loadHistory(false), 3500);
@@ -31,9 +56,20 @@ export const JourneyHistory: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-bold text-white tracking-tight">Trip Archives & Historical Records</h2>
-        <p className="text-xs text-slate-400">Completed journey records, duration metrics, and distance audit trails. Click any trip to view its path on the map.</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-bold text-white tracking-tight">Trip Archives & Historical Records</h2>
+          <p className="text-xs text-slate-400">Completed journey records, duration metrics, and distance audit trails. Click any trip to view its path on the map.</p>
+        </div>
+        {history.length > 0 && (
+          <button
+            onClick={exportToCsv}
+            className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/30 rounded-xl text-xs font-bold transition shadow-sm w-fit"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>Export CSV</span>
+          </button>
+        )}
       </div>
 
       <Card>

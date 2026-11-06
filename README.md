@@ -34,47 +34,66 @@ An enterprise-grade, real-time fleet telematics, geospatial navigation, and ephe
 
 ---
 
-## 🔑 Demo & Real User Credentials
+## 🔑 Demo Multi-Tenant Credentials
 
-The platform seeds initial demonstration accounts on startup, or you can register real driver and manager accounts directly from your phone:
+The platform auto-seeds demonstration accounts across two completely isolated organizations for multi-tenant verification:
 
-| Role | Email | Password | Intended Portal |
+### Organization 1: FleetCorp Logistics (`FLEETCORP-2026`)
+| Role | Email | Password | Access Portal |
 | :--- | :--- | :--- | :--- |
-| **Driver 1** | `driver1@fleetcorp.com` | `Driver1Pass!` | Driver Mobile App (`/driver`) |
-| **Driver 2** | `driver2@fleetcorp.com` | `Driver2Pass!` | Driver Mobile App (`/driver`) |
-| **Fleet Manager**| `manager@fleetcorp.com` | `Manager1Pass!` | Company Dashboard (`/company`) |
-| **System Admin** | `admin@fleetcorp.com` | `Admin1Pass!` | Full System Access |
+| **Driver 1** | `driver1@fleetcorp.com` | `Password123!` | Driver Mobile App (`/driver`) |
+| **Driver 2** | `driver2@fleetcorp.com` | `Password123!` | Driver Mobile App (`/driver`) |
+| **Fleet Manager**| `manager@fleetcorp.com` | `Password123!` | Company Dashboard (`/company`) |
+| **System Admin** | `admin@fleetcorp.com` | `Password123!` | Full System Console |
 
-*(The login page includes 1-click demo autofill buttons as well as a "Create Account" registration tab).*
+### Organization 2: Apex Freight Global (`APEX-2026`)
+| Role | Email | Password | Access Portal |
+| :--- | :--- | :--- | :--- |
+| **Driver** | `driver@apex.com` | `Password123!` | Driver Mobile App (`/driver`) |
+| **Fleet Manager**| `manager@apex.com` | `Password123!` | Company Dashboard (`/company`) |
+
+*(Public registration is locked strictly to `DRIVER` unless a user creates a new company, in which case they become `FLEET_MANAGER` of that organization).*
 
 ---
 
-## 🏃 Quick Start Guide
+## 🏃 Quick Start Guide (Under 5 Minutes)
 
-### 1. Start the FastAPI Backend
+### Option A: One-Command Docker Setup (Recommended)
 ```bash
+# Clone and enter repo
+git clone https://github.com/aravind090507-cmyk/fleettrack.git
+cd fleettrack
+
+# Launch PostgreSQL (PostGIS), Redis, FastAPI backend, Vite frontend, and Nginx reverse proxy
+docker compose up -d --build
+
+# Open app
+# Frontend: http://localhost:80
+# Backend API Docs: http://localhost:8000/docs
+```
+
+### Option B: Local Development
+```bash
+# 1. Backend
 cd backend
 python -m venv venv
-
-# Windows (PowerShell):
-.\venv\Scripts\activate
-
-# Linux/macOS:
-source venv/bin/activate
-
+.\venv\Scripts\activate   # Linux/macOS: source venv/bin/activate
 pip install -r requirements.txt
 python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-```
-- **API Documentation**: [http://localhost:8000/docs](http://localhost:8000/docs)
-- **Health Check**: [http://localhost:8000/health](http://localhost:8000/health)
 
-### 2. Start the React Frontend
-```bash
+# 2. Frontend (in a separate terminal)
 cd frontend
 npm install
 npm run dev
+# Access at https://localhost:5173
 ```
-- **Local Access**: [https://localhost:5173](https://localhost:5173)
+
+### Option C: Run Automated Test Suite
+```bash
+$env:PYTHONPATH="backend"
+.\backend\venv\Scripts\python.exe -m pytest backend/tests/ -v
+# Executes Auth, GPS Validation, and E2E Journey Lifecycle tests
+```
 
 ---
 

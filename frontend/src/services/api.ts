@@ -146,6 +146,10 @@ export const journeysApi = {
       total_distance_km: number;
     };
   },
+  revokeTrackingLink: async (journeyId: string) => {
+    const { data } = await api.post(`/api/journeys/${journeyId}/tracking-link/revoke`);
+    return data;
+  },
   recordEvent: async (
     journeyId: string,
     eventData: { event_type: string; latitude: number; longitude: number; metadata?: any }

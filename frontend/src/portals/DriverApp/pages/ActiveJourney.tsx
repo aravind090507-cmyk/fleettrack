@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { QRCodeSVG } from 'qrcode.react';
 import {
   Share2,
   Copy,
@@ -13,6 +14,9 @@ import {
   Gauge,
   Compass,
   MapPin,
+  QrCode,
+  Shield,
+  EyeOff,
 } from 'lucide-react';
 import { useDriverStore } from '../../../store/driverStore';
 import { journeysApi, locationApi } from '../../../services/api';
@@ -41,11 +45,43 @@ export const ActiveJourney: React.FC = () => {
   const [isBreakdownReported, setIsBreakdownReported] = useState<boolean>(false);
   const [isSosActive, setIsSosActive] = useState<boolean>(false);
   const [showEndModal, setShowEndModal] = useState<boolean>(false);
+  const [showQrModal, setShowQrModal] = useState<boolean>(false);
+  const [isLinkRevoked, setIsLinkRevoked] = useState<boolean>(false);
+  const [backgroundWarning, setBackgroundWarning] = useState<boolean>(false);
   const [sosProgress, setSosProgress] = useState<number>(0);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [pingCount, setPingCount] = useState<number>(0);
 
   const sosTimerRef = useRef<any>(null);
+
+  // Screen Wake Lock API to prevent mobile screen sleep during trip
+  useEffect(() => {
+    let wakeLock: any = null;
+    const acquireLock = async () => {
+      try {
+        if ('wakeLock' in navigator) {
+          wakeLock = await (navigator as any).wakeLock.request('screen');
+        }
+      } catch (e) {
+        console.warn('Wake Lock request skipped:', e);
+      }
+    };
+    acquireLock();
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        acquireLock();
+      } else if (document.visibilityState === 'hidden') {
+        setBackgroundWarning(true);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      if (wakeLock) wakeLock.release().catch(() => {});
+    };
+  }, []);
 
   // Offline queue synchronization hook
   useOfflineSync(currentJourney?.id || null);
@@ -230,6 +266,19 @@ export const ActiveJourney: React.FC = () => {
     }
   };
 
+  const handleRevokeLink = async () => {
+    if (!currentJourney) return;
+    if (window.confirm('Immediately revoke the public tracking link? Anyone viewing will lose access.')) {
+      try {
+        await journeysApi.revokeTrackingLink(currentJourney.id);
+        setIsLinkRevoked(true);
+        setStatusMessage('🔒 Public tracking link has been permanently revoked.');
+      } catch (e: any) {
+        alert('Failed to revoke tracking link: ' + (e.response?.data?.detail || e.message));
+      }
+    }
+  };
+
   // End journey confirmation
   const handleEndJourney = async () => {
     if (!currentJourney) return;
@@ -271,33 +320,74 @@ export const ActiveJourney: React.FC = () => {
         </div>
       )}
 
+      {/* Background GPS Throttling Warning Banner */}
+      {backgroundWarning && (
+        <div className="p-3 bg-amber-950/70 border border-amber-800 rounded-2xl flex items-start gap-2.5 shadow-lg">
+          <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+          <div className="flex-1 text-xs">
+            <p className="font-bold text-amber-300">Screen Lock / Background Warning</p>
+            <p className="text-amber-200/80 text-[11px] mt-0.5 leading-relaxed">
+              Mobile browsers pause GPS updates when screen locks. Screen Wake Lock is active — please keep this screen
+              unlocked during your trip.
+            </p>
+          </div>
+          <button
+            onClick={() => setBackgroundWarning(false)}
+            className="text-amber-400 hover:text-amber-200 text-xs font-bold"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* Ephemeral Tracking Link Sharing Card */}
       <Card title="Temporary Public Tracking Link">
         <div className="space-y-3">
           <p className="text-xs text-slate-400 leading-relaxed">
-            Share this secure link with clients or dispatchers. Valid only while in transit.
+            {isLinkRevoked
+              ? 'Public link access has been manually revoked.'
+              : 'Share this secure link with clients or dispatchers. Valid only while in transit.'}
           </p>
 
-          <div className="flex items-center gap-2 p-2 bg-slate-950 border border-slate-800 rounded-xl">
-            <input
-              type="text"
-              readOnly
-              value={trackingUrl || ''}
-              className="w-full bg-transparent text-xs text-emerald-400 font-mono truncate px-2 focus:outline-none"
-            />
-            <button
-              onClick={handleCopyLink}
-              className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-medium flex items-center gap-1 transition-all flex-shrink-0"
-            >
-              {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-              <span>{copied ? 'Copied' : 'Copy'}</span>
-            </button>
-          </div>
+          {!isLinkRevoked && (
+            <>
+              <div className="flex items-center gap-2 p-2 bg-slate-950 border border-slate-800 rounded-xl">
+                <input
+                  type="text"
+                  readOnly
+                  value={trackingUrl || ''}
+                  className="w-full bg-transparent text-xs text-emerald-400 font-mono truncate px-2 focus:outline-none"
+                />
+                <button
+                  onClick={handleCopyLink}
+                  className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-medium flex items-center gap-1 transition-all flex-shrink-0"
+                >
+                  {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>{copied ? 'Copied' : 'Copy'}</span>
+                </button>
+              </div>
 
-          <Button variant="secondary" size="sm" className="w-full" onClick={handleNativeShare}>
-            <Share2 className="w-4 h-4 text-emerald-400" />
-            <span>Share Tracking Link</span>
-          </Button>
+              <div className="grid grid-cols-2 gap-2">
+                <Button variant="secondary" size="sm" onClick={handleNativeShare}>
+                  <Share2 className="w-4 h-4 text-emerald-400" />
+                  <span>Share Link</span>
+                </Button>
+                <Button variant="secondary" size="sm" onClick={() => setShowQrModal(true)}>
+                  <QrCode className="w-4 h-4 text-blue-400" />
+                  <span>View QR</span>
+                </Button>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleRevokeLink}
+                className="w-full py-1 text-[11px] text-slate-500 hover:text-rose-400 transition font-medium flex items-center justify-center gap-1.5"
+              >
+                <EyeOff className="w-3.5 h-3.5" />
+                <span>Revoke public link access immediately</span>
+              </button>
+            </>
+          )}
         </div>
       </Card>
 
@@ -309,17 +399,19 @@ export const ActiveJourney: React.FC = () => {
             Live GPS Telemetry
           </span>
           <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              onClick={toggleSimulatedMode}
-              className={`px-2 py-0.5 rounded-full text-[10px] font-bold border transition cursor-pointer flex items-center gap-1 ${
-                simulatedMode
-                  ? 'bg-emerald-600 text-white border-emerald-500 shadow-sm'
-                  : 'bg-slate-900 text-slate-400 border-slate-700 hover:text-white'
-              }`}
-            >
-              <span>{simulatedMode ? '🚗 Sim Drive ON' : '📡 Device GPS'}</span>
-            </button>
+            {import.meta.env.DEV && (
+              <button
+                type="button"
+                onClick={toggleSimulatedMode}
+                className={`px-2 py-0.5 rounded-full text-[10px] font-bold border transition cursor-pointer flex items-center gap-1 ${
+                  simulatedMode
+                    ? 'bg-emerald-600 text-white border-emerald-500 shadow-sm'
+                    : 'bg-slate-900 text-slate-400 border-slate-700 hover:text-white'
+                }`}
+              >
+                <span>{simulatedMode ? '🚗 Sim ON' : '📡 GPS'}</span>
+              </button>
+            )}
             <span className="font-mono text-emerald-400 font-bold bg-emerald-950/80 px-2 py-0.5 rounded-full border border-emerald-800">
               {pingCount} pings sent
             </span>
@@ -421,6 +513,24 @@ export const ActiveJourney: React.FC = () => {
                 Confirm End
               </Button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* QR Code Sharing Modal */}
+      {showQrModal && trackingUrl && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-xs w-full space-y-4 shadow-2xl text-center">
+            <h3 className="text-base font-bold text-white">Scan Live Tracking Link</h3>
+            <div className="p-4 bg-white rounded-2xl flex items-center justify-center mx-auto shadow-inner w-fit">
+              <QRCodeSVG value={trackingUrl} size={180} level="M" />
+            </div>
+            <p className="text-[11px] text-slate-400 leading-tight">
+              Anyone scanning this code can monitor delivery progress in real time.
+            </p>
+            <Button variant="secondary" size="sm" className="w-full mt-2" onClick={() => setShowQrModal(false)}>
+              Close
+            </Button>
           </div>
         </div>
       )}

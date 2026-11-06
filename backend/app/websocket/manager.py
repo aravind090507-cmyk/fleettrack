@@ -17,7 +17,9 @@ class ConnectionManager:
     def __init__(self):
         # Maps journey_id -> list of active WebSockets (public tracking viewers)
         self.journey_subscribers: Dict[str, List[WebSocket]] = {}
-        # Fleet manager consoles listening to all vehicular movement
+        # Fleet manager consoles listening to company vehicular movement
+        self.fleet_company_subscribers: Dict[str, List[WebSocket]] = {}
+        # Global admin subscribers
         self.fleet_subscribers: List[WebSocket] = []
         self._lock = asyncio.Lock()
 
@@ -38,14 +40,22 @@ class ConnectionManager:
                     del self.journey_subscribers[journey_id]
         logger.info("Client disconnected from journey stream: %s", journey_id)
 
-    async def connect_fleet(self, websocket: WebSocket):
+    async def connect_fleet(self, websocket: WebSocket, company_id: Optional[str] = None):
         await websocket.accept()
         async with self._lock:
-            self.fleet_subscribers.append(websocket)
-        logger.info("Company console connected to fleet stream (Total: %d)", len(self.fleet_subscribers))
+            if company_id:
+                if company_id not in self.fleet_company_subscribers:
+                    self.fleet_company_subscribers[company_id] = []
+                self.fleet_company_subscribers[company_id].append(websocket)
+            else:
+                self.fleet_subscribers.append(websocket)
+        logger.info("Company console connected to fleet stream (Company: %s)", company_id or "Global")
 
-    async def disconnect_fleet(self, websocket: WebSocket):
+    async def disconnect_fleet(self, websocket: WebSocket, company_id: Optional[str] = None):
         async with self._lock:
+            if company_id and company_id in self.fleet_company_subscribers:
+                if websocket in self.fleet_company_subscribers[company_id]:
+                    self.fleet_company_subscribers[company_id].remove(websocket)
             if websocket in self.fleet_subscribers:
                 self.fleet_subscribers.remove(websocket)
         logger.info("Company console disconnected from fleet stream")
@@ -71,11 +81,14 @@ class ConnectionManager:
                         if ds in self.journey_subscribers[journey_id]:
                             self.journey_subscribers[journey_id].remove(ds)
 
-    async def broadcast_to_fleet(self, message: dict):
+    async def broadcast_to_fleet(self, message: dict, company_id: Optional[str] = None):
         """Broadcast telemetry event to all connected company fleet consoles."""
         dead_sockets = []
+        sockets = []
         async with self._lock:
-            sockets = list(self.fleet_subscribers)
+            if company_id and company_id in self.fleet_company_subscribers:
+                sockets.extend(self.fleet_company_subscribers[company_id])
+            sockets.extend(self.fleet_subscribers)
 
         text_data = json.dumps(message)
         for ws in sockets:
@@ -86,6 +99,10 @@ class ConnectionManager:
 
         if dead_sockets:
             async with self._lock:
+                if company_id and company_id in self.fleet_company_subscribers:
+                    for ds in dead_sockets:
+                        if ds in self.fleet_company_subscribers[company_id]:
+                            self.fleet_company_subscribers[company_id].remove(ds)
                 for ds in dead_sockets:
                     if ds in self.fleet_subscribers:
                         self.fleet_subscribers.remove(ds)

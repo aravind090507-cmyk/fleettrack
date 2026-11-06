@@ -14,12 +14,21 @@ class LoginRequest(BaseModel):
 class RegisterRequest(BaseModel):
     name: str = Field(..., min_length=2, max_length=255)
     email: str = Field(..., min_length=3, max_length=255)
-    password: str = Field(..., min_length=4)
+    password: str = Field(..., min_length=6)
+    invite_code: Optional[str] = None
+    company_name: Optional[str] = None
+
+
+class InviteUserRequest(BaseModel):
+    name: str = Field(..., min_length=2, max_length=255)
+    email: str = Field(..., min_length=3, max_length=255)
     role: str = Field(default="DRIVER")  # DRIVER | FLEET_MANAGER
 
 
 class UserProfile(BaseModel):
     id: str
+    company_id: Optional[str] = None
+    company_name: Optional[str] = None
     name: str
     email: str
     role: str

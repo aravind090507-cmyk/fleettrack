@@ -72,13 +72,17 @@ async def get_public_tracking_info(
             recorded_at=journey.started_at,
         )
 
+    veh_reg = getattr(journey.vehicle, "registration_number", "FLEET-01") if journey.vehicle else "FLEET-01"
+    veh_type = getattr(journey.vehicle, "vehicle_type", "VAN") if journey.vehicle else "VAN"
+    drv_name = getattr(journey.driver, "name", "Assigned Driver") if journey.driver else "Assigned Driver"
+
     return TrackingInfoResponse(
         journey_id=journey.id,
         vehicle_id=journey.vehicle_id,
-        vehicle_registration=journey.vehicle.registration_number,
-        vehicle_type=journey.vehicle.vehicle_type,
+        vehicle_registration=veh_reg,
+        vehicle_type=veh_type,
         driver_id=journey.driver_id,
-        driver_name=journey.driver.name,
+        driver_name=drv_name,
         origin_name=journey.origin_name,
         destination_name=journey.destination_name,
         origin_lat=journey.origin_lat,

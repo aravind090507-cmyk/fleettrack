@@ -55,6 +55,7 @@ async def init_db():
     """Create all tables from ORM models. Called once at startup."""
     from app.database.base import Base
     # Import all models so they register with Base.metadata
+    import app.models.company  # noqa: F401
     import app.models.user  # noqa: F401
     import app.models.vehicle  # noqa: F401
     import app.models.journey  # noqa: F401
@@ -64,3 +65,11 @@ async def init_db():
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # Auto-migrate missing columns for existing SQLite databases
+        from sqlalchemy import text
+        for table in ["users", "vehicles", "journeys"]:
+            try:
+                await conn.execute(text(f"ALTER TABLE {table} ADD COLUMN company_id VARCHAR(36)"))
+            except Exception:
+                # Column already exists
+                pass

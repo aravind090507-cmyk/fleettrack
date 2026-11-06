@@ -62,6 +62,7 @@ async def start_new_journey(
         from datetime import datetime
         final_reg = custom_reg if custom_reg else f"FT-{random.randint(100, 999)}-{datetime.now().strftime('%S')}"
         vehicle = Vehicle(
+            company_id=current_user.company_id,
             registration_number=final_reg,
             model=payload.vehicle_model or "Fleet Unit",
             vehicle_type=(payload.vehicle_type or "VAN").upper(),
@@ -71,6 +72,10 @@ async def start_new_journey(
         db.add(vehicle)
         await db.commit()
         await db.refresh(vehicle)
+
+    # Verify company ownership if existing vehicle
+    if vehicle.company_id and current_user.company_id and vehicle.company_id != current_user.company_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Vehicle belongs to another organization")
 
     # If vehicle was marked in transit from a previous test, reset to available
     if vehicle.status == "IN_TRANSIT":
@@ -103,6 +108,7 @@ async def start_new_journey(
         destination_lng=payload.destination_lng,
         description=payload.description,
         redis_svc=redis_svc,
+        company_id=current_user.company_id,
     )
 
     logger.info("Journey %s started by driver %s (Vehicle: %s)", journey.id, current_user.email, vehicle.registration_number)
@@ -130,6 +136,9 @@ async def get_active_journeys(
         .order_by(Journey.started_at.desc())
     )
 
+    # Multi-tenant isolation
+    if current_user.company_id:
+        stmt = stmt.where(Journey.company_id == current_user.company_id)
     # If driver, filter to own active journey
     if current_user.role == "DRIVER":
         stmt = stmt.where(Journey.driver_id == current_user.id)
@@ -150,6 +159,7 @@ async def get_active_journeys(
 
         token_payload = {
             "jid": j.id,
+            "cid": j.company_id,
             "vid": j.vehicle_id,
             "vreg": j.vehicle.registration_number if j.vehicle else "FLEET-01",
             "vtype": j.vehicle.vehicle_type if j.vehicle else "VAN",
@@ -187,6 +197,9 @@ async def get_journey_history(
         .limit(limit)
     )
 
+    # Multi-tenant isolation
+    if current_user.company_id:
+        stmt = stmt.where(Journey.company_id == current_user.company_id)
     if current_user.role == "DRIVER":
         stmt = stmt.where(Journey.driver_id == current_user.id)
 
@@ -206,6 +219,7 @@ async def get_journey_history(
 
         token_payload = {
             "jid": j.id,
+            "cid": j.company_id,
             "vid": j.vehicle_id,
             "vreg": j.vehicle.registration_number if j.vehicle else "FLEET-01",
             "vtype": j.vehicle.vehicle_type if j.vehicle else "VAN",
@@ -242,6 +256,12 @@ async def get_journey_by_id(
     journey = result.scalar_one_or_none()
     if not journey:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Journey not found")
+
+    # Multi-tenant validation
+    if current_user.company_id and journey.company_id and journey.company_id != current_user.company_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Journey not found")
+    if current_user.role == "DRIVER" and journey.driver_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
 
     resp = JourneyResponse.model_validate(journey)
     if journey.vehicle:
@@ -280,9 +300,20 @@ async def end_active_journey(
             total_distance_km=0.0,
         )
 
-    # Only assigned driver or fleet manager can end
+    # Multi-tenant and ownership check
+    if current_user.company_id and journey.company_id and journey.company_id != current_user.company_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cross-company access denied")
     if current_user.role == "DRIVER" and journey.driver_id != current_user.id:
-        logger.info("Allowing driver %s to conclude active dispatch %s", current_user.email, journey.id)
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only assigned driver or manager can end this journey")
+
+    if journey.status == "COMPLETED":
+        return JourneyEndResponse(
+            journey_id=journey.id,
+            status=journey.status,
+            ended_at=journey.ended_at or now,
+            duration_seconds=journey.duration_seconds or 0,
+            total_distance_km=journey.total_distance_km or 0.0,
+        )
 
     redis_svc = get_redis_service()
     ws_mgr = get_ws_manager()
@@ -306,6 +337,32 @@ async def end_active_journey(
     )
 
 
+@router.post("/{journey_id}/tracking-link/revoke", status_code=status.HTTP_200_OK)
+async def revoke_tracking_link(
+    journey_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Driver or manager manually invalidates public tracking link before trip end."""
+    stmt = select(Journey).where(Journey.id == journey_id).options(selectinload(Journey.tracking_links))
+    res = await db.execute(stmt)
+    journey = res.scalar_one_or_none()
+    if not journey:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Journey not found")
+    if current_user.company_id and journey.company_id and journey.company_id != current_user.company_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+    if current_user.role == "DRIVER" and journey.driver_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+
+    now = datetime.now(timezone.utc)
+    redis_svc = get_redis_service()
+    for link in journey.tracking_links:
+        link.revoked_at = now
+        await redis_svc.revoke_tracking_token(link.token_hash)
+    await db.commit()
+    return {"status": "revoked", "journey_id": journey_id}
+
+
 @router.post("/{journey_id}/event", response_model=TripEventResponse, status_code=status.HTTP_201_CREATED)
 async def record_trip_event(
     journey_id: str,
@@ -317,7 +374,12 @@ async def record_trip_event(
     stmt = select(Journey).where(Journey.id == journey_id)
     result = await db.execute(stmt)
     journey = result.scalar_one_or_none()
-    if not journey:
+    if journey:
+        if current_user.company_id and journey.company_id and journey.company_id != current_user.company_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+        if current_user.role == "DRIVER" and journey.driver_id != current_user.id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+    else:
         # Cross-container self-heal: restore active journey so emergency incident is preserved
         now_dt = datetime.now(timezone.utc)
         v_res = await db.execute(select(Vehicle).limit(1))
@@ -326,6 +388,7 @@ async def record_trip_event(
         if not veh:
             veh = Vehicle(
                 id=vid,
+                company_id=current_user.company_id,
                 registration_number="FLEET-01",
                 model="Fleet Vehicle",
                 vehicle_type="VAN",
@@ -336,6 +399,7 @@ async def record_trip_event(
 
         journey = Journey(
             id=journey_id,
+            company_id=current_user.company_id,
             driver_id=current_user.id,
             vehicle_id=vid,
             origin_name="Start",

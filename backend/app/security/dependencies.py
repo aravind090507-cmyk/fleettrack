@@ -7,6 +7,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.database.session import get_db
 from app.models.user import User
@@ -31,12 +32,14 @@ async def get_current_user(
     if user_id is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
 
-    result = await db.execute(select(User).where(User.id == user_id))
+    result = await db.execute(select(User).options(selectinload(User.company)).where(User.id == user_id))
     user = result.scalar_one_or_none()
+    company_id = payload.get("cid")
     if user is None:
         # Self-heal on stateless containers: persist user record from validated cryptographic JWT
         user = User(
             id=user_id,
+            company_id=company_id,
             name=payload.get("name", "User"),
             email=payload.get("email", f"{user_id}@fleettrack.local"),
             password_hash="stateless_session",
@@ -51,6 +54,9 @@ async def get_current_user(
             await db.rollback()
     elif not user.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User account is inactive")
+    elif user.company_id is None and company_id:
+        user.company_id = company_id
+        await db.commit()
 
     return user
 

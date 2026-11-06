@@ -25,8 +25,15 @@ async def list_vehicles(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """List vehicles. Available to all authenticated drivers and managers."""
+    """
+    List vehicles scoped strictly to the authenticated user's company (multi-tenant isolation).
+    Available to all authenticated drivers and managers.
+    """
     stmt = select(Vehicle).options(selectinload(Vehicle.assigned_driver))
+
+    # Multi-tenant scoping: only show company's own assets
+    if current_user.company_id:
+        stmt = stmt.where(Vehicle.company_id == current_user.company_id)
 
     if current_user.role == "DRIVER":
         # Show all available vehicles or vehicles assigned to this driver
@@ -57,17 +64,19 @@ async def create_vehicle(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Add a vehicle asset to the fleet. Allowed for drivers (from phone) and managers."""
+    """Add a vehicle asset to the user's company fleet."""
     reg_clean = payload.registration_number.upper().strip()
 
-    # Check registration uniqueness
+    # Check registration uniqueness within the company
     existing = await db.execute(
-        select(Vehicle).where(Vehicle.registration_number == reg_clean)
+        select(Vehicle).where(
+            (Vehicle.registration_number == reg_clean) & (Vehicle.company_id == current_user.company_id)
+        )
     )
     if existing.scalar_one_or_none():
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"Vehicle with registration {reg_clean} already exists",
+            detail=f"Vehicle with registration {reg_clean} already exists in your fleet.",
         )
 
     # If created by a driver and no driver assigned, assign to self
@@ -76,6 +85,7 @@ async def create_vehicle(
         assigned_id = current_user.id
 
     vehicle = Vehicle(
+        company_id=current_user.company_id,
         registration_number=reg_clean,
         model=payload.model.strip(),
         vehicle_type=payload.vehicle_type.upper(),
@@ -95,7 +105,7 @@ async def get_vehicle(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Retrieve detailed vehicle telemetry and assignment status."""
+    """Retrieve detailed vehicle telemetry and assignment status with tenant authorization."""
     stmt = (
         select(Vehicle)
         .where(Vehicle.id == vehicle_id)
@@ -103,7 +113,7 @@ async def get_vehicle(
     )
     result = await db.execute(stmt)
     vehicle = result.scalar_one_or_none()
-    if not vehicle:
+    if not vehicle or (current_user.company_id and vehicle.company_id != current_user.company_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vehicle not found")
 
     resp = VehicleResponse.model_validate(vehicle)
@@ -119,11 +129,11 @@ async def update_vehicle(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Update vehicle specifications or status."""
+    """Update vehicle specifications or status with tenant authorization."""
     stmt = select(Vehicle).where(Vehicle.id == vehicle_id)
     result = await db.execute(stmt)
     vehicle = result.scalar_one_or_none()
-    if not vehicle:
+    if not vehicle or (current_user.company_id and vehicle.company_id != current_user.company_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vehicle not found")
 
     update_data = payload.model_dump(exclude_unset=True)
@@ -145,11 +155,11 @@ async def delete_vehicle(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Decommission a vehicle asset from the fleet."""
+    """Decommission a vehicle asset from the fleet with tenant authorization."""
     stmt = select(Vehicle).where(Vehicle.id == vehicle_id)
     result = await db.execute(stmt)
     vehicle = result.scalar_one_or_none()
-    if not vehicle:
+    if not vehicle or (current_user.company_id and vehicle.company_id != current_user.company_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vehicle not found")
 
     await db.delete(vehicle)
@@ -157,21 +167,39 @@ async def delete_vehicle(
 
 
 async def seed_demo_vehicles(db: AsyncSession):
-    """Seed standard fleet vehicle assets if not already present."""
+    """Seed multi-tenant company vehicle assets if not present."""
+    from app.models.company import Company
+
+    c1_stmt = select(Company).where(Company.name == "FleetCorp Logistics")
+    c1_res = await db.execute(c1_stmt)
+    c1 = c1_res.scalar_one_or_none()
+
+    c2_stmt = select(Company).where(Company.name == "Apex Freight Global")
+    c2_res = await db.execute(c2_stmt)
+    c2 = c2_res.scalar_one_or_none()
+
+    c1_id = c1.id if c1 else None
+    c2_id = c2.id if c2 else None
+
+    # Company 1 (FleetCorp) vehicles
     demo_vehicles = [
-        ("VAN-01", "KA-01-AB-1234", "Mercedes-Benz Sprinter 3500", "VAN"),
-        ("TRUCK-02", "MH-02-CD-5678", "Tata Ace Gold Logistics", "TRUCK"),
-        ("VAN-03", "TN-03-EF-9012", "Toyota Probox Delivery Wagon", "VAN"),
-        ("TRUCK-04", "DL-04-GH-3456", "Mahindra Bolero Maxi Truck", "TRUCK"),
-        ("BIKE-05", "SAMPLE P1", "Royal Enfield Hunter 350", "MOTORCYCLE"),
+        ("KA-01-AB-1234", "Mercedes-Benz Sprinter 3500", "VAN", c1_id),
+        ("MH-02-CD-5678", "Tata Ace Gold Logistics", "TRUCK", c1_id),
+        ("TN-03-EF-9012", "Toyota Probox Delivery Wagon", "VAN", c1_id),
+        ("DL-04-GH-3456", "Mahindra Bolero Maxi Truck", "TRUCK", c1_id),
+        ("SAMPLE P1", "Royal Enfield Hunter 350", "MOTORCYCLE", c1_id),
+        # Company 2 (Apex Freight) vehicles for multi-tenant isolation
+        ("APEX-TRUCK-01", "Volvo FH16 Long Haul", "TRUCK", c2_id),
+        ("APEX-VAN-02", "Ford Transit Cargo Custom", "VAN", c2_id),
     ]
 
-    for short_id, reg, model, v_type in demo_vehicles:
+    for reg, model, v_type, comp_id in demo_vehicles:
         stmt = select(Vehicle).where(Vehicle.registration_number == reg)
         res = await db.execute(stmt)
         existing = res.scalar_one_or_none()
         if not existing:
             v = Vehicle(
+                company_id=comp_id,
                 registration_number=reg,
                 model=model,
                 vehicle_type=v_type,
@@ -179,4 +207,6 @@ async def seed_demo_vehicles(db: AsyncSession):
                 battery_or_fuel_level=100.0,
             )
             db.add(v)
+        else:
+            existing.company_id = comp_id
     await db.commit()
