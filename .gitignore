@@ -1,3 +1,6 @@
+# Reference code
+_reference/
+
 # Python
 __pycache__/
 *.py[cod]

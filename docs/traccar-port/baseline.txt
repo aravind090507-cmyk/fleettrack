@@ -1,0 +1,80 @@
+================================================================================
+FLEETTRACK × TRACCAR ARCHITECTURE INTEGRATION - BASELINE TEST RUNS
+Date: 2026-11-06
+================================================================================
+
+1. BACKEND PYTEST SUITE
+Command: cd backend; .\venv\Scripts\python.exe -m pytest tests/
+--------------------------------------------------------------------------------
+============================= test session starts =============================
+platform win32 -- Python 3.14.3, pytest-9.2.0, pluggy-1.7.0
+rootdir: C:\Users\Aravind\OneDrive\Desktop\sample tracker\backend
+configfile: pytest.ini
+plugins: anyio-4.16.0, asyncio-1.4.1.post1
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=function, asyncio_default_test_loop_scope=function
+collected 11 items
+
+tests\test_auth.py ....                                                  [ 36%]
+tests\test_e2e_verification.py .                                         [ 45%]
+tests\test_gps_validation.py ....                                        [ 81%]
+tests\test_journey_source_destination.py .                               [ 90%]
+tests\test_journeys_lifecycle.py .                                       [100%]
+
+============================= 11 passed in 8.90s ==============================
+
+
+2. BACKEND EVIDENCE PROBE
+Command: cd backend; $env:PYTHONPATH="."; .\venv\Scripts\python.exe ..\evidence\probe.py
+--------------------------------------------------------------------------------
+{
+  "accuracy_130m": "filtered_noise",
+  "clock_ahead_120s": "filtered_noise",
+  "burst_6_pings_0.2s_apart": {
+    "statuses": [
+      "recorded",
+      "filtered_noise",
+      "filtered_noise",
+      "filtered_noise",
+      "recorded",
+      "filtered_noise"
+    ],
+    "rows_stored_incl_origin_seed": 3
+  },
+  "batch_600": 422,
+  "batch_30h_old_20pts": {
+    "status": "batch_recorded",
+    "pings_processed": 0,
+    "received_at": "2026-11-06T11:28:56.527322Z"
+  },
+  "batch_after_end": {
+    "http": 200,
+    "body": {
+      "status": "batch_recorded",
+      "pings_processed": 1,
+      "received_at": "2026-11-06T11:28:56.610374Z"
+    }
+  },
+  "jitter_saved": 200,
+  "stationary_10min_reported_distance_km": 0.885
+}
+
+
+3. FRONTEND EVIDENCE PROBE
+Command: cd frontend; npx vitest run probe.test.tsx --environment jsdom --test-timeout=10000
+--------------------------------------------------------------------------------
+ RUN  v2.1.9 C:/Users/Aravind/OneDrive/Desktop/sample tracker/frontend
+
+stdout | probe.test.tsx > PublicTrackingPage pattern: inline onJourneyCompleted + 1s ticking state => WebSocket churn
+[PUBLIC WS] in 5.2s: sockets created=7, closed=6
+
+stdout | probe.test.tsx > ActiveJourney pattern: literal coord objects + onLocationUpdate => geolocation re-subscription loop
+[DRIVER GPS] in 2s with ONE real fix source: uploads=68, getCurrentPosition calls=69, watchPosition calls=69, clearWatch=68
+
+ ✓ probe.test.tsx (2 tests) 7249ms
+   ✓ PublicTrackingPage pattern: inline onJourneyCompleted + 1s ticking state => WebSocket churn 5233ms
+   ✓ ActiveJourney pattern: literal coord objects + onLocationUpdate => geolocation re-subscription loop 2014ms
+
+ Test Files  1 passed (1)
+      Tests  2 passed (2)
+   Start at  17:04:39
+   Duration  15.05s (transform 157ms, setup 0ms, collect 1.28s, tests 7.25s, environment 4.02s, prepare 311ms)
