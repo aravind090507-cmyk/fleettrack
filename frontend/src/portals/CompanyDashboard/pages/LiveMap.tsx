@@ -149,10 +149,10 @@ export const LiveMap: React.FC = () => {
     }
   };
 
-  // Periodic fast auto-refresh every 2.5 seconds (ensures rock-solid sync even without WS)
+  // Periodic fast auto-refresh every 1.5 seconds (ensures rock-solid sync even without WS)
   useEffect(() => {
     loadFleetData();
-    const interval = setInterval(loadFleetData, 2500);
+    const interval = setInterval(loadFleetData, 1500);
     return () => clearInterval(interval);
   }, [loadFleetData]);
 
@@ -242,9 +242,11 @@ export const LiveMap: React.FC = () => {
         const jId = msg.journey_id;
 
         // 1. Update vehicle position in state
+        let foundVehicle = false;
         setVehicles((prev) =>
           prev.map((v) => {
             if (v.vehicle_id === vId) {
+              foundVehicle = true;
               return {
                 ...v,
                 latest_latitude: msg.latitude,
@@ -260,9 +262,11 @@ export const LiveMap: React.FC = () => {
         );
 
         // 2. Update active journeys in state
+        let foundJourney = false;
         setActiveJourneys((prev) =>
           prev.map((j) => {
             if (j.journey_id === jId || j.vehicle_id === vId) {
+              foundJourney = true;
               return {
                 ...j,
                 latest_location: {
@@ -279,12 +283,23 @@ export const LiveMap: React.FC = () => {
           })
         );
 
-        // 3. If currently viewing this transit, immediately append point to polyline
+        // If newly discovered vehicle or journey arrived via WS, refresh full fleet list
+        if (!foundVehicle || !foundJourney) {
+          loadFleetData();
+        }
+
+        // 3. If currently viewing this transit, immediately append point to polyline & update speed
         const current = selectedTransitRef.current;
         if (current && (current.journey_id === jId || (current as any).vehicle_id === vId)) {
+          setSelectedTransit((prev) => (prev ? { ...prev, latest_speed: msg.speed } : prev));
           setJourneyPath((prev) => [...prev, [msg.latitude, msg.longitude]]);
         }
-      } else if (msg.type === 'JOURNEY_FINISHED' || msg.type === 'JOURNEY_COMPLETED' || msg.type === 'TRIP_EVENT') {
+      } else if (
+        msg.type === 'JOURNEY_STARTED' ||
+        msg.type === 'JOURNEY_FINISHED' ||
+        msg.type === 'JOURNEY_COMPLETED' ||
+        msg.type === 'TRIP_EVENT'
+      ) {
         loadFleetData();
       }
     },

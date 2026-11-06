@@ -23,7 +23,7 @@ export const Overview: React.FC = () => {
 
   useEffect(() => {
     loadData();
-    const interval = setInterval(loadData, 3000); // 3s auto-refresh
+    const interval = setInterval(loadData, 1500); // 1.5s auto-refresh
     return () => clearInterval(interval);
   }, [loadData]);
 

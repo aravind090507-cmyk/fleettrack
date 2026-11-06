@@ -52,7 +52,7 @@ export const ActiveJourneys: React.FC = () => {
 
   useEffect(() => {
     loadActive();
-    const interval = setInterval(loadActive, 2500); // 2.5s auto-refresh
+    const interval = setInterval(loadActive, 1500); // 1.5s auto-refresh
     return () => clearInterval(interval);
   }, [loadActive]);
 

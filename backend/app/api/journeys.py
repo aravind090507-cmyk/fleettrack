@@ -113,6 +113,21 @@ async def start_new_journey(
 
     logger.info("Journey %s started by driver %s (Vehicle: %s)", journey.id, current_user.email, vehicle.registration_number)
 
+    ws_mgr = get_ws_manager()
+    await ws_mgr.broadcast_to_fleet({
+        "type": "JOURNEY_STARTED",
+        "journey_id": journey.id,
+        "vehicle_id": vehicle.id,
+        "vehicle_registration": vehicle.registration_number,
+        "driver_name": current_user.name,
+        "origin_name": journey.origin_name,
+        "origin_lat": journey.origin_lat,
+        "origin_lng": journey.origin_lng,
+        "destination_name": journey.destination_name,
+        "destination_lat": journey.destination_lat,
+        "destination_lng": journey.destination_lng,
+    }, company_id=current_user.company_id)
+
     return JourneyStartResponse(
         journey_id=journey.id,
         tracking_token=raw_token,

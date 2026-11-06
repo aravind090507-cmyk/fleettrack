@@ -88,6 +88,9 @@ class ConnectionManager:
         async with self._lock:
             if company_id and company_id in self.fleet_company_subscribers:
                 sockets.extend(self.fleet_company_subscribers[company_id])
+            else:
+                for comp_sockets in self.fleet_company_subscribers.values():
+                    sockets.extend(comp_sockets)
             sockets.extend(self.fleet_subscribers)
 
         text_data = json.dumps(message)
