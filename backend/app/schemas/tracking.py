@@ -31,6 +31,12 @@ class TrackingInfoResponse(BaseModel):
     status: str
     started_at: datetime
     latest_location: Optional[LatestLocation] = None
+    # ETA and event fields
+    eta_minutes: Optional[float] = None
+    distance_remaining_km: Optional[float] = None
+    latest_event_type: Optional[str] = None
+    latest_event_at: Optional[datetime] = None
+    latest_event_note: Optional[str] = None
 
 
 class TrackingLocationResponse(BaseModel):

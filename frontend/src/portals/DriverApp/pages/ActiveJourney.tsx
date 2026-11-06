@@ -287,6 +287,17 @@ export const ActiveJourney: React.FC = () => {
       stopWatching();
       useDriverStore.getState().setJourney(null);
     } catch (e: any) {
+      const status = e.response?.status;
+      // Journey already ended on the server — treat as success
+      if (status === 404 || status === 410) {
+        setStatusMessage('ℹ️ Journey already ended or not found. Returning home...');
+        setShowEndModal(false);
+        stopWatching();
+        setTimeout(() => {
+          useDriverStore.getState().setJourney(null);
+        }, 3000);
+        return;
+      }
       console.warn('Network issue ending journey on backend:', e);
       // Gracefully conclude journey locally if offline or network connection issue
       const confirmForce = window.confirm(

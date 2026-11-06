@@ -1,19 +1,22 @@
 """
 Async SQLAlchemy engine and session management.
-Supports both SQLite (local dev) and PostgreSQL (production).
+Supports both SQLite (local dev) and PostgreSQL (Neon production).
 """
 from __future__ import annotations
 
+import logging
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.config.settings import get_settings
 
+logger = logging.getLogger("fleettrack.db")
 settings = get_settings()
 
-# Connection args differ by backend
 connect_args = {}
 if settings.DATABASE_URL.startswith("sqlite"):
     connect_args = {"check_same_thread": False}
+elif "asyncpg" in settings.DATABASE_URL:
+    connect_args = {"statement_cache_size": 0}
 
 engine = create_async_engine(
     settings.DATABASE_URL,
@@ -40,8 +43,7 @@ async def get_db():
                 await seed_demo_vehicles(init_session)
             _db_initialized = True
         except Exception as e:
-            import logging
-            logging.getLogger("fleettrack.db").warning("DB init or seed warning: %s", e)
+            logger.warning("DB init or seed notice: %s", e)
             _db_initialized = True
 
     async with AsyncSessionLocal() as session:
@@ -54,7 +56,6 @@ async def get_db():
 async def init_db():
     """Create all tables from ORM models. Called once at startup."""
     from app.database.base import Base
-    # Import all models so they register with Base.metadata
     import app.models.company  # noqa: F401
     import app.models.user  # noqa: F401
     import app.models.vehicle  # noqa: F401
@@ -65,11 +66,10 @@ async def init_db():
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-        # Auto-migrate missing columns for existing SQLite databases
-        from sqlalchemy import text
-        for table in ["users", "vehicles", "journeys"]:
-            try:
-                await conn.execute(text(f"ALTER TABLE {table} ADD COLUMN company_id VARCHAR(36)"))
-            except Exception:
-                # Column already exists
-                pass
+        if settings.DATABASE_URL.startswith("sqlite"):
+            from sqlalchemy import text
+            for table in ["users", "vehicles", "journeys"]:
+                try:
+                    await conn.execute(text(f"ALTER TABLE {table} ADD COLUMN company_id VARCHAR(36)"))
+                except Exception:
+                    pass

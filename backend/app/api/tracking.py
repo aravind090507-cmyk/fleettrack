@@ -76,6 +76,33 @@ async def get_public_tracking_info(
     veh_type = getattr(journey.vehicle, "vehicle_type", "VAN") if journey.vehicle else "VAN"
     drv_name = getattr(journey.driver, "name", "Assigned Driver") if journey.driver else "Assigned Driver"
 
+    # --- ETA Computation ---
+    eta_minutes = None
+    distance_remaining_km = None
+    if latest_loc and journey.destination_lat and journey.destination_lng:
+        import math
+        lat1 = math.radians(latest_loc.latitude)
+        lat2 = math.radians(journey.destination_lat)
+        dlat = math.radians(journey.destination_lat - latest_loc.latitude)
+        dlng = math.radians(journey.destination_lng - latest_loc.longitude)
+        a = math.sin(dlat/2)**2 + math.cos(lat1)*math.cos(lat2)*math.sin(dlng/2)**2
+        dist_km = 6371 * 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
+        distance_remaining_km = round(dist_km, 2)
+        avg_speed_kmh = latest_loc.speed if latest_loc.speed and latest_loc.speed > 2 else 30.0
+        if avg_speed_kmh > 0:
+            eta_minutes = round((dist_km / avg_speed_kmh) * 60, 1)
+
+    # --- Latest Trip Event ---
+    from app.models.trip_event import TripEvent
+    evt_stmt = (
+        select(TripEvent)
+        .where(TripEvent.journey_id == journey.id)
+        .order_by(TripEvent.created_at.desc())
+        .limit(1)
+    )
+    evt_res = await db.execute(evt_stmt)
+    latest_event = evt_res.scalar_one_or_none()
+
     return TrackingInfoResponse(
         journey_id=journey.id,
         vehicle_id=journey.vehicle_id,
@@ -92,6 +119,11 @@ async def get_public_tracking_info(
         status=journey.status,
         started_at=journey.started_at,
         latest_location=latest_loc_dto,
+        eta_minutes=eta_minutes,
+        distance_remaining_km=distance_remaining_km,
+        latest_event_type=latest_event.event_type if latest_event else None,
+        latest_event_at=latest_event.created_at if latest_event else None,
+        latest_event_note=latest_event.notes if latest_event else None,
     )
 
 

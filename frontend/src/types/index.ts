@@ -76,6 +76,11 @@ export interface TrackingInfo {
   status: string;
   started_at: string;
   latest_location: LatestLocation | null;
+  eta_minutes?: number | null;
+  distance_remaining_km?: number | null;
+  latest_event_type?: string | null;
+  latest_event_at?: string | null;
+  latest_event_note?: string | null;
 }
 
 export interface DashboardOverview {

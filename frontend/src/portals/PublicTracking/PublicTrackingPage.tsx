@@ -79,12 +79,12 @@ export const PublicTrackingPage: React.FC = () => {
     fetchLiveState();
   }, [fetchLiveState]);
 
-  // High-frequency 2.5s auto-polling fallback (guarantees real-time GPS sync even without WebSockets)
+  // High-frequency 1.5s auto-polling fallback (guarantees real-time GPS sync even without WebSockets)
   useEffect(() => {
     if (isEnded || !token) return;
     const interval = setInterval(() => {
       fetchLiveState();
-    }, 2500);
+    }, 1500);
     return () => clearInterval(interval);
   }, [fetchLiveState, isEnded, token]);
 
@@ -204,7 +204,7 @@ export const PublicTrackingPage: React.FC = () => {
             <div className="bg-slate-900/90 border border-slate-800/80 backdrop-blur-md px-3 py-1.5 rounded-full shadow-xl flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
               <span className="text-[10px] font-bold tracking-wide uppercase text-emerald-400">
-                {isConnected ? 'LIVE WEBSOCKET' : 'REAL-TIME SYNC (2.5s)'}
+                {isConnected ? 'LIVE WEBSOCKET' : 'REAL-TIME SYNC (1.5s)'}
               </span>
             </div>
           )}
@@ -262,6 +262,60 @@ export const PublicTrackingPage: React.FC = () => {
               <span>Encrypted Stream</span>
             </div>
           </div>
+
+          {/* Event Status Banner */}
+          {trackingInfo.latest_event_type && trackingInfo.latest_event_type !== 'RESUME' && (() => {
+            const evt = trackingInfo.latest_event_type;
+            const isSos = evt === 'SOS';
+            const isBreakdown = evt === 'BREAKDOWN';
+            const isBreak = evt === 'BREAK';
+            const bannerClass = isSos || isBreakdown
+              ? 'bg-rose-950/90 border-rose-800 text-rose-200'
+              : isBreak
+              ? 'bg-amber-950/90 border-amber-800 text-amber-200'
+              : 'bg-slate-800 border-slate-700 text-slate-300';
+            const label = isSos
+              ? '🆘 SOS Emergency'
+              : isBreakdown
+              ? '⚠️ Vehicle Breakdown Reported'
+              : isBreak
+              ? '🛑 Driver on Break'
+              : `ℹ️ ${evt}`;
+            return (
+              <div className={`mt-1 px-3 py-2 rounded-xl border text-xs font-bold text-center ${bannerClass} ${isSos ? 'animate-pulse' : ''}`}>
+                {label}
+                {trackingInfo.latest_event_note && (
+                  <span className="ml-2 font-normal opacity-80">— {trackingInfo.latest_event_note}</span>
+                )}
+              </div>
+            );
+          })()}
+
+          {/* RESUME banner */}
+          {trackingInfo.latest_event_type === 'RESUME' && (
+            <div className="mt-1 px-3 py-2 rounded-xl border bg-emerald-950/90 border-emerald-800 text-emerald-200 text-xs font-bold text-center">
+              ✅ Journey Resumed
+            </div>
+          )}
+
+          {/* ETA Card */}
+          {trackingInfo.eta_minutes != null && (
+            <div className="mt-1 flex items-center justify-between px-3 py-2 bg-slate-800/80 border border-slate-700 rounded-xl text-xs">
+              <span className="text-slate-400 font-semibold uppercase tracking-wide">ETA</span>
+              <span className="font-bold font-mono text-white">
+                {trackingInfo.eta_minutes < 1 && (trackingInfo.distance_remaining_km ?? 999) < 0.1
+                  ? '✅ Arrived'
+                  : trackingInfo.eta_minutes < 60
+                  ? `${Math.round(trackingInfo.eta_minutes)} min`
+                  : `${Math.floor(trackingInfo.eta_minutes / 60)}h ${Math.round(trackingInfo.eta_minutes % 60)}m`}
+              </span>
+              {trackingInfo.distance_remaining_km != null && trackingInfo.distance_remaining_km >= 0.1 && (
+                <span className="text-slate-500 text-[11px]">
+                  {trackingInfo.distance_remaining_km.toFixed(1)} km left
+                </span>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
