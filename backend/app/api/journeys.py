@@ -364,6 +364,7 @@ async def revoke_tracking_link(
 
 
 @router.post("/{journey_id}/event", response_model=TripEventResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/{journey_id}/events", response_model=TripEventResponse, status_code=status.HTTP_201_CREATED)
 async def record_trip_event(
     journey_id: str,
     payload: TripEventCreate,
