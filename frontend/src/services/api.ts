@@ -136,6 +136,14 @@ export const journeysApi = {
       status: string;
       started_at: string;
       vehicle_registration: string;
+      driver_name?: string;
+      origin_name: string;
+      origin_lat: number;
+      origin_lng: number;
+      destination_name: string;
+      destination_lat: number;
+      destination_lng: number;
+      description?: string;
     };
   },
   getActive: async () => {

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Optional, List
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 from app.schemas.location import LocationPing
 
 
@@ -31,6 +31,22 @@ class ActiveVehicleResponse(BaseModel):
     latest_heading: Optional[float] = None
     latest_recorded_at: Optional[datetime] = None
     latest_event_type: Optional[str] = None
+    origin_name: Optional[str] = None
+    origin_lat: Optional[float] = None
+    origin_lng: Optional[float] = None
+    destination_name: Optional[str] = None
+    destination_lat: Optional[float] = None
+    destination_lng: Optional[float] = None
+    source: Optional[str] = None
+    start_location: Optional[str] = None
+    end_location: Optional[str] = None
+
+    @model_validator(mode="after")
+    def populate_aliases(self) -> ActiveVehicleResponse:
+        self.source = self.origin_name
+        self.start_location = self.origin_name
+        self.end_location = self.destination_name
+        return self
 
 
 class TripAlertResponse(BaseModel):
@@ -64,3 +80,13 @@ class ActiveJourneyResponse(BaseModel):
     latest_location: Optional[LocationPing] = None
     latest_event_type: Optional[str] = None
     latest_event_at: Optional[datetime] = None
+    source: Optional[str] = None
+    start_location: Optional[str] = None
+    end_location: Optional[str] = None
+
+    @model_validator(mode="after")
+    def populate_aliases(self) -> ActiveJourneyResponse:
+        self.source = self.origin_name
+        self.start_location = self.origin_name
+        self.end_location = self.destination_name
+        return self

@@ -172,8 +172,8 @@ export const JourneySetup: React.FC = () => {
           setDestLngInput(destLng.toString());
 
           setMapTarget([lat, lng]);
-          setOriginName('Current Office Location');
-          setDestinationName('10m Walk Endpoint');
+          setOriginName((prev) => (prev === 'My Starting Location' ? 'Current Office Location' : prev));
+          setDestinationName((prev) => (prev === 'Destination Point' ? '10m Walk Endpoint' : prev));
         },
         (err) => console.warn('Could not auto-acquire GPS on setup:', err)
       );
@@ -381,21 +381,22 @@ export const JourneySetup: React.FC = () => {
 
       const newJourney = {
         id: res.journey_id,
-        vehicle_id: (res as any).vehicle_id || payload.vehicle_id || '',
-        driver_id: (res as any).driver_id || '',
-        origin_name: originName,
-        origin_lat: finalOriginLat,
-        origin_lng: finalOriginLng,
-        destination_name: destinationName,
-        destination_lat: finalDestLat,
-        destination_lng: finalDestLng,
+        vehicle_id: res.vehicle_id || payload.vehicle_id || '',
+        driver_id: res.driver_id || '',
+        origin_name: res.origin_name || originName,
+        origin_lat: res.origin_lat ?? finalOriginLat,
+        origin_lng: res.origin_lng ?? finalOriginLng,
+        destination_name: res.destination_name || destinationName,
+        destination_lat: res.destination_lat ?? finalDestLat,
+        destination_lng: res.destination_lng ?? finalDestLng,
         status: 'IN_PROGRESS' as const,
-        description,
+        description: res.description ?? description,
         total_distance_km: 0,
         duration_seconds: 0,
         started_at: res.started_at,
         created_at: res.started_at,
         vehicle_registration: res.vehicle_registration,
+        driver_name: res.driver_name,
       };
 
       const trackingUrl = `${window.location.origin}/track/${res.tracking_token}`;
@@ -862,6 +863,67 @@ export const JourneySetup: React.FC = () => {
                 {distanceMeters < 1000 ? `${distanceMeters} meters` : `${(distanceMeters / 1000).toFixed(2)} km`}
               </span>
             </div>
+          </div>
+        </div>
+      </Card>
+
+      {/* Explicit Route Endpoints Card */}
+      <Card title="Journey Source & Destination Details">
+        <div className="space-y-3 pt-1">
+          {/* Starting Location (Source) */}
+          <div className="space-y-1">
+            <div className="flex items-center justify-between">
+              <label className="block text-[11px] font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                <span>Source / Starting Location Name *</span>
+              </label>
+              <span className="text-[10px] text-slate-500 font-mono">
+                {originCoords[0].toFixed(5)}, {originCoords[1].toFixed(5)}
+              </span>
+            </div>
+            <input
+              type="text"
+              required
+              value={originName}
+              onChange={(e) => setOriginName(e.target.value)}
+              placeholder="e.g. Mumbai Port Terminal, Warehouse A, Central Office..."
+              className="w-full px-3 py-2 bg-slate-950 border border-emerald-900/60 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 font-medium"
+            />
+          </div>
+
+          {/* Destination (Target) */}
+          <div className="space-y-1">
+            <div className="flex items-center justify-between">
+              <label className="block text-[11px] font-bold text-rose-400 uppercase tracking-wider flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-rose-400" />
+                <span>Destination / Ending Location Name *</span>
+              </label>
+              <span className="text-[10px] text-slate-500 font-mono">
+                {destCoords[0].toFixed(5)}, {destCoords[1].toFixed(5)}
+              </span>
+            </div>
+            <input
+              type="text"
+              required
+              value={destinationName}
+              onChange={(e) => setDestinationName(e.target.value)}
+              placeholder="e.g. Pune Distribution Depot, Client Hub, Delivery Point..."
+              className="w-full px-3 py-2 bg-slate-950 border border-rose-900/60 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-rose-500 font-medium"
+            />
+          </div>
+
+          {/* Consignment Notes */}
+          <div className="space-y-1">
+            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+              Consignment Description / Trip Notes (Optional)
+            </label>
+            <input
+              type="text"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="e.g. High Priority Medical Cargo, Temperature Controlled..."
+              className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+            />
           </div>
         </div>
       </Card>

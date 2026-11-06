@@ -69,6 +69,7 @@ export const Overview: React.FC = () => {
                 <th className="py-3 px-4">Type</th>
                 <th className="py-3 px-4">Assigned Driver</th>
                 <th className="py-3 px-4">Status</th>
+                <th className="py-3 px-4">Active Route (Source &rarr; Destination)</th>
                 <th className="py-3 px-4">Current Speed</th>
                 <th className="py-3 px-4">Last Coordinates</th>
               </tr>
@@ -82,6 +83,23 @@ export const Overview: React.FC = () => {
                   <td className="py-3 px-4">{v.assigned_driver_name || 'Unassigned'}</td>
                   <td className="py-3 px-4">
                     <StatusBadge status={v.status} size="sm" />
+                  </td>
+                  <td className="py-3 px-4">
+                    {v.origin_name && v.destination_name ? (
+                      <div className="flex items-center gap-1.5 text-xs">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+                        <span className="text-emerald-300 font-semibold truncate max-w-[120px]" title={v.origin_name}>
+                          {v.origin_name}
+                        </span>
+                        <span className="text-slate-500">&rarr;</span>
+                        <span className="w-1.5 h-1.5 rounded-full bg-rose-400 shrink-0" />
+                        <span className="text-white font-semibold truncate max-w-[120px]" title={v.destination_name}>
+                          {v.destination_name}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-slate-500 italic text-[11px]">No active dispatch</span>
+                    )}
                   </td>
                   <td className="py-3 px-4 font-mono">
                     {v.latest_speed != null ? `${v.latest_speed} km/h` : '0 km/h'}

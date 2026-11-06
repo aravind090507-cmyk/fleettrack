@@ -479,7 +479,9 @@ export const LiveMap: React.FC = () => {
                     }`}
                   />
                   <span className="font-mono">{j.vehicle_registration}</span>
-                  <span className="text-[10px] text-slate-400 font-normal truncate max-w-[70px]">{j.driver_name}</span>
+                  <span className="text-[10px] text-slate-300 font-semibold truncate max-w-[130px]" title={`${j.origin_name} → ${j.destination_name}`}>
+                    {j.origin_name} &rarr; {j.destination_name}
+                  </span>
                   {isSos && (
                     <span className="bg-rose-600 text-white px-1.5 py-0.2 rounded text-[9px] uppercase font-black">
                       SOS
@@ -937,6 +939,15 @@ export const LiveMap: React.FC = () => {
                     <StatusBadge status={v.status} size="sm" />
                   </div>
                   <p className="text-xs text-slate-400 mb-1">{v.model}</p>
+                  {v.origin_name && v.destination_name && (
+                    <div className="text-[11px] text-slate-300 flex items-center gap-1 my-1.5 truncate bg-slate-950/60 p-1.5 rounded-lg border border-slate-800">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+                      <span className="truncate text-emerald-300 font-medium">{v.origin_name}</span>
+                      <span className="text-slate-500">&rarr;</span>
+                      <span className="w-1.5 h-1.5 rounded-full bg-rose-400 shrink-0" />
+                      <span className="truncate text-white font-medium">{v.destination_name}</span>
+                    </div>
+                  )}
                   <div className="flex items-center justify-between text-[11px] text-slate-400">
                     <span>Driver: {v.assigned_driver_name || 'None'}</span>
                     <span className="font-mono text-emerald-400 font-bold">{v.latest_speed || 0} km/h</span>

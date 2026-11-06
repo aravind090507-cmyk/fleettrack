@@ -137,6 +137,14 @@ async def start_new_journey(
         status=journey.status,
         started_at=journey.started_at,
         vehicle_registration=vehicle.registration_number,
+        driver_name=current_user.name,
+        origin_name=journey.origin_name,
+        origin_lat=journey.origin_lat,
+        origin_lng=journey.origin_lng,
+        destination_name=journey.destination_name,
+        destination_lat=journey.destination_lat,
+        destination_lng=journey.destination_lng,
+        description=journey.description,
     )
 
 
@@ -153,12 +161,11 @@ async def get_active_journeys(
         .order_by(Journey.started_at.desc())
     )
 
-    # Multi-tenant isolation
-    if current_user.company_id:
-        stmt = stmt.where(Journey.company_id == current_user.company_id)
-    # If driver, filter to own active journey
+    # Role and multi-tenant isolation
     if current_user.role == "DRIVER":
         stmt = stmt.where(Journey.driver_id == current_user.id)
+    elif current_user.company_id:
+        stmt = stmt.where(Journey.company_id == current_user.company_id)
 
     result = await db.execute(stmt)
     journeys = result.scalars().all()
@@ -214,11 +221,11 @@ async def get_journey_history(
         .limit(limit)
     )
 
-    # Multi-tenant isolation
-    if current_user.company_id:
-        stmt = stmt.where(Journey.company_id == current_user.company_id)
+    # Role and multi-tenant isolation
     if current_user.role == "DRIVER":
         stmt = stmt.where(Journey.driver_id == current_user.id)
+    elif current_user.company_id:
+        stmt = stmt.where(Journey.company_id == current_user.company_id)
 
     result = await db.execute(stmt)
     journeys = result.scalars().all()

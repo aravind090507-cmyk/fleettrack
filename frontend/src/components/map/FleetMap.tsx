@@ -480,6 +480,24 @@ export const FleetMap: React.FC<FleetMapProps> = ({
 
                   <p className="text-xs text-slate-600 mb-1 font-medium">{v.model}</p>
 
+                  {v.origin_name && v.destination_name && (
+                    <div className="mb-2 p-2 rounded-lg bg-emerald-50 border border-emerald-200 text-xs">
+                      <div className="flex items-center gap-1 text-[10px] font-bold text-emerald-800 uppercase tracking-wider mb-1">
+                        <span>Current Dispatch Route:</span>
+                      </div>
+                      <div className="text-[11px] text-slate-800 flex items-center gap-1 truncate mb-0.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                        <strong className="text-slate-900 font-semibold shrink-0">From:</strong>
+                        <span className="truncate">{v.origin_name}</span>
+                      </div>
+                      <div className="text-[11px] text-slate-800 flex items-center gap-1 truncate">
+                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0" />
+                        <strong className="text-slate-900 font-semibold shrink-0">To:</strong>
+                        <span className="truncate">{v.destination_name}</span>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="space-y-1 text-[11px] bg-slate-50 p-2 rounded-lg border border-slate-200 mb-1">
                     <div className="flex justify-between items-center text-slate-600">
                       <span>Ignition:</span>

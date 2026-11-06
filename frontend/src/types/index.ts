@@ -107,6 +107,12 @@ export interface ActiveVehicleTelemetry {
   latest_heading: number | null;
   latest_recorded_at: string | null;
   latest_event_type?: string | null;
+  origin_name?: string | null;
+  origin_lat?: number | null;
+  origin_lng?: number | null;
+  destination_name?: string | null;
+  destination_lat?: number | null;
+  destination_lng?: number | null;
 }
 
 export interface ActiveJourneyTelemetry {

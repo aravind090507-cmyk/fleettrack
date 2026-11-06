@@ -191,6 +191,12 @@ async def get_active_vehicles_with_telemetry(
                 latest_heading=heading,
                 latest_recorded_at=rec_at,
                 latest_event_type=latest_ev_type,
+                origin_name=active_j.origin_name if active_j else None,
+                origin_lat=active_j.origin_lat if active_j else None,
+                origin_lng=active_j.origin_lng if active_j else None,
+                destination_name=active_j.destination_name if active_j else None,
+                destination_lat=active_j.destination_lat if active_j else None,
+                destination_lng=active_j.destination_lng if active_j else None,
             )
         )
 

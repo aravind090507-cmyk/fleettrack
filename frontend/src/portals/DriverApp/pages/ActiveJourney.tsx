@@ -17,6 +17,7 @@ import {
   QrCode,
   Shield,
   EyeOff,
+  Route,
 } from 'lucide-react';
 import { useDriverStore } from '../../../store/driverStore';
 import { journeysApi, locationApi } from '../../../services/api';
@@ -326,6 +327,53 @@ export const ActiveJourney: React.FC = () => {
         </div>
       </div>
 
+      {/* Starting Location & Destination Route Card */}
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl space-y-3">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+          <div className="flex items-center gap-2">
+            <Route className="w-4 h-4 text-emerald-400" />
+            <span className="text-xs font-bold text-white uppercase tracking-wider">Active Journey Endpoints</span>
+          </div>
+          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-950 text-emerald-400 border border-emerald-800">
+            {currentJourney?.status || 'IN_PROGRESS'}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+          {/* Starting Location (Source) */}
+          <div className="bg-slate-950/70 p-3 rounded-xl border border-slate-800 space-y-1">
+            <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-400" />
+              Source (Starting Location)
+            </span>
+            <p className="text-sm font-bold text-white break-words">
+              {currentJourney?.origin_name || 'Starting Point'}
+            </p>
+            {currentJourney?.origin_lat != null && currentJourney?.origin_lng != null && (
+              <p className="text-[10px] text-slate-500 font-mono">
+                {currentJourney.origin_lat.toFixed(5)}, {currentJourney.origin_lng.toFixed(5)}
+              </p>
+            )}
+          </div>
+
+          {/* Destination (Target) */}
+          <div className="bg-slate-950/70 p-3 rounded-xl border border-slate-800 space-y-1">
+            <span className="text-[10px] font-bold text-rose-400 uppercase tracking-wider flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-rose-400" />
+              Destination (Ending Location)
+            </span>
+            <p className="text-sm font-bold text-white break-words">
+              {currentJourney?.destination_name || 'Destination Point'}
+            </p>
+            {currentJourney?.destination_lat != null && currentJourney?.destination_lng != null && (
+              <p className="text-[10px] text-slate-500 font-mono">
+                {currentJourney.destination_lat.toFixed(5)}, {currentJourney.destination_lng.toFixed(5)}
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+
       {statusMessage && (
         <div className="p-3 bg-rose-950 border border-rose-800 text-rose-200 text-xs font-bold rounded-xl text-center animate-pulse">
           {statusMessage}
@@ -456,8 +504,28 @@ export const ActiveJourney: React.FC = () => {
             </span>
           </div>
         </div>
-        <div className="h-44 w-full rounded-2xl overflow-hidden border border-slate-800 shadow-xl">
-          <DriverMap position={position} />
+        <div className="h-56 w-full rounded-2xl overflow-hidden border border-slate-800 shadow-xl">
+          <DriverMap
+            position={position}
+            origin={
+              currentJourney?.origin_lat != null && currentJourney?.origin_lng != null
+                ? {
+                    lat: currentJourney.origin_lat,
+                    lng: currentJourney.origin_lng,
+                    name: currentJourney.origin_name || 'Start Point',
+                  }
+                : undefined
+            }
+            destination={
+              currentJourney?.destination_lat != null && currentJourney?.destination_lng != null
+                ? {
+                    lat: currentJourney.destination_lat,
+                    lng: currentJourney.destination_lng,
+                    name: currentJourney.destination_name || 'Destination',
+                  }
+                : undefined
+            }
+          />
         </div>
       </div>
 
