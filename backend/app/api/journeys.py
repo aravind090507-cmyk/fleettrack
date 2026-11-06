@@ -371,7 +371,7 @@ async def revoke_tracking_link(
     if current_user.role == "DRIVER" and journey.driver_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     redis_svc = get_redis_service()
     for link in journey.tracking_links:
         link.revoked_at = now

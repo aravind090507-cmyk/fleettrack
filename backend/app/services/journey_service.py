@@ -60,8 +60,9 @@ async def create_journey(
     Initiates a new journey, creates an unguessable 256-bit token,
     hashes it with SHA-256, and links it in Redis and PostgreSQL.
     """
-    now = datetime.now(timezone.utc)
-    expires_at = now + timedelta(hours=settings.TRACKING_LINK_EXPIRE_HOURS)
+    now_aware = datetime.now(timezone.utc)
+    now = now_aware.replace(tzinfo=None)
+    expires_at = (now_aware + timedelta(hours=settings.TRACKING_LINK_EXPIRE_HOURS)).replace(tzinfo=None)
 
     # 1. Fetch vehicle & driver to generate self-contained, stateless tracking token
     v_stmt = select(Vehicle).where(Vehicle.id == vehicle_id)
@@ -190,11 +191,12 @@ async def end_journey(
     if journey.status == "COMPLETED":
         return journey
 
-    now = datetime.now(timezone.utc)
-    # Make started_at timezone-aware for comparison if it is naive
+    now_aware = datetime.now(timezone.utc)
+    now = now_aware.replace(tzinfo=None)
+    # Compare with started_at cleanly
     started_at = journey.started_at
-    if started_at.tzinfo is None:
-        started_at = started_at.replace(tzinfo=timezone.utc)
+    if started_at.tzinfo is not None:
+        started_at = started_at.replace(tzinfo=None)
     duration = int((now - started_at).total_seconds())
 
     # Compute total distance from recorded location points

@@ -120,7 +120,7 @@ async def ingest_location_ping(
         heading=ping.heading,
         accuracy=ping.accuracy,
         altitude=ping.altitude,
-        recorded_at=rec_time,
+        recorded_at=rec_time.replace(tzinfo=None) if rec_time.tzinfo else rec_time,
     )
     db.add(loc)
     await db.commit()
@@ -205,7 +205,7 @@ async def ingest_location_batch(
             heading=ping.heading,
             accuracy=ping.accuracy,
             altitude=ping.altitude,
-            recorded_at=rec_time,
+            recorded_at=rec_time.replace(tzinfo=None) if rec_time.tzinfo else rec_time,
         )
         db.add(loc)
         saved_count += 1
