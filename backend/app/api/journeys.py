@@ -82,7 +82,7 @@ async def start_new_journey(
         vehicle.status = "AVAILABLE"
         await db.commit()
 
-    # 2. Check if driver already has an active journey; auto-complete prior test to prevent blocking
+    # 2. Check if driver already has an active journey; reject with 409 Conflict if so
     active_stmt = (
         select(Journey)
         .where(Journey.driver_id == current_user.id, Journey.status == "IN_PROGRESS")
@@ -90,10 +90,10 @@ async def start_new_journey(
     active_result = await db.execute(active_stmt)
     existing_active = active_result.scalar_one_or_none()
     if existing_active:
-        from datetime import datetime
-        existing_active.status = "COMPLETED"
-        existing_active.ended_at = datetime.now()
-        await db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Driver already has an active journey in progress (ID: {existing_active.id}). Please complete or end it before starting a new journey.",
+        )
 
     redis_svc = get_redis_service()
     journey, raw_token, tracking_url = await create_journey(
@@ -390,46 +390,12 @@ async def record_trip_event(
     stmt = select(Journey).where(Journey.id == journey_id)
     result = await db.execute(stmt)
     journey = result.scalar_one_or_none()
-    if journey:
-        if current_user.company_id and journey.company_id and journey.company_id != current_user.company_id:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
-        if current_user.role == "DRIVER" and journey.driver_id != current_user.id:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
-    else:
-        # Cross-container self-heal: restore active journey so emergency incident is preserved
-        now_dt = datetime.now(timezone.utc)
-        v_res = await db.execute(select(Vehicle).limit(1))
-        veh = v_res.scalar_one_or_none()
-        vid = veh.id if veh else f"veh-{current_user.id[:8]}"
-        if not veh:
-            veh = Vehicle(
-                id=vid,
-                company_id=current_user.company_id,
-                registration_number="FLEET-01",
-                model="Fleet Vehicle",
-                vehicle_type="VAN",
-                status="IN_TRANSIT",
-            )
-            db.add(veh)
-            await db.flush()
-
-        journey = Journey(
-            id=journey_id,
-            company_id=current_user.company_id,
-            driver_id=current_user.id,
-            vehicle_id=vid,
-            origin_name="Start",
-            origin_lat=payload.latitude,
-            origin_lng=payload.longitude,
-            destination_name="Destination",
-            destination_lat=payload.latitude,
-            destination_lng=payload.longitude,
-            status="IN_PROGRESS",
-            started_at=now_dt,
-        )
-        db.add(journey)
-        await db.commit()
-        await db.refresh(journey)
+    if not journey:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Journey not found")
+    if current_user.company_id and journey.company_id and journey.company_id != current_user.company_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+    if current_user.role == "DRIVER" and journey.driver_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
 
     event = TripEvent(
         journey_id=journey_id,

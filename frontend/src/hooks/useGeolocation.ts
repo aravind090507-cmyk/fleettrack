@@ -121,8 +121,7 @@ export function useGeolocation({
     }
 
     if (!('geolocation' in navigator)) {
-      setError('Geolocation not supported — activating simulated motion.');
-      startSimulatedMovement();
+      setError('Geolocation is not supported by your browser.');
       return;
     }
 
@@ -133,21 +132,13 @@ export function useGeolocation({
     navigator.geolocation.getCurrentPosition(
       (pos) => handlePosition(pos.coords, pos.timestamp),
       (err) => {
-        console.warn('Initial GPS fetch notice:', err.message);
-        // Fallback to initial coords ping if real GPS takes long
-        const initialPing: LocationPing = {
-          latitude: initialCoords.lat,
-          longitude: initialCoords.lng,
-          speed: 0,
-          heading: 0,
-          accuracy: 5,
-          altitude: null,
-          timestamp: new Date().toISOString(),
-        };
-        setPosition(initialPing);
-        if (onLocationUpdate) onLocationUpdate(initialPing);
+        let msg = 'Live GPS pending...';
+        if (err.code === 1) msg = 'Location permission denied. Please enable GPS permission in your browser/device settings.';
+        else if (err.code === 2) msg = 'GPS hardware unavailable. Ensure location services are active.';
+        else if (err.code === 3) msg = 'Acquiring satellite fix...';
+        setError(msg);
       },
-      { enableHighAccuracy: true, timeout: 5000, maximumAge: 1000 }
+      { enableHighAccuracy, timeout: 8000, maximumAge: 1000 }
     );
 
     // Continuous watchPosition for live movement
@@ -155,14 +146,10 @@ export function useGeolocation({
       (pos) => handlePosition(pos.coords, pos.timestamp),
       (err) => {
         let msg = 'Live GPS pending...';
-        if (err.code === 1) msg = 'Location permission denied. Using route simulation.';
-        else if (err.code === 2) msg = 'GPS hardware unavailable. Using route simulation.';
-        else if (err.code === 3) msg = 'Satellite GPS timed out indoors. Using route simulation.';
+        if (err.code === 1) msg = 'Location permission denied. Please grant GPS permissions to transmit live tracking.';
+        else if (err.code === 2) msg = 'GPS signal lost or unavailable. Checking device location sensors...';
+        else if (err.code === 3) msg = 'GPS satellite lock timed out. Searching for satellite signal...';
         setError(msg);
-        // Automatically start simulation if GPS is blocked so tracking never stalls
-        if (!simTimerRef.current) {
-          startSimulatedMovement();
-        }
       },
       {
         enableHighAccuracy,
@@ -171,21 +158,20 @@ export function useGeolocation({
       }
     );
 
-    // Periodic heartbeat poll every 1.5 seconds for instant real-time telemetry
+    // Periodic heartbeat poll every 2 seconds for fresh telemetry
     if (periodicTimerRef.current) clearInterval(periodicTimerRef.current);
     periodicTimerRef.current = setInterval(() => {
       navigator.geolocation.getCurrentPosition(
         (pos) => handlePosition(pos.coords, pos.timestamp),
-        (_err) => {
-          // If indoor GPS is struggling and no position yet, keep simulation running
-          if (!hasPositionRef.current && !simTimerRef.current) {
-            startSimulatedMovement();
+        (err) => {
+          if (!hasPositionRef.current && err.code === 1) {
+            setError('Location permission denied. GPS tracking inactive.');
           }
         },
-        { enableHighAccuracy: true, timeout: 3000, maximumAge: 1000 }
+        { enableHighAccuracy, timeout: 4000, maximumAge: 1000 }
       );
-    }, 1500);
-  }, [enableHighAccuracy, handlePosition, initialCoords, maximumAge, onLocationUpdate, simulated, startSimulatedMovement, timeout]);
+    }, 2000);
+  }, [enableHighAccuracy, handlePosition, maximumAge, simulated, startSimulatedMovement, timeout]);
 
   const stopWatching = useCallback(() => {
     if (watchIdRef.current !== null) {
@@ -213,6 +199,7 @@ export function useGeolocation({
     position,
     error,
     isWatching,
+    isSimulating: simulated,
     startWatching,
     stopWatching,
   };

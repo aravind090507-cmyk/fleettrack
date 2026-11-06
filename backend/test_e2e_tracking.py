@@ -20,6 +20,14 @@ async def test_full_pipeline():
         token = auth_data["access_token"]
         headers = {"Authorization": f"Bearer {token}"}
 
+        # 2b. End any prior active journey for this driver to ensure clean state
+        active_res = await client.get("/api/journeys/active", headers=headers)
+        if active_res.status_code == 200:
+            for active_j in active_res.json():
+                if active_j.get("driver_id") == auth_data["user"]["id"] or active_j.get("id"):
+                    await client.post(f"/api/journeys/{active_j['id']}/end", headers=headers)
+                    print(f"   Cleared previous active journey: {active_j['id']}")
+
         # 3. Start a journey
         start_payload = {
             "vehicle_registration": "TN-01-E2E-99",
@@ -115,6 +123,20 @@ async def test_full_pipeline():
         # 10. Verify Tracking Link returns 410 Gone immediately
         r = await client.get(f"/api/track/{tracking_token}")
         print(f"10. Verify 410 Gone: {r.status_code} (expected 410)")
+
+        # 11. Verify Bug 4 fix: Unknown journey IDs return 404 (never create ghost journeys)
+        bad_jid = "non-existent-journey-uuid-999"
+        ping_fake = {
+            "latitude": 13.022,
+            "longitude": 80.181,
+            "speed": 20.0,
+            "heading": 90.0,
+            "accuracy": 5.0,
+            "timestamp": "2026-11-06T12:00:00Z"
+        }
+        r = await client.post(f"/api/journeys/{bad_jid}/location", json=ping_fake, headers=headers)
+        print(f"11. Verify Unknown Journey Location Ping: {r.status_code} (expected 404)")
+        assert r.status_code == 404, f"Expected 404 but got {r.status_code}"
 
 if __name__ == "__main__":
     asyncio.run(test_full_pipeline())

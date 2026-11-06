@@ -21,21 +21,44 @@ export interface SelectedTransitInfo {
   latest_speed?: number | null;
 }
 
+export interface ReplayPoint {
+  latitude: number;
+  longitude: number;
+  speed: number;
+  heading: number;
+  recorded_at?: string;
+  accuracy?: number;
+}
+
+function getCardinalDirection(heading: number = 0): string {
+  const directions = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+  const index = Math.round(((heading % 360) / 45)) % 8;
+  return directions[index];
+}
+
 // Helper component to auto-pan or fit bounds
 function MapController({
   vehicles,
   selectedId,
   selectedTransit,
   journeyPath,
+  replayPoint,
 }: {
   vehicles: ActiveVehicleTelemetry[];
   selectedId: string | null;
   selectedTransit?: SelectedTransitInfo | null;
   journeyPath?: [number, number][];
+  replayPoint?: ReplayPoint | null;
 }) {
   const map = useMap();
 
   useEffect(() => {
+    // 0. If route playback is running, follow replay vehicle smoothly
+    if (replayPoint && replayPoint.latitude && replayPoint.longitude) {
+      map.panTo([replayPoint.latitude, replayPoint.longitude], { animate: true, duration: 0.3 });
+      return;
+    }
+
     // 1. If a transit is selected, fit bounds to the entire journey (origin, destination, path)
     if (selectedTransit) {
       const points: [number, number][] = [];
@@ -81,6 +104,29 @@ function MapController({
   }, [map, selectedId, selectedTransit, journeyPath, vehicles]);
 
   return null;
+}
+
+function createReplayIcon(heading: number = 0, speed: number = 0) {
+  const html = `
+    <div style="position: relative; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;">
+      <div style="position: absolute; width: 48px; height: 48px; border-radius: 50%; background-color: rgba(99, 102, 241, 0.4); animation: ping 1.2s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>
+      <div style="position: absolute; top: -14px; background: #4f46e5; color: white; font-size: 9px; font-weight: 800; padding: 1px 6px; border-radius: 9999px; border: 1.5px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.4); white-space: nowrap; z-index: 10;">
+        ${Math.round(speed)} km/h
+      </div>
+      <div style="transform: rotate(${heading}deg) scale(1.3); width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; position: relative; z-index: 5;">
+        <svg width="34" height="34" viewBox="0 0 24 24" fill="#6366f1" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="filter: drop-shadow(0 4px 6px rgba(0,0,0,0.6));">
+          <polygon points="12 2 19 21 12 17 5 21 12 2"/>
+        </svg>
+      </div>
+    </div>
+  `;
+  return L.divIcon({
+    html,
+    className: 'replay-vehicle-div-icon',
+    iconSize: [48, 48],
+    iconAnchor: [24, 24],
+    popupAnchor: [0, -22],
+  });
 }
 
 // Function to generate rotated SVG marker for vehicles
@@ -187,6 +233,7 @@ interface FleetMapProps {
   onSelectVehicle?: (id: string) => void;
   selectedTransit?: SelectedTransitInfo | null;
   journeyPath?: [number, number][];
+  replayPoint?: ReplayPoint | null;
 }
 
 export const FleetMap: React.FC<FleetMapProps> = ({
@@ -195,6 +242,7 @@ export const FleetMap: React.FC<FleetMapProps> = ({
   onSelectVehicle,
   selectedTransit,
   journeyPath = [],
+  replayPoint,
 }) => {
   // Default to Bangalore / India if no coordinates
   const defaultCenter: [number, number] = [12.9716, 77.5946];
@@ -245,6 +293,7 @@ export const FleetMap: React.FC<FleetMapProps> = ({
           selectedId={selectedVehicleId}
           selectedTransit={selectedTransit}
           journeyPath={journeyPath}
+          replayPoint={replayPoint}
         />
 
         {/* Selected Transit Path (Traveled Breadcrumb Polyline) */}
@@ -319,6 +368,44 @@ export const FleetMap: React.FC<FleetMapProps> = ({
             </Marker>
           )}
 
+        {/* Active Route Playback Marker (Traccar style animated replay) */}
+        {replayPoint && (
+          <Marker
+            position={[replayPoint.latitude, replayPoint.longitude]}
+            icon={createReplayIcon(replayPoint.heading || 0, replayPoint.speed || 0)}
+          >
+            <Popup className="custom-leaflet-popup" autoPan={false}>
+              <div className="p-1 min-w-[200px] text-slate-900 font-sans">
+                <div className="flex items-center justify-between border-b pb-1 mb-1.5">
+                  <span className="font-black text-xs text-indigo-700 uppercase tracking-wider flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-indigo-600 animate-ping"></span>
+                    Trip Replay Position
+                  </span>
+                  <span className="text-[10px] font-mono font-bold bg-indigo-100 text-indigo-900 px-1.5 py-0.5 rounded">
+                    {Math.round(replayPoint.speed || 0)} km/h
+                  </span>
+                </div>
+                <div className="space-y-1 text-xs">
+                  <div className="flex justify-between text-slate-600">
+                    <span>Course:</span>
+                    <strong className="text-slate-800">{Math.round(replayPoint.heading || 0)}° ({getCardinalDirection(replayPoint.heading || 0)})</strong>
+                  </div>
+                  <div className="flex justify-between text-slate-600">
+                    <span>Coordinates:</span>
+                    <strong className="text-slate-800 font-mono text-[11px]">{replayPoint.latitude.toFixed(5)}, {replayPoint.longitude.toFixed(5)}</strong>
+                  </div>
+                  {replayPoint.recorded_at && (
+                    <div className="flex justify-between text-slate-600 border-t pt-1 mt-1 text-[10px]">
+                      <span>Timestamp:</span>
+                      <strong className="text-slate-700">{new Date(replayPoint.recorded_at).toLocaleTimeString()}</strong>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </Popup>
+          </Marker>
+        )}
+
         {/* If transit is completed and vehicle is not active, render vehicle marker at last recorded ping */}
         {selectedTransit &&
           !vehiclesWithCoords.some((v) => v.vehicle_id === selectedTransit.vehicle_id) &&
@@ -391,14 +478,42 @@ export const FleetMap: React.FC<FleetMapProps> = ({
                     </div>
                   )}
 
-                  <p className="text-xs text-slate-600 mb-1">{v.model}</p>
-                  <p className="text-xs text-slate-700">
-                    <strong>Driver:</strong> {v.assigned_driver_name || 'Unassigned'}
-                  </p>
-                  <p className="text-xs text-slate-700">
-                    <strong>Speed:</strong> {v.latest_speed || 0} km/h
-                  </p>
-                  <p className="text-[10px] text-slate-500 mt-1">
+                  <p className="text-xs text-slate-600 mb-1 font-medium">{v.model}</p>
+
+                  <div className="space-y-1 text-[11px] bg-slate-50 p-2 rounded-lg border border-slate-200 mb-1">
+                    <div className="flex justify-between items-center text-slate-600">
+                      <span>Ignition:</span>
+                      <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold ${
+                        (v.latest_speed && v.latest_speed > 2) || v.status === 'IN_TRANSIT'
+                          ? 'bg-emerald-100 text-emerald-800'
+                          : 'bg-slate-200 text-slate-700'
+                      }`}>
+                        {(v.latest_speed && v.latest_speed > 2) || v.status === 'IN_TRANSIT' ? '⚡ ON' : 'OFF'}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between items-center text-slate-600">
+                      <span>Speed:</span>
+                      <strong className="text-slate-900 font-mono">{v.latest_speed || 0} km/h</strong>
+                    </div>
+
+                    <div className="flex justify-between items-center text-slate-600">
+                      <span>Heading:</span>
+                      <strong className="text-slate-900">{v.latest_heading || 0}° ({getCardinalDirection(v.latest_heading || 0)})</strong>
+                    </div>
+
+                    <div className="flex justify-between items-center text-slate-600">
+                      <span>Coords:</span>
+                      <strong className="text-slate-700 font-mono text-[10px]">{lat.toFixed(4)}, {lng.toFixed(4)}</strong>
+                    </div>
+
+                    <div className="flex justify-between items-center text-slate-600 border-t border-slate-200 pt-1 mt-1">
+                      <span>Driver:</span>
+                      <strong className="text-slate-800">{v.assigned_driver_name || 'Unassigned'}</strong>
+                    </div>
+                  </div>
+
+                  <p className="text-[10px] text-slate-500 text-right">
                     Updated: {v.latest_recorded_at ? new Date(v.latest_recorded_at).toLocaleTimeString() : 'N/A'}
                   </p>
 

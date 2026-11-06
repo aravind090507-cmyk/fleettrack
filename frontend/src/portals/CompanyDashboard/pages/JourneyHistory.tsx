@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { History, Calendar, CheckCircle, MapPin, ArrowRight, Download } from 'lucide-react';
+import { History, Calendar, CheckCircle, MapPin, ArrowRight, Download, Play } from 'lucide-react';
 import { journeysApi } from '../../../services/api';
 import { Journey } from '../../../types';
 import { Card } from '../../../components/ui/Card';
@@ -122,16 +122,29 @@ export const JourneyHistory: React.FC = () => {
                         <StatusBadge status={j.status} size="sm" />
                       </td>
                       <td className="py-3 px-4 text-right">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(`/company/live-map?journeyId=${j.id}`);
-                          }}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-[11px] font-bold transition"
-                        >
-                          <MapPin className="w-3 h-3 text-emerald-400" />
-                          <span>View Path</span>
-                        </button>
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(`/company/live-map?journeyId=${j.id}&replay=true`);
+                            }}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 rounded-lg text-[11px] font-bold transition shadow-sm cursor-pointer"
+                            title="Interactive Route Replay"
+                          >
+                            <Play className="w-3 h-3 text-indigo-400" />
+                            <span>Replay</span>
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(`/company/live-map?journeyId=${j.id}`);
+                            }}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-[11px] font-bold transition cursor-pointer"
+                          >
+                            <MapPin className="w-3 h-3 text-emerald-400" />
+                            <span>View Path</span>
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );

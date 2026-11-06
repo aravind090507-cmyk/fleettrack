@@ -37,47 +37,16 @@ async def post_single_location_ping(
     result = await db.execute(stmt)
     journey = result.scalar_one_or_none()
 
-    if journey:
-        if current_user.company_id and journey.company_id and journey.company_id != current_user.company_id:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
-        if current_user.role == "DRIVER" and journey.driver_id != current_user.id:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
-    else:
-        # Cross-container self-heal: restore active journey so telemetry ingestion persists
-        now_dt = datetime.now(timezone.utc)
-        from app.models.vehicle import Vehicle
-        v_res = await db.execute(select(Vehicle).limit(1))
-        veh = v_res.scalar_one_or_none()
-        vid = veh.id if veh else f"veh-{current_user.id[:8]}"
-        if not veh:
-            veh = Vehicle(
-                id=vid,
-                company_id=current_user.company_id,
-                registration_number="FLEET-01",
-                model="Fleet Vehicle",
-                vehicle_type="VAN",
-                status="IN_TRANSIT",
-            )
-            db.add(veh)
-            await db.flush()
-
-        journey = Journey(
-            id=journey_id,
-            company_id=current_user.company_id,
-            driver_id=current_user.id,
-            vehicle_id=vid,
-            origin_name="Start",
-            origin_lat=ping.latitude,
-            origin_lng=ping.longitude,
-            destination_name="Destination",
-            destination_lat=ping.latitude,
-            destination_lng=ping.longitude,
-            status="IN_PROGRESS",
-            started_at=now_dt,
+    if not journey:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Journey not found",
         )
-        db.add(journey)
-        await db.commit()
-        await db.refresh(journey)
+
+    if current_user.company_id and journey.company_id and journey.company_id != current_user.company_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+    if current_user.role == "DRIVER" and journey.driver_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
 
     if journey.status != "IN_PROGRESS":
         raise HTTPException(
@@ -118,46 +87,16 @@ async def post_batch_location_pings(
     result = await db.execute(stmt)
     journey = result.scalar_one_or_none()
 
-    if journey:
-        if current_user.company_id and journey.company_id and journey.company_id != current_user.company_id:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
-        if current_user.role == "DRIVER" and journey.driver_id != current_user.id:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Unauthorized")
-    else:
-        # Cross-container self-heal
-        now_dt = datetime.now(timezone.utc)
-        from app.models.vehicle import Vehicle
-        v_res = await db.execute(select(Vehicle).limit(1))
-        veh = v_res.scalar_one_or_none()
-        vid = veh.id if veh else f"veh-{current_user.id[:8]}"
-        if not veh:
-            veh = Vehicle(
-                id=vid,
-                company_id=current_user.company_id,
-                registration_number="FLEET-01",
-                model="Fleet Vehicle",
-                vehicle_type="VAN",
-                status="IN_TRANSIT",
-            )
-            db.add(veh)
-            await db.flush()
-
-        journey = Journey(
-            id=journey_id,
-            company_id=current_user.company_id,
-            driver_id=current_user.id,
-            vehicle_id=vid,
-            origin_name="Start",
-            origin_lat=batch.pings[0].latitude if batch.pings else 12.9716,
-            origin_lng=batch.pings[0].longitude if batch.pings else 77.5946,
-            destination_name="Destination",
-            destination_lat=batch.pings[-1].latitude if batch.pings else 12.9750,
-            destination_lng=batch.pings[-1].longitude if batch.pings else 77.5980,
-            status="IN_PROGRESS",
-            started_at=now_dt,
+    if not journey:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Journey not found",
         )
-        db.add(journey)
-        await db.commit()
+
+    if current_user.company_id and journey.company_id and journey.company_id != current_user.company_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+    if current_user.role == "DRIVER" and journey.driver_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Unauthorized")
         await db.refresh(journey)
 
     redis_svc = get_redis_service()

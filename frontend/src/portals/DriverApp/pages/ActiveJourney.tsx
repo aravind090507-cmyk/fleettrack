@@ -134,8 +134,8 @@ export const ActiveJourney: React.FC = () => {
     [currentJourney, setGPSStatus, setLastPing, setOfflineQueueCount]
   );
 
-  // Active GPS watcher hook with automatic smart fallback
-  const { position, error: gpsError, startWatching, stopWatching } = useGeolocation({
+  // Active GPS watcher hook with clean error feedback
+  const { position, error: gpsError, isSimulating, startWatching, stopWatching } = useGeolocation({
     simulated: simulatedMode,
     initialCoords: {
       lat: currentJourney?.origin_lat || 12.9716,
@@ -152,22 +152,6 @@ export const ActiveJourney: React.FC = () => {
     startWatching();
     return () => stopWatching();
   }, [startWatching, stopWatching, simulatedMode]);
-
-  // Immediately send initial origin ping on mount if pingCount is 0
-  useEffect(() => {
-    if (currentJourney && pingCount === 0) {
-      const initPing: LocationPing = {
-        latitude: currentJourney.origin_lat,
-        longitude: currentJourney.origin_lng,
-        speed: 0,
-        heading: 0,
-        accuracy: 5,
-        altitude: null,
-        timestamp: new Date().toISOString(),
-      };
-      handleLocationPing(initPing);
-    }
-  }, [currentJourney, handleLocationPing, pingCount]);
 
   // Copy tracking link to clipboard
   const handleCopyLink = () => {
@@ -328,6 +312,33 @@ export const ActiveJourney: React.FC = () => {
       {statusMessage && (
         <div className="p-3 bg-rose-950 border border-rose-800 text-rose-200 text-xs font-bold rounded-xl text-center animate-pulse">
           {statusMessage}
+        </div>
+      )}
+
+      {/* GPS Status Alert Banner */}
+      {gpsError && !simulatedMode && (
+        <div className="p-3 bg-red-950/80 border border-red-700 rounded-2xl flex items-start gap-2.5 shadow-lg">
+          <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5 animate-bounce" />
+          <div className="flex-1 text-xs">
+            <p className="font-bold text-red-300">GPS Signal Alert</p>
+            <p className="text-red-200/90 text-[11px] mt-0.5 leading-relaxed">{gpsError}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Development Simulation Indicator */}
+      {simulatedMode && (
+        <div className="p-2.5 bg-blue-950/70 border border-blue-800 rounded-xl flex items-center justify-between text-xs text-blue-300">
+          <span className="font-semibold flex items-center gap-1.5">
+            🚗 <span className="underline">Route Simulation Active</span> (Demo/Test Mode)
+          </span>
+          <button
+            type="button"
+            onClick={toggleSimulatedMode}
+            className="text-[10px] bg-blue-900/80 hover:bg-blue-800 text-blue-200 px-2.5 py-1 rounded-lg border border-blue-700 transition"
+          >
+            Switch to Live GPS
+          </button>
         </div>
       )}
 

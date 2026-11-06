@@ -16,6 +16,8 @@ import {
   Coffee,
   Wrench,
   ExternalLink,
+  Play,
+  Pause,
 } from 'lucide-react';
 import { dashboardApi, journeysApi, locationApi, trackingApi } from '../../../services/api';
 import {
@@ -43,6 +45,11 @@ export const LiveMap: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'transits' | 'vehicles'>('transits');
   const [search, setSearch] = useState<string>('');
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+  const [isReplaying, setIsReplaying] = useState<boolean>(false);
+  const [isPlaying, setIsPlaying] = useState<boolean>(false);
+  const [playbackIndex, setPlaybackIndex] = useState<number>(0);
+  const [playbackSpeed, setPlaybackSpeed] = useState<number>(1);
+  const [historyPings, setHistoryPings] = useState<any[]>([]);
   const { token } = useAuthStore();
 
   const selectedTransitRef = useRef<SelectedTransitInfo | null>(null);
@@ -229,10 +236,84 @@ export const LiveMap: React.FC = () => {
     setSelectedTransit(null);
     setSelectedVehicleId(null);
     setJourneyPath([]);
+    setIsReplaying(false);
+    setIsPlaying(false);
+    setPlaybackIndex(0);
     if (queryJourneyId) {
       setSearchParams({});
     }
   }, [queryJourneyId, setSearchParams]);
+
+  // Traccar-inspired Replay interval runner
+  useEffect(() => {
+    let timer: any = null;
+    if (isReplaying && isPlaying && historyPings.length > 0) {
+      const intervalMs = Math.max(150, Math.round(900 / playbackSpeed));
+      timer = setInterval(() => {
+        setPlaybackIndex((prev) => {
+          if (prev >= historyPings.length - 1) {
+            setIsPlaying(false);
+            return prev;
+          }
+          return prev + 1;
+        });
+      }, intervalMs);
+    }
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [isReplaying, isPlaying, historyPings.length, playbackSpeed]);
+
+  // Trigger auto-replay if URL has ?replay=true
+  useEffect(() => {
+    if (queryJourneyId && searchParams.get('replay') === 'true') {
+      locationApi.getHistory(queryJourneyId).then((history) => {
+        if (history && history.length > 0) {
+          setHistoryPings(history);
+          setPlaybackIndex(0);
+          setIsReplaying(true);
+          setIsPlaying(true);
+        }
+      });
+    }
+  }, [queryJourneyId, searchParams]);
+
+  const handleStartReplay = useCallback(async () => {
+    const jId = selectedTransit?.journey_id || selectedTransit?.id;
+    if (!jId) return;
+    try {
+      const history = await locationApi.getHistory(jId);
+      if (history && history.length > 0) {
+        setHistoryPings(history);
+        setPlaybackIndex(0);
+        setIsReplaying(true);
+        setIsPlaying(true);
+      } else {
+        alert('No GPS points recorded for this journey yet.');
+      }
+    } catch (e) {
+      console.warn('Could not load history for replay:', e);
+    }
+  }, [selectedTransit]);
+
+  const handleStopReplay = useCallback(() => {
+    setIsReplaying(false);
+    setIsPlaying(false);
+    setPlaybackIndex(0);
+  }, []);
+
+  const currentReplayPoint = useMemo(() => {
+    if (!isReplaying || !historyPings[playbackIndex]) return null;
+    const p = historyPings[playbackIndex];
+    return {
+      latitude: p.latitude,
+      longitude: p.longitude,
+      speed: p.speed || 0,
+      heading: p.heading || 0,
+      recorded_at: p.recorded_at || p.timestamp,
+      accuracy: p.accuracy,
+    };
+  }, [isReplaying, historyPings, playbackIndex]);
 
   // Handle incoming real-time WebSocket vehicle & journey telemetry
   const handleWebSocketMessage = useCallback(
@@ -353,6 +434,7 @@ export const LiveMap: React.FC = () => {
           }}
           selectedTransit={selectedTransit}
           journeyPath={journeyPath}
+          replayPoint={currentReplayPoint}
         />
 
         {/* 1. Real-time Clickable Active Trips Bar across top of map */}
@@ -555,8 +637,8 @@ export const LiveMap: React.FC = () => {
                 </div>
               </div>
 
-              {/* Real-time stats footer */}
-              <div className="flex items-center justify-between text-[11px] text-slate-400 pt-0.5">
+              {/* Real-time stats footer & Replay trigger */}
+              <div className="flex items-center justify-between text-[11px] text-slate-400 pt-0.5 border-t border-slate-800/80">
                 <div className="flex items-center gap-1.5">
                   <Gauge className="w-3.5 h-3.5 text-emerald-400" />
                   <span>
@@ -564,8 +646,120 @@ export const LiveMap: React.FC = () => {
                     <strong className="text-white font-mono">{journeyPath.length} pings</strong>
                   </span>
                 </div>
-                <span className="text-emerald-400 font-mono font-bold">
-                  {selectedTransit.latest_speed || 0} km/h
+                <div className="flex items-center gap-2">
+                  <span className="text-emerald-400 font-mono font-bold">
+                    {selectedTransit.latest_speed || 0} km/h
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleStartReplay}
+                    className="flex items-center gap-1 px-2.5 py-1 bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 border border-indigo-500/40 rounded-lg text-[10px] font-bold transition shadow-sm cursor-pointer"
+                    title="Traccar-style route playback"
+                  >
+                    <Play className="w-3 h-3 text-indigo-400" />
+                    <span>Replay</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Traccar-style Interactive Trip Playback Bar */}
+        {isReplaying && historyPings.length > 0 && (
+          <div className="absolute bottom-5 left-4 right-96 bg-slate-900/95 border border-indigo-500/40 backdrop-blur-xl p-4 rounded-2xl shadow-2xl z-20 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-indigo-400 animate-pulse" />
+                <span className="text-xs font-black text-white uppercase tracking-wider">
+                  Route Replay: {selectedTransit?.vehicle_registration || 'Vehicle'}
+                </span>
+                <span className="text-[10px] bg-indigo-950 text-indigo-300 px-2 py-0.5 rounded-full border border-indigo-700/60 font-mono">
+                  Point {playbackIndex + 1} of {historyPings.length}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {/* Speed Multipliers */}
+                <div className="flex bg-slate-950 p-0.5 rounded-lg border border-slate-800 text-[10px] font-bold">
+                  {[1, 2, 5].map((s) => (
+                    <button
+                      key={s}
+                      onClick={() => setPlaybackSpeed(s)}
+                      className={`px-2 py-0.5 rounded transition ${
+                        playbackSpeed === s
+                          ? 'bg-indigo-600 text-white shadow'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      {s}x
+                    </button>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleStopReplay}
+                  className="text-xs text-slate-400 hover:text-rose-400 px-2 py-1 rounded-lg hover:bg-slate-800 transition font-bold cursor-pointer"
+                >
+                  ✕ Close
+                </button>
+              </div>
+            </div>
+
+            {/* Scrubber slider */}
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setIsPlaying(!isPlaying)}
+                className="p-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl shadow-lg transition flex-shrink-0 cursor-pointer"
+              >
+                {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+              </button>
+
+              <input
+                type="range"
+                min={0}
+                max={Math.max(historyPings.length - 1, 0)}
+                value={playbackIndex}
+                onChange={(e) => {
+                  setPlaybackIndex(Number(e.target.value));
+                  setIsPlaying(false);
+                }}
+                className="w-full accent-indigo-500 cursor-pointer h-2 bg-slate-800 rounded-lg appearance-none"
+              />
+            </div>
+
+            {/* Telemetry metrics bar */}
+            <div className="grid grid-cols-4 gap-2 text-center text-xs bg-slate-950/70 p-2 rounded-xl border border-slate-800">
+              <div>
+                <span className="text-[9px] uppercase font-bold text-slate-500 block">Speed</span>
+                <span className="font-mono font-black text-indigo-400">
+                  {Math.round(historyPings[playbackIndex]?.speed || 0)} km/h
+                </span>
+              </div>
+              <div>
+                <span className="text-[9px] uppercase font-bold text-slate-500 block">Heading</span>
+                <span className="font-mono font-bold text-slate-200">
+                  {Math.round(historyPings[playbackIndex]?.heading || 0)}°
+                </span>
+              </div>
+              <div>
+                <span className="text-[9px] uppercase font-bold text-slate-500 block">Recorded At</span>
+                <span className="font-mono font-medium text-slate-300 text-[10px]">
+                  {historyPings[playbackIndex]?.recorded_at
+                    ? new Date(historyPings[playbackIndex].recorded_at).toLocaleTimeString()
+                    : historyPings[playbackIndex]?.timestamp
+                    ? new Date(historyPings[playbackIndex].timestamp).toLocaleTimeString()
+                    : 'N/A'}
+                </span>
+              </div>
+              <div>
+                <span className="text-[9px] uppercase font-bold text-slate-500 block">Ignition</span>
+                <span className={`text-[10px] font-bold ${
+                  (historyPings[playbackIndex]?.speed || 0) > 2 ? 'text-emerald-400' : 'text-slate-400'
+                }`}>
+                  {(historyPings[playbackIndex]?.speed || 0) > 2 ? '⚡ ON' : 'OFF'}
                 </span>
               </div>
             </div>
