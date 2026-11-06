@@ -123,7 +123,11 @@ async def get_public_tracking_info(
         distance_remaining_km=distance_remaining_km,
         latest_event_type=latest_event.event_type if latest_event else None,
         latest_event_at=latest_event.created_at if latest_event else None,
-        latest_event_note=latest_event.notes if latest_event else None,
+        latest_event_note=(
+            latest_event.metadata_json.get("note") or latest_event.metadata_json.get("notes")
+            if (latest_event and isinstance(latest_event.metadata_json, dict))
+            else None
+        ),
     )
 
 
