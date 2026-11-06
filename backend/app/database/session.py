@@ -13,15 +13,23 @@ logger = logging.getLogger("fleettrack.db")
 settings = get_settings()
 
 connect_args = {}
+engine_kwargs = {"echo": False}
+
 if settings.DATABASE_URL.startswith("sqlite"):
     connect_args = {"check_same_thread": False}
 elif "asyncpg" in settings.DATABASE_URL:
     connect_args = {"statement_cache_size": 0}
+    engine_kwargs.update({
+        "pool_size": 10,
+        "max_overflow": 20,
+        "pool_pre_ping": True,
+        "pool_recycle": 300,
+    })
 
 engine = create_async_engine(
     settings.DATABASE_URL,
-    echo=False,
     connect_args=connect_args,
+    **engine_kwargs,
 )
 
 AsyncSessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
@@ -65,6 +73,14 @@ async def init_db():
     import app.models.trip_event  # noqa: F401
 
     async with engine.begin() as conn:
+        # Optional PostGIS extension verification on PostgreSQL
+        if "postgresql" in settings.DATABASE_URL or "asyncpg" in settings.DATABASE_URL:
+            from sqlalchemy import text
+            try:
+                await conn.execute(text("CREATE EXTENSION IF NOT EXISTS postgis;"))
+            except Exception as e:
+                logger.debug("PostGIS extension notice (optional for standard coordinates): %s", e)
+
         await conn.run_sync(Base.metadata.create_all)
         if settings.DATABASE_URL.startswith("sqlite"):
             from sqlalchemy import text

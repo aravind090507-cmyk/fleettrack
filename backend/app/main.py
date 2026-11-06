@@ -41,6 +41,8 @@ async def lifespan(app: FastAPI):
         logger.info("Database schemas verified and initialized.")
     except Exception as e:
         logger.error("Database schema init error: %s", e)
+        if settings.APP_ENVIRONMENT == "production":
+            raise RuntimeError(f"Database connectivity failed during production startup: {e}")
 
     # 2. Seed initial demo credentials and vehicles
     try:
@@ -60,6 +62,8 @@ async def lifespan(app: FastAPI):
     # Clean shutdown
     logger.info("Shutting down Fleet Tracking Engine...")
     await redis_svc.close()
+    from app.database.session import engine
+    await engine.dispose()
     logger.info("Shutdown finalized.")
 
 
@@ -73,14 +77,25 @@ app = FastAPI(
     openapi_url="/openapi.json",
 )
 
-# Configure Cross-Origin Resource Sharing (CORS) - supports all mobile & web deployments
-app.add_middleware(
-    CORSMiddleware,
-    allow_origin_regex=r"^https?://.*",
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# Configure Cross-Origin Resource Sharing (CORS)
+cors_origins = settings.CORS_ORIGINS
+if "*" in cors_origins or settings.APP_ENVIRONMENT != "production":
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origin_regex=r"^https?://.*",
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+else:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=cors_origins,
+        allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1|.*\.vercel\.app|.*\.railway\.app)(:\d+)?$",
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
 # Mount REST API Routers
 app.include_router(auth_router)
@@ -95,15 +110,29 @@ app.include_router(ws_router)
 
 @app.get("/health", tags=["Health"])
 async def health_check():
-    """System heartbeat check."""
+    """System heartbeat and database readiness probe."""
+    db_status = "connected"
+    try:
+        from sqlalchemy import text
+        from app.database.session import AsyncSessionLocal
+        async with AsyncSessionLocal() as session:
+            await session.execute(text("SELECT 1"))
+    except Exception as e:
+        logger.warning("Database health probe check warning: %s", e)
+        db_status = "disconnected"
+
     redis_svc = get_redis_service()
-    return {
-        "status": "healthy",
-        "service": "FleetTrack Enterprise",
-        "version": "1.0.0",
-        "environment": settings.APP_ENVIRONMENT,
-        "redis_connected": redis_svc.is_connected,
-    }
+    redis_status = "connected" if redis_svc.is_connected else "in-memory"
+
+    is_healthy = db_status == "connected"
+    return JSONResponse(
+        status_code=status.HTTP_200_OK if is_healthy else status.HTTP_503_SERVICE_UNAVAILABLE,
+        content={
+            "status": "healthy" if is_healthy else "degraded",
+            "database": db_status,
+            "redis": redis_status,
+        },
+    )
 
 
 @app.exception_handler(Exception)

@@ -18,7 +18,11 @@ if (typeof window !== 'undefined') {
 }
 
 export const getApiBaseUrl = (): string => {
-  return import.meta.env.VITE_API_BASE_URL || '';
+  return (
+    import.meta.env.VITE_API_URL ||
+    import.meta.env.VITE_API_BASE_URL ||
+    ''
+  ).replace(/\/$/, '');
 };
 
 const api = axios.create({

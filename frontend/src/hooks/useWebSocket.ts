@@ -26,17 +26,22 @@ export function useWebSocket({
   const connect = useCallback(() => {
     if (!url || isTerminatedRef.current) return;
 
-    // Resolve full WebSocket URL (supports GitHub Pages, Vercel, or local proxy)
+    // Resolve full WebSocket URL (supports Vercel, Railway, or local proxy)
     let fullUrl = url;
     if (url.startsWith('/')) {
-      const customApi = getApiBaseUrl();
-      if (customApi) {
-        const wsProto = customApi.startsWith('https:') ? 'wss:' : 'ws:';
-        const host = customApi.replace(/^https?:\/\//, '').replace(/\/$/, '');
-        fullUrl = `${wsProto}//${host}${url}`;
+      const explicitWs = import.meta.env.VITE_WS_URL;
+      if (explicitWs) {
+        fullUrl = `${explicitWs.replace(/\/$/, '')}${url}`;
       } else {
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        fullUrl = `${protocol}//${window.location.host}${url}`;
+        const customApi = getApiBaseUrl();
+        if (customApi) {
+          const wsProto = customApi.startsWith('https:') ? 'wss:' : 'ws:';
+          const host = customApi.replace(/^https?:\/\//, '').replace(/\/$/, '');
+          fullUrl = `${wsProto}//${host}${url}`;
+        } else {
+          const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+          fullUrl = `${protocol}//${window.location.host}${url}`;
+        }
       }
     }
 
