@@ -80,7 +80,7 @@ async def create_device(
 
     import uuid
     device = Device(
-        id=f"dev-{uuid.uuid4()}",
+        id=str(uuid.uuid4()),
         company_id=current_user.company_id,
         unique_id=payload.unique_id,
         name=payload.name,

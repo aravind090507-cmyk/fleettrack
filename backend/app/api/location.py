@@ -32,14 +32,23 @@ async def _get_or_create_device_for_journey(db: AsyncSession, journey: Journey) 
         if dev:
             return dev
 
+    import uuid
     stmt = select(Device).where(Device.vehicle_id == journey.vehicle_id)
     dev = (await db.execute(stmt)).scalars().first()
     if not dev:
+        comp_id = journey.company_id
+        if not comp_id and journey.vehicle:
+            comp_id = journey.vehicle.company_id
+        if not comp_id:
+            from app.models.company import Company
+            comp = (await db.execute(select(Company))).scalars().first()
+            comp_id = comp.id if comp else None
+
         dev = Device(
-            id=f"dev-{journey.vehicle_id}",
-            company_id=journey.company_id or "default",
-            unique_id=f"web-{journey.vehicle_id}",
-            name=f"Web Tracker - {journey.vehicle_id}",
+            id=str(uuid.uuid4()),
+            company_id=comp_id,
+            unique_id=f"web-{journey.vehicle_id}"[:100],
+            name=f"Web Tracker - {journey.vehicle_id}"[:255],
             vehicle_id=journey.vehicle_id,
             status="online",
         )
