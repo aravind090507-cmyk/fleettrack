@@ -17,18 +17,22 @@ class LocationPing(BaseModel):
 
 
 class LocationBatch(BaseModel):
-    pings: List[LocationPing] = Field(..., min_length=1, max_length=500)
+    pings: List[LocationPing] = Field(..., min_length=1, max_length=1000)
 
 
 class LocationResponse(BaseModel):
     id: int
-    journey_id: str
+    journey_id: Optional[str] = None
+    device_id: Optional[str] = None
     latitude: float
     longitude: float
     speed: float
     heading: float
     accuracy: float
     altitude: Optional[float] = None
+    valid: bool = True
+    outdated: bool = False
+    protocol: str = "web"
     recorded_at: datetime
     server_received_at: datetime
 
@@ -39,3 +43,8 @@ class LocationIngestResult(BaseModel):
     status: str = "recorded"
     pings_processed: int = 1
     received_at: datetime
+    server_time: Optional[datetime] = None
+    accepted_count: int = 1
+    rejected_count: int = 0
+    filtered_count: int = 0
+    results: Optional[List[dict]] = None

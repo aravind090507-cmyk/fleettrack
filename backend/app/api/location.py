@@ -2,8 +2,8 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
-from typing import List, Optional
+from datetime import datetime, timezone, timedelta
+from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,15 +11,51 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database.session import get_db
 from app.models.journey import Journey
 from app.models.location import Location
+from app.models.device import Device
+from app.models.geofence import Geofence
 from app.models.user import User
 from app.schemas.location import LocationBatch, LocationIngestResult, LocationPing, LocationResponse
 from app.security.dependencies import get_current_user, require_driver
-from app.services.gps_service import ingest_location_batch, ingest_location_ping
+from app.pipeline.runner import PipelineRunner
+from app.pipeline.reasons import PipelineStatus
 from app.services.redis_service import get_redis_service
 from app.websocket.manager import get_ws_manager
 
 logger = logging.getLogger("fleettrack.location")
 router = APIRouter(prefix="/api/journeys", tags=["GPS Telemetry"])
+
+
+async def _get_or_create_device_for_journey(db: AsyncSession, journey: Journey) -> Device:
+    if journey.device_id:
+        stmt = select(Device).where(Device.id == journey.device_id)
+        dev = (await db.execute(stmt)).scalars().first()
+        if dev:
+            return dev
+
+    stmt = select(Device).where(Device.vehicle_id == journey.vehicle_id)
+    dev = (await db.execute(stmt)).scalars().first()
+    if not dev:
+        dev = Device(
+            id=f"dev-{journey.vehicle_id}",
+            company_id=journey.company_id or "default",
+            unique_id=f"web-{journey.vehicle_id}",
+            name=f"Web Tracker - {journey.vehicle_id}",
+            vehicle_id=journey.vehicle_id,
+            status="online",
+        )
+        db.add(dev)
+        await db.flush()
+
+    journey.device_id = dev.id
+    return dev
+
+
+async def _get_active_geofences(db: AsyncSession, company_id: Optional[str]) -> List[Dict[str, Any]]:
+    if not company_id:
+        return []
+    stmt = select(Geofence).where(Geofence.company_id == company_id)
+    gfs = (await db.execute(stmt)).scalars().all()
+    return [{"id": g.id, "name": g.name, "geometry": g.geometry} for g in gfs]
 
 
 @router.post("/{journey_id}/location", response_model=LocationIngestResult)
@@ -30,8 +66,8 @@ async def post_single_location_ping(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Ingest real-time GPS coordinate ping from driver mobile device.
-    Validates accuracy and speed, updates live cache, and triggers WebSocket push.
+    Ingest real-time GPS coordinate ping through the Traccar pipeline.
+    Validates, corrects time skew, suppresses jitter, evaluates geofences, and pushes updates.
     """
     stmt = select(Journey).where(Journey.id == journey_id)
     result = await db.execute(stmt)
@@ -54,21 +90,54 @@ async def post_single_location_ping(
             detail="Cannot upload GPS telemetry for a completed or inactive journey",
         )
 
-    redis_svc = get_redis_service()
-    ws_mgr = get_ws_manager()
+    device = await _get_or_create_device_for_journey(db, journey)
+    geofences = await _get_active_geofences(db, journey.company_id)
 
-    loc = await ingest_location_ping(
-        db=db,
+    runner = PipelineRunner(db)
+    res = await runner.process_position(
+        raw_ping=ping.model_dump(),
+        device=device,
         journey=journey,
-        ping=ping,
-        redis_svc=redis_svc,
-        ws_mgr=ws_mgr,
+        geofences=geofences,
+        protocol="web",
     )
+    await db.commit()
 
+    # Broadcast update if recorded
+    if res.status == PipelineStatus.RECORDED:
+        redis_svc = get_redis_service()
+        ws_mgr = get_ws_manager()
+
+        loc_payload = {
+            "type": "LOCATION_UPDATE",
+            "journey_id": journey.id,
+            "vehicle_id": journey.vehicle_id,
+            "device_id": device.id,
+            "latitude": res.position["latitude"],
+            "longitude": res.position["longitude"],
+            "speed": res.position["speed"],
+            "heading": res.position.get("heading", 0.0),
+            "accuracy": res.position.get("accuracy", 0.0),
+            "total_distance_km": journey.total_distance_km,
+            "timestamp": res.position["recorded_at"].isoformat(),
+        }
+
+        await redis_svc.set_vehicle_location(journey.vehicle_id, loc_payload)
+        await ws_mgr.broadcast_to_journey(journey.id, loc_payload)
+        if journey.company_id:
+            await ws_mgr.broadcast_to_fleet(loc_payload, company_id=journey.company_id)
+
+    status_str = "recorded" if res.status == PipelineStatus.RECORDED else res.status.value
+    now_utc = datetime.now(timezone.utc)
     return LocationIngestResult(
-        status="recorded" if loc else "filtered_noise",
-        pings_processed=1,
-        received_at=datetime.now(timezone.utc),
+        status=status_str,
+        pings_processed=1 if res.status == PipelineStatus.RECORDED else 0,
+        received_at=now_utc,
+        server_time=now_utc,
+        accepted_count=1 if res.status == PipelineStatus.RECORDED else 0,
+        rejected_count=1 if res.status == PipelineStatus.REJECTED else 0,
+        filtered_count=1 if res.status == PipelineStatus.FILTERED else 0,
+        results=[res.to_dict()],
     )
 
 
@@ -81,8 +150,15 @@ async def post_batch_location_pings(
 ):
     """
     Synchronize accumulated offline telemetry after network reconnection.
-    Preserves chronological order and filters anomalies.
+    Capped at 1000 pings with HTTP 413 on exceed.
+    Allows late offline sync within 6-hour grace window, otherwise returns 409 journey_ended.
     """
+    if len(batch.pings) > 1000:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="Payload Too Large: batch exceeds maximum 1000 pings",
+        )
+
     stmt = select(Journey).where(Journey.id == journey_id)
     result = await db.execute(stmt)
     journey = result.scalar_one_or_none()
@@ -97,23 +173,101 @@ async def post_batch_location_pings(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
     if current_user.role == "DRIVER" and journey.driver_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Unauthorized")
-        await db.refresh(journey)
 
-    redis_svc = get_redis_service()
-    ws_mgr = get_ws_manager()
+    now_utc = datetime.now(timezone.utc)
 
-    saved_count = await ingest_location_batch(
-        db=db,
-        journey=journey,
-        pings=batch.pings,
-        redis_svc=redis_svc,
-        ws_mgr=ws_mgr,
-    )
+    # Journey lifecycle checks
+    if journey.status != "IN_PROGRESS":
+        ended_at = journey.ended_at or journey.started_at
+        if ended_at.tzinfo is None:
+            ended_at = ended_at.replace(tzinfo=timezone.utc)
+
+        grace_cutoff = ended_at + timedelta(hours=6)
+        if now_utc > grace_cutoff:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={"error": "journey_ended", "status": journey.status, "ended_at": ended_at.isoformat()},
+            )
+
+        # Check if batch contains points recorded after journey ended
+        has_post_end_points = any(
+            (p.timestamp.replace(tzinfo=timezone.utc) if p.timestamp.tzinfo is None else p.timestamp) > ended_at
+            for p in batch.pings
+        )
+        if has_post_end_points:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={"error": "journey_ended", "status": journey.status, "ended_at": ended_at.isoformat()},
+            )
+
+    device = await _get_or_create_device_for_journey(db, journey)
+    geofences = await _get_active_geofences(db, journey.company_id)
+
+    sorted_pings = sorted(batch.pings, key=lambda p: p.timestamp)
+    runner = PipelineRunner(db)
+
+    accepted = 0
+    filtered = 0
+    rejected = 0
+    results_list = []
+    last_recorded_pos = None
+
+    for idx, p in enumerate(sorted_pings):
+        res = await runner.process_position(
+            raw_ping=p.model_dump(),
+            device=device,
+            journey=journey,
+            geofences=geofences,
+            protocol="web",
+        )
+        if res.status == PipelineStatus.RECORDED:
+            accepted += 1
+            last_recorded_pos = res.position
+        elif res.status == PipelineStatus.FILTERED:
+            filtered += 1
+        else:
+            rejected += 1
+
+        results_list.append({
+            "index": idx,
+            "timestamp": p.timestamp.isoformat(),
+            **res.to_dict(),
+        })
+
+    await db.commit()
+
+    # Broadcast latest recorded position if any were accepted
+    if last_recorded_pos:
+        redis_svc = get_redis_service()
+        ws_mgr = get_ws_manager()
+
+        loc_payload = {
+            "type": "LOCATION_UPDATE",
+            "journey_id": journey.id,
+            "vehicle_id": journey.vehicle_id,
+            "device_id": device.id,
+            "latitude": last_recorded_pos["latitude"],
+            "longitude": last_recorded_pos["longitude"],
+            "speed": last_recorded_pos["speed"],
+            "heading": last_recorded_pos.get("heading", 0.0),
+            "accuracy": last_recorded_pos.get("accuracy", 0.0),
+            "total_distance_km": journey.total_distance_km,
+            "timestamp": last_recorded_pos["recorded_at"].isoformat(),
+        }
+        await redis_svc.set_vehicle_location(journey.vehicle_id, loc_payload)
+        await ws_mgr.broadcast_to_journey(journey.id, loc_payload)
+        if journey.company_id:
+            await ws_mgr.broadcast_to_fleet(loc_payload, company_id=journey.company_id)
 
     return LocationIngestResult(
         status="batch_recorded",
-        pings_processed=saved_count,
-        received_at=datetime.now(timezone.utc),
+        pings_processed=accepted,
+        received_at=now_utc,
+        server_time=now_utc,
+        accepted_count=accepted,
+        rejected_count=rejected,
+        filtered_count=filtered,
+        results=results_list,
     )
 
 

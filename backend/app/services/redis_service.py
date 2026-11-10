@@ -140,6 +140,17 @@ class RedisService:
                 logger.error("Redis set location error: %s", e)
         self._memory_kv[key] = json_str
 
+    async def set_vehicle_location(self, vehicle_id: str, loc_data: Dict[str, Any]):
+        """Convenience method accepting dictionary payload."""
+        return await self.set_latest_vehicle_location(
+            vehicle_id=vehicle_id,
+            lat=float(loc_data.get("latitude", 0.0)),
+            lng=float(loc_data.get("longitude", 0.0)),
+            speed=float(loc_data.get("speed", 0.0) or 0.0),
+            heading=float(loc_data.get("heading", 0.0) or 0.0),
+            timestamp=str(loc_data.get("timestamp", "")),
+        )
+
     async def get_latest_vehicle_location(self, vehicle_id: str) -> Optional[Dict[str, Any]]:
         key = f"vehicle:{vehicle_id}:latest"
         if self._is_connected and self._client:

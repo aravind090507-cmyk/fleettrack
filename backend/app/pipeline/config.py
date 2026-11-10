@@ -14,7 +14,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "filter.future": 86400,        # 24 hours in seconds
     "filter.past": 259200,         # 72 hours (3 days) in seconds
     "filter.accuracy": 200.0,      # meters
-    "filter.maxSpeed": 250.0,      # km/h (teleport guard)
+    "filter.maxSpeed": 0,          # km/h (0 = disabled by default, matching Traccar)
     "filter.minPeriod": 0,         # seconds (0 = disabled)
     "filter.distance": 0.0,        # meters (0 = disabled)
     "filter.static": False,

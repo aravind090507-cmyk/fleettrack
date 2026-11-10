@@ -18,6 +18,9 @@ from app.api.location import router as location_router, search_router
 from app.api.tracking import router as tracking_router
 from app.api.vehicles import router as vehicles_router, seed_demo_vehicles
 from app.api.websocket_routes import router as ws_router
+from app.api.osmand import router as osmand_router
+from app.api.devices import router as devices_router
+from app.pipeline.status_sweeper import DeviceStatusSweeper
 from app.config.settings import get_settings
 from app.database.session import AsyncSessionLocal, init_db
 from app.services.redis_service import get_redis_service
@@ -56,11 +59,16 @@ async def lifespan(app: FastAPI):
     redis_svc = get_redis_service()
     await redis_svc.initialize()
 
+    # 4. Start background device status sweeper
+    sweeper = DeviceStatusSweeper(timeout_seconds=120, check_interval_seconds=30)
+    sweeper.start()
+
     logger.info("Fleet Tracking Engine startup complete.")
     yield
 
     # Clean shutdown
     logger.info("Shutting down Fleet Tracking Engine...")
+    sweeper.stop()
     await redis_svc.close()
     from app.database.session import engine
     await engine.dispose()
@@ -106,6 +114,8 @@ app.include_router(search_router)
 app.include_router(tracking_router)
 app.include_router(dashboard_router)
 app.include_router(ws_router)
+app.include_router(osmand_router)
+app.include_router(devices_router)
 
 
 @app.get("/health", tags=["Health"])

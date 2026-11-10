@@ -67,8 +67,8 @@ class FilterHandler:
                 if filter_min_period > 0 and 0 < time_delta_s < filter_min_period:
                     return False, ReasonCode.FILTERED_MIN_PERIOD
 
-                # 6. Max speed filter (teleportation guard)
-                filter_max_speed = lookup_config("filter.maxSpeed", device_attributes, self.config, 250.0)
+                # 6. Max speed filter (teleportation guard, disabled by default)
+                filter_max_speed = lookup_config("filter.maxSpeed", device_attributes, self.config, 0)
                 if filter_max_speed > 0 and time_delta_s > 0:
                     dist_m = geo.distance(last_lat, last_lon, lat, lon)
                     calculated_kmh = (dist_m / time_delta_s) * 3.6
