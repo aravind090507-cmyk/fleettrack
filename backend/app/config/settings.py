@@ -8,7 +8,7 @@ import json
 import os
 from functools import lru_cache
 from pathlib import Path
-from typing import List
+from typing import List, Union, Any
 
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -82,7 +82,7 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440  # 24 hours
 
     # CORS
-    CORS_ORIGINS: List[str] = [
+    CORS_ORIGINS: Union[List[str], str] = [
         "http://localhost:5173",
         "http://localhost:3000",
         "http://127.0.0.1:5173",
@@ -155,13 +155,26 @@ class Settings(BaseSettings):
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
-    def parse_cors_origins(cls, v):
+    def parse_cors_origins(cls, v) -> List[str]:
         if isinstance(v, str):
             stripped = v.strip()
+            if not stripped:
+                return ["*"]
             if stripped.startswith("["):
-                return json.loads(stripped)
-            return [origin.strip() for origin in stripped.split(",")]
-        return v
+                try:
+                    return json.loads(stripped)
+                except Exception:
+                    try:
+                        import ast
+                        parsed = ast.literal_eval(stripped)
+                        if isinstance(parsed, list):
+                            return [str(x).strip() for x in parsed]
+                    except Exception:
+                        pass
+            return [origin.strip() for origin in stripped.split(",") if origin.strip()]
+        if isinstance(v, list):
+            return [str(x).strip() for x in v]
+        return ["*"]
 
 
 @lru_cache(maxsize=1)
