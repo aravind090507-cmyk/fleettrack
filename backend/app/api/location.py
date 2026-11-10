@@ -108,6 +108,7 @@ async def post_single_location_ping(
         redis_svc = get_redis_service()
         ws_mgr = get_ws_manager()
 
+        rec_iso = res.position["recorded_at"].isoformat()
         loc_payload = {
             "type": "LOCATION_UPDATE",
             "journey_id": journey.id,
@@ -119,14 +120,16 @@ async def post_single_location_ping(
             "heading": res.position.get("heading", 0.0),
             "accuracy": res.position.get("accuracy", 0.0),
             "total_distance_km": journey.total_distance_km,
-            "timestamp": res.position["recorded_at"].isoformat(),
+            "timestamp": rec_iso,
+            "recorded_at": rec_iso,
         }
 
         await redis_svc.set_vehicle_location(journey.vehicle_id, loc_payload)
         await ws_mgr.broadcast_to_journey(journey.id, loc_payload)
-        if journey.company_id:
-            await ws_mgr.broadcast_to_fleet(loc_payload, company_id=journey.company_id)
-            await ws_mgr.queue_coalesced_update(company_id=journey.company_id, position=loc_payload)
+        
+        effective_company_id = journey.company_id or (journey.vehicle.company_id if journey.vehicle else None)
+        await ws_mgr.broadcast_to_fleet(loc_payload, company_id=effective_company_id)
+        await ws_mgr.queue_coalesced_update(company_id=effective_company_id, position=loc_payload)
 
     status_str = "recorded" if res.status == PipelineStatus.RECORDED else res.status.value
     now_utc = datetime.now(timezone.utc)
@@ -242,6 +245,7 @@ async def post_batch_location_pings(
         redis_svc = get_redis_service()
         ws_mgr = get_ws_manager()
 
+        rec_iso = last_recorded_pos["recorded_at"].isoformat()
         loc_payload = {
             "type": "LOCATION_UPDATE",
             "journey_id": journey.id,
@@ -253,13 +257,15 @@ async def post_batch_location_pings(
             "heading": last_recorded_pos.get("heading", 0.0),
             "accuracy": last_recorded_pos.get("accuracy", 0.0),
             "total_distance_km": journey.total_distance_km,
-            "timestamp": last_recorded_pos["recorded_at"].isoformat(),
+            "timestamp": rec_iso,
+            "recorded_at": rec_iso,
         }
         await redis_svc.set_vehicle_location(journey.vehicle_id, loc_payload)
         await ws_mgr.broadcast_to_journey(journey.id, loc_payload)
-        if journey.company_id:
-            await ws_mgr.broadcast_to_fleet(loc_payload, company_id=journey.company_id)
-            await ws_mgr.queue_coalesced_update(company_id=journey.company_id, position=loc_payload)
+        
+        effective_company_id = journey.company_id or (journey.vehicle.company_id if journey.vehicle else None)
+        await ws_mgr.broadcast_to_fleet(loc_payload, company_id=effective_company_id)
+        await ws_mgr.queue_coalesced_update(company_id=effective_company_id, position=loc_payload)
 
     return LocationIngestResult(
         status="batch_recorded",

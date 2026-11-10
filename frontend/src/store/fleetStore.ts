@@ -39,7 +39,7 @@ export const useFleetStore = create<FleetState>((set) => ({
   updateVehiclePosition: (update) =>
     set((state) => {
       const updatedActive = state.activeVehicles.map((v) => {
-        if (v.vehicle_id === update.vehicle_id) {
+        if (v.vehicle_id === update.vehicle_id || (v as any).id === update.vehicle_id) {
           return {
             ...v,
             latest_latitude: update.latitude,

@@ -132,6 +132,7 @@ async def _handle_osmand_payload(params: Dict[str, Any], db: AsyncSession) -> Re
         redis_svc = get_redis_service()
         ws_mgr = get_ws_manager()
 
+        rec_iso = pipe_res.position["recorded_at"].isoformat()
         loc_payload = {
             "type": "LOCATION_UPDATE",
             "device_id": device.id,
@@ -142,12 +143,16 @@ async def _handle_osmand_payload(params: Dict[str, Any], db: AsyncSession) -> Re
             "speed": pipe_res.position["speed"],
             "heading": pipe_res.position.get("heading", 0.0),
             "total_distance_km": round(pipe_res.position["total_distance_m"] / 1000.0, 3),
-            "timestamp": pipe_res.position["recorded_at"].isoformat(),
+            "timestamp": rec_iso,
+            "recorded_at": rec_iso,
         }
 
         if device.vehicle_id:
             await redis_svc.set_vehicle_location(device.vehicle_id, loc_payload)
-        await ws_mgr.broadcast_to_fleet(loc_payload, company_id=device.company_id)
+        
+        effective_company_id = device.company_id or (journey.company_id if journey else None)
+        await ws_mgr.broadcast_to_fleet(loc_payload, company_id=effective_company_id)
+        await ws_mgr.queue_coalesced_update(company_id=effective_company_id, position=loc_payload)
         if journey:
             await ws_mgr.broadcast_to_journey(journey.id, loc_payload)
 

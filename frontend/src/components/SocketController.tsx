@@ -80,24 +80,24 @@ export const SocketController: React.FC = () => {
         if (envelope.positions) {
           for (const pos of envelope.positions) {
             updateVehiclePosition({
-              vehicle_id: pos.device_id, // device_id is linked to vehicle
+              vehicle_id: (pos as any).vehicle_id || pos.device_id,
               latitude: pos.latitude,
               longitude: pos.longitude,
               speed: pos.speed,
-              heading: pos.course,
-              recorded_at: pos.device_time || pos.server_time,
+              heading: pos.course ?? (pos as any).heading ?? 0,
+              recorded_at: pos.device_time || pos.server_time || (pos as any).timestamp || (pos as any).recorded_at || new Date().toISOString(),
             });
           }
         }
-      } else if (msg.type === 'LOCATION_UPDATE') {
+      } else if (msg.type === 'LOCATION_UPDATE' || msg.type === 'VEHICLE_MOVED') {
         const pos: Position = {
           id: msg.id || Date.now(),
           device_id: msg.device_id || msg.vehicle_id,
           journey_id: msg.journey_id,
           protocol: msg.protocol || 'osmand',
           server_time: msg.server_time || new Date().toISOString(),
-          device_time: msg.timestamp || msg.recorded_at || new Date().toISOString(),
-          fix_time: msg.timestamp || new Date().toISOString(),
+          device_time: msg.recorded_at || msg.timestamp || new Date().toISOString(),
+          fix_time: msg.recorded_at || msg.timestamp || new Date().toISOString(),
           valid: true,
           outdated: false,
           latitude: msg.latitude,
@@ -119,7 +119,7 @@ export const SocketController: React.FC = () => {
           longitude: msg.longitude,
           speed: msg.speed || 0,
           heading: msg.heading ?? msg.course ?? 0,
-          recorded_at: msg.timestamp || msg.recorded_at || new Date().toISOString(),
+          recorded_at: msg.recorded_at || msg.timestamp || new Date().toISOString(),
         });
       } else if (msg.type === 'TRIP_EVENT') {
         addEvent({

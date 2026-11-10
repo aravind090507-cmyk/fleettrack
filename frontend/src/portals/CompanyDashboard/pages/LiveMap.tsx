@@ -55,6 +55,42 @@ export const LiveMap: React.FC = () => {
   const selectedTransitRef = useRef<SelectedTransitInfo | null>(null);
   selectedTransitRef.current = selectedTransit;
 
+  // Select a transit and load its full GPS breadcrumb path
+  const handleSelectTransit = useCallback(async (transit: ActiveJourneyTelemetry | any) => {
+    const jId = transit.journey_id || transit.id;
+    setSelectedTransit({
+      id: jId,
+      journey_id: jId,
+      vehicle_id: transit.vehicle_id,
+      origin_name: transit.origin_name,
+      origin_lat: transit.origin_lat,
+      origin_lng: transit.origin_lng,
+      destination_name: transit.destination_name,
+      destination_lat: transit.destination_lat,
+      destination_lng: transit.destination_lng,
+      vehicle_registration: transit.vehicle_registration,
+      driver_name: transit.driver_name,
+      status: transit.status,
+      total_distance_km: transit.total_distance_km,
+      latest_event_type: transit.latest_event_type,
+      latest_speed: transit.latest_location?.speed,
+    });
+    setSelectedVehicleId(transit.vehicle_id);
+
+    try {
+      const history = await locationApi.getHistory(jId);
+      if (history && history.length > 0) {
+        const coords = history.map((loc: any) => [loc.latitude, loc.longitude] as [number, number]);
+        setJourneyPath(coords);
+      } else {
+        setJourneyPath([]);
+      }
+    } catch (err) {
+      console.warn('Could not load transit path history:', err);
+      setJourneyPath([]);
+    }
+  }, []);
+
   // Load telemetry data from backend with multi-container self-healing sync
   const loadFleetData = useCallback(async () => {
     try {
@@ -113,11 +149,14 @@ export const LiveMap: React.FC = () => {
           const coords = history.map((loc: any) => [loc.latitude, loc.longitude] as [number, number]);
           setJourneyPath(coords);
         }
+      } else if (!current && resolvedJourneys.length > 0) {
+        // Auto-select first active transit so map displays route and vehicle marker immediately
+        handleSelectTransit(resolvedJourneys[0]);
       }
     } catch (e) {
       console.error('Failed to load live fleet data:', e);
     }
-  }, []);
+  }, [handleSelectTransit]);
 
   // Quick manual importer for tracking links/tokens from remote phones
   const handlePromptImportToken = async () => {
@@ -189,41 +228,6 @@ export const LiveMap: React.FC = () => {
     }
   }, [queryJourneyId]);
 
-  // Select a transit and load its full GPS breadcrumb path
-  const handleSelectTransit = useCallback(async (transit: ActiveJourneyTelemetry | any) => {
-    const jId = transit.journey_id || transit.id;
-    setSelectedTransit({
-      id: jId,
-      journey_id: jId,
-      vehicle_id: transit.vehicle_id,
-      origin_name: transit.origin_name,
-      origin_lat: transit.origin_lat,
-      origin_lng: transit.origin_lng,
-      destination_name: transit.destination_name,
-      destination_lat: transit.destination_lat,
-      destination_lng: transit.destination_lng,
-      vehicle_registration: transit.vehicle_registration,
-      driver_name: transit.driver_name,
-      status: transit.status,
-      total_distance_km: transit.total_distance_km,
-      latest_event_type: transit.latest_event_type,
-      latest_speed: transit.latest_location?.speed,
-    });
-    setSelectedVehicleId(transit.vehicle_id);
-
-    try {
-      const history = await locationApi.getHistory(jId);
-      if (history && history.length > 0) {
-        const coords = history.map((loc: any) => [loc.latitude, loc.longitude] as [number, number]);
-        setJourneyPath(coords);
-      } else {
-        setJourneyPath([]);
-      }
-    } catch (err) {
-      console.warn('Could not load transit path history:', err);
-      setJourneyPath([]);
-    }
-  }, []);
 
   const handleClearTransit = useCallback(() => {
     setSelectedTransit(null);
@@ -308,74 +312,117 @@ export const LiveMap: React.FC = () => {
     };
   }, [isReplaying, historyPings, playbackIndex]);
 
+  // Core handler for single location pings (both direct WebSocket and coalesced envelopes)
+  const processLocationUpdate = useCallback(
+    (update: any) => {
+      const vId = update.vehicle_id || update.device_id || update.id;
+      const jId = update.journey_id;
+      const lat = update.latitude;
+      const lng = update.longitude;
+      const speed = update.speed ?? 0;
+      const heading = update.heading ?? update.course ?? 0;
+      const recAt =
+        update.recorded_at ||
+        update.timestamp ||
+        update.device_time ||
+        update.server_time ||
+        new Date().toISOString();
+      const accuracy = update.accuracy || 0;
+
+      if (lat == null || lng == null) return;
+
+      // 1. Update vehicle position in state
+      let foundVehicle = false;
+      setVehicles((prev) =>
+        prev.map((v) => {
+          if (
+            (vId && (v.vehicle_id === vId || (v as any).id === vId)) ||
+            (jId && v.current_journey_id === jId)
+          ) {
+            foundVehicle = true;
+            return {
+              ...v,
+              latest_latitude: lat,
+              latest_longitude: lng,
+              latest_speed: speed,
+              latest_heading: heading,
+              latest_recorded_at: recAt,
+              status: 'IN_TRANSIT',
+            };
+          }
+          return v;
+        })
+      );
+
+      // 2. Update active journeys in state
+      let foundJourney = false;
+      setActiveJourneys((prev) =>
+        prev.map((j) => {
+          if (
+            (jId && (j.journey_id === jId || (j as any).id === jId)) ||
+            (vId && j.vehicle_id === vId)
+          ) {
+            foundJourney = true;
+            return {
+              ...j,
+              latest_location: {
+                latitude: lat,
+                longitude: lng,
+                speed: speed,
+                heading: heading,
+                accuracy: accuracy,
+                timestamp: recAt,
+              },
+            };
+          }
+          return j;
+        })
+      );
+
+      // 3. Update polyline path and speed if this transit is currently selected
+      const current = selectedTransitRef.current;
+      if (
+        current &&
+        ((jId && (current.journey_id === jId || (current as any).id === jId)) ||
+          (vId && (current as any).vehicle_id === vId))
+      ) {
+        setSelectedTransit((prev) => (prev ? { ...prev, latest_speed: speed } : prev));
+        setJourneyPath((prev) => {
+          if (prev.length > 0) {
+            const last = prev[prev.length - 1];
+            if (Math.abs(last[0] - lat) < 0.00001 && Math.abs(last[1] - lng) < 0.00001) {
+              return prev;
+            }
+          }
+          return [...prev, [lat, lng]];
+        });
+      }
+
+      // If newly discovered vehicle or journey arrived via WS, refresh full fleet list
+      if (!foundVehicle || !foundJourney) {
+        loadFleetData();
+      }
+    },
+    [loadFleetData]
+  );
+
   // Handle incoming real-time WebSocket vehicle & journey telemetry
   const handleWebSocketMessage = useCallback(
     (msg: WebSocketMessage) => {
-      if (msg.type === 'VEHICLE_MOVED' || msg.type === 'LOCATION_UPDATE') {
-        const vId = msg.vehicle_id;
-        const jId = msg.journey_id;
+      if (!msg) return;
 
-        // 1. Update vehicle position in state
-        let foundVehicle = false;
-        setVehicles((prev) =>
-          prev.map((v) => {
-            if (v.vehicle_id === vId) {
-              foundVehicle = true;
-              return {
-                ...v,
-                latest_latitude: msg.latitude,
-                latest_longitude: msg.longitude,
-                latest_speed: msg.speed,
-                latest_heading: msg.heading,
-                latest_recorded_at: msg.recorded_at,
-                status: 'IN_TRANSIT',
-              };
-            }
-            return v;
-          })
-        );
-
-        // 2. Update active journeys in state
-        let foundJourney = false;
-        setActiveJourneys((prev) =>
-          prev.map((j) => {
-            if (j.journey_id === jId || j.vehicle_id === vId) {
-              foundJourney = true;
-              return {
-                ...j,
-                latest_location: {
-                  latitude: msg.latitude,
-                  longitude: msg.longitude,
-                  speed: msg.speed,
-                  heading: msg.heading,
-                  accuracy: msg.accuracy || 0,
-                  timestamp: msg.recorded_at,
-                },
-              };
-            }
-            return j;
-          })
-        );
-
-        // If newly discovered vehicle or journey arrived via WS, refresh full fleet list
-        if (!foundVehicle || !foundJourney) {
+      if (msg.type === 'ENVELOPE') {
+        const env = msg as any;
+        if (env.positions && Array.isArray(env.positions)) {
+          for (const pos of env.positions) {
+            processLocationUpdate(pos);
+          }
+        }
+        if (env.events && Array.isArray(env.events)) {
           loadFleetData();
         }
-
-        // 3. If currently viewing this transit, append point to polyline (deduplicating identical coordinates) & update speed
-        const current = selectedTransitRef.current;
-        if (current && (current.journey_id === jId || (current as any).vehicle_id === vId)) {
-          setSelectedTransit((prev) => (prev ? { ...prev, latest_speed: msg.speed } : prev));
-          setJourneyPath((prev) => {
-            if (prev.length > 0) {
-              const last = prev[prev.length - 1];
-              if (Math.abs(last[0] - msg.latitude) < 0.00001 && Math.abs(last[1] - msg.longitude) < 0.00001) {
-                return prev;
-              }
-            }
-            return [...prev, [msg.latitude, msg.longitude]];
-          });
-        }
+      } else if (msg.type === 'VEHICLE_MOVED' || msg.type === 'LOCATION_UPDATE') {
+        processLocationUpdate(msg);
       } else if (
         msg.type === 'JOURNEY_STARTED' ||
         msg.type === 'JOURNEY_FINISHED' ||
@@ -385,7 +432,7 @@ export const LiveMap: React.FC = () => {
         loadFleetData();
       }
     },
-    [loadFleetData]
+    [processLocationUpdate, loadFleetData]
   );
 
   // Connect to live fleet WebSocket
