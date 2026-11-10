@@ -204,6 +204,14 @@ class PipelineRunner:
                 else:
                     safe_attributes[k] = str(v)
 
+            rec_at = pos["recorded_at"]
+            if hasattr(rec_at, "tzinfo") and rec_at.tzinfo is not None:
+                rec_at = rec_at.replace(tzinfo=None)
+
+            dev_time = pos.get("device_time")
+            if hasattr(dev_time, "tzinfo") and dev_time.tzinfo is not None:
+                dev_time = dev_time.replace(tzinfo=None)
+
             location_record = Location(
                 journey_id=journey.id if journey else None,
                 device_id=device.id,
@@ -212,8 +220,8 @@ class PipelineRunner:
                 speed=pos["speed"],
                 heading=pos.get("heading", 0.0),
                 accuracy=pos.get("accuracy", 0.0),
-                recorded_at=pos["recorded_at"],
-                device_time=pos.get("device_time"),
+                recorded_at=rec_at,
+                device_time=dev_time,
                 valid=pos.get("valid", True),
                 outdated=pos.get("outdated", False),
                 protocol=protocol,
@@ -227,6 +235,9 @@ class PipelineRunner:
 
             # Persist Events
             for evt_data in events:
+                e_time = evt_data.get("event_time")
+                if hasattr(e_time, "tzinfo") and e_time.tzinfo is not None:
+                    e_time = e_time.replace(tzinfo=None)
                 evt_record = Event(
                     id=evt_data["id"],
                     company_id=evt_data["company_id"],
@@ -234,14 +245,14 @@ class PipelineRunner:
                     journey_id=evt_data.get("journey_id"),
                     geofence_id=evt_data.get("geofence_id"),
                     type=evt_data["type"],
-                    event_time=evt_data["event_time"],
+                    event_time=e_time,
                     attributes=evt_data.get("attributes"),
                 )
                 self.session.add(evt_record)
 
             # 10. Update Device State & Tracking in DB and Cache
             device.status = "online"
-            device.last_update = pos["recorded_at"]
+            device.last_update = rec_at
             device.motion_state = pos["motion"]
 
             # Update Journey summary if active journey exists
