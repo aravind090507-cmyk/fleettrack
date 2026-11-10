@@ -7,19 +7,19 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://fleettrack-production-dba9.up.railway.app/api/:path*"
+      "destination": "https://fleettrack-production-d254.up.railway.app/api/:path*"
     },
     {
       "source": "/health",
-      "destination": "https://fleettrack-production-dba9.up.railway.app/health"
+      "destination": "https://fleettrack-production-d254.up.railway.app/health"
     },
     {
       "source": "/docs",
-      "destination": "https://fleettrack-production-dba9.up.railway.app/docs"
+      "destination": "https://fleettrack-production-d254.up.railway.app/docs"
     },
     {
       "source": "/openapi.json",
-      "destination": "https://fleettrack-production-dba9.up.railway.app/openapi.json"
+      "destination": "https://fleettrack-production-d254.up.railway.app/openapi.json"
     },
     {
       "source": "/(.*)",
