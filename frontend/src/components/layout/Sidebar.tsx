@@ -9,6 +9,10 @@ import {
   LogOut,
   Radio,
   ShieldAlert,
+  Smartphone,
+  Shield,
+  FileText,
+  RotateCcw,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { useAuthStore } from '../../store/authStore';
@@ -28,6 +32,10 @@ export const Sidebar: React.FC = () => {
     { to: '/company/vehicles', label: 'Fleet Assets', icon: Truck },
     { to: '/company/journeys', label: 'Active Trips', icon: Route },
     { to: '/company/history', label: 'Trip History', icon: History },
+    { to: '/company/devices', label: 'Telematics Trackers', icon: Smartphone },
+    { to: '/company/geofences', label: 'Geofences', icon: Shield },
+    { to: '/company/reports', label: 'Reports & Logs', icon: FileText },
+    { to: '/company/replay', label: 'Route Replay', icon: RotateCcw },
   ];
 
   return (

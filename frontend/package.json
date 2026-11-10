@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "test": "vitest run src/tests/probe.test.tsx --environment jsdom --test-timeout=10000"
+    "test": "vitest run src/tests --environment jsdom --test-timeout=15000"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.60.5",

@@ -3,11 +3,19 @@ import {
   ActiveJourneyTelemetry,
   ActiveVehicleTelemetry,
   DashboardOverview,
+  Device,
+  DeviceDiagnostics,
+  Geofence,
   Journey,
   LatestLocation,
   LocationPing,
+  Position,
+  StopReportItem,
+  SummaryReportItem,
+  TelematicsEvent,
   TrackingInfo,
   TripAlert,
+  TripReportItem,
   User,
   Vehicle,
 } from '../types';
@@ -234,6 +242,143 @@ export const dashboardApi = {
   getRecentEvents: async (limit = 20) => {
     const { data } = await api.get(`/api/dashboard/events?limit=${limit}`);
     return data as TripAlert[];
+  },
+};
+
+// --- Devices Endpoints ---
+export const devicesApi = {
+  list: async () => {
+    const { data } = await api.get('/api/devices');
+    return data as Device[];
+  },
+  get: async (id: string) => {
+    const { data } = await api.get(`/api/devices/${id}`);
+    return data as Device;
+  },
+  create: async (deviceData: { unique_id: string; name: string; phone?: string; model?: string; contact?: string; category?: string; attributes?: Record<string, any> }) => {
+    const { data } = await api.post('/api/devices', deviceData);
+    return data as Device;
+  },
+  update: async (id: string, deviceData: Partial<Device>) => {
+    const { data } = await api.put(`/api/devices/${id}`, deviceData);
+    return data as Device;
+  },
+  delete: async (id: string) => {
+    await api.delete(`/api/devices/${id}`);
+  },
+  getDiagnostics: async (id: string) => {
+    const { data } = await api.get(`/api/devices/${id}/diagnostics`);
+    return data as DeviceDiagnostics;
+  },
+};
+
+// --- Positions Endpoints ---
+export const positionsApi = {
+  list: async (params?: { device_id?: string; from?: string; to?: string; cursor?: number; limit?: number }) => {
+    const query = new URLSearchParams();
+    if (params?.device_id) query.append('device_id', params.device_id);
+    if (params?.from) query.append('from', params.from);
+    if (params?.to) query.append('to', params.to);
+    if (params?.cursor !== undefined) query.append('cursor', String(params.cursor));
+    if (params?.limit !== undefined) query.append('limit', String(params.limit));
+    const { data } = await api.get(`/api/positions?${query.toString()}`);
+    return data as { items: Position[]; next_cursor: number | null; total: number };
+  },
+};
+
+// --- Events Endpoints ---
+export const eventsApi = {
+  list: async (params?: { device_id?: string; journey_id?: string; type?: string; from?: string; to?: string; limit?: number }) => {
+    const query = new URLSearchParams();
+    if (params?.device_id) query.append('device_id', params.device_id);
+    if (params?.journey_id) query.append('journey_id', params.journey_id);
+    if (params?.type) query.append('type', params.type);
+    if (params?.from) query.append('from', params.from);
+    if (params?.to) query.append('to', params.to);
+    if (params?.limit !== undefined) query.append('limit', String(params.limit));
+    const { data } = await api.get(`/api/events?${query.toString()}`);
+    return data as TelematicsEvent[];
+  },
+};
+
+// --- Geofences Endpoints ---
+export const geofencesApi = {
+  list: async () => {
+    const { data } = await api.get('/api/geofences');
+    return data as Geofence[];
+  },
+  get: async (id: string) => {
+    const { data } = await api.get(`/api/geofences/${id}`);
+    return data as Geofence;
+  },
+  create: async (geofence: { name: string; description?: string; area: string; attributes?: Record<string, any> }) => {
+    const { data } = await api.post('/api/geofences', geofence);
+    return data as Geofence;
+  },
+  update: async (id: string, geofence: Partial<Geofence>) => {
+    const { data } = await api.put(`/api/geofences/${id}`, geofence);
+    return data as Geofence;
+  },
+  delete: async (id: string) => {
+    await api.delete(`/api/geofences/${id}`);
+  },
+  linkDevices: async (id: string, deviceIds: string[]) => {
+    const { data } = await api.post(`/api/geofences/${id}/devices`, { device_ids: deviceIds });
+    return data;
+  },
+};
+
+// --- Reports Endpoints ---
+export const reportsApi = {
+  getRoute: async (params: { device_id?: string; from: string; to: string; format?: 'json' | 'csv' | 'gpx' }) => {
+    const query = new URLSearchParams();
+    if (params.device_id) query.append('device_id', params.device_id);
+    query.append('from', params.from);
+    query.append('to', params.to);
+    if (params.format) query.append('format', params.format);
+    
+    if (params.format === 'csv' || params.format === 'gpx') {
+      const response = await api.get(`/api/reports/route?${query.toString()}`, { responseType: 'blob' });
+      return response.data;
+    }
+    const { data } = await api.get(`/api/reports/route?${query.toString()}`);
+    return data as Position[];
+  },
+  getTrips: async (params: { device_id?: string; from: string; to: string; format?: 'json' | 'csv' }) => {
+    const query = new URLSearchParams();
+    if (params.device_id) query.append('device_id', params.device_id);
+    query.append('from', params.from);
+    query.append('to', params.to);
+    if (params.format) query.append('format', params.format);
+
+    if (params.format === 'csv') {
+      const response = await api.get(`/api/reports/trips?${query.toString()}`, { responseType: 'blob' });
+      return response.data;
+    }
+    const { data } = await api.get(`/api/reports/trips?${query.toString()}`);
+    return data as TripReportItem[];
+  },
+  getStops: async (params: { device_id?: string; from: string; to: string; format?: 'json' | 'csv' }) => {
+    const query = new URLSearchParams();
+    if (params.device_id) query.append('device_id', params.device_id);
+    query.append('from', params.from);
+    query.append('to', params.to);
+    if (params.format) query.append('format', params.format);
+
+    if (params.format === 'csv') {
+      const response = await api.get(`/api/reports/stops?${query.toString()}`, { responseType: 'blob' });
+      return response.data;
+    }
+    const { data } = await api.get(`/api/reports/stops?${query.toString()}`);
+    return data as StopReportItem[];
+  },
+  getSummary: async (params: { device_id?: string; from: string; to: string }) => {
+    const query = new URLSearchParams();
+    if (params.device_id) query.append('device_id', params.device_id);
+    query.append('from', params.from);
+    query.append('to', params.to);
+    const { data } = await api.get(`/api/reports/summary?${query.toString()}`);
+    return data as SummaryReportItem[];
   },
 };
 

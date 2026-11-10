@@ -2,14 +2,16 @@ import React, { useEffect, useState } from 'react';
 import { Truck, Navigation, CheckCircle2, WifiOff, AlertTriangle, Activity } from 'lucide-react';
 import { dashboardApi } from '../../../services/api';
 import { ActiveVehicleTelemetry, DashboardOverview } from '../../../types';
+import { useTelematicsStore } from '../../../store/telematicsStore';
+import { useFleetStore } from '../../../store/fleetStore';
 import { Card } from '../../../components/ui/Card';
 import { LoadingSpinner } from '../../../components/ui/LoadingSpinner';
 import { StatusBadge } from '../../../components/ui/StatusBadge';
 
 export const Overview: React.FC = () => {
-  const [overview, setOverview] = useState<DashboardOverview | null>(null);
-  const [activeVehicles, setActiveVehicles] = useState<ActiveVehicleTelemetry[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const socketConnected = useTelematicsStore((s) => s.socket.connected);
+  const { overview, activeVehicles, setOverview, setActiveVehicles } = useFleetStore();
+  const [loading, setLoading] = useState<boolean>(!overview);
 
   const loadData = React.useCallback(() => {
     Promise.all([dashboardApi.getOverview(), dashboardApi.getActiveVehicles()])
@@ -19,13 +21,15 @@ export const Overview: React.FC = () => {
       })
       .catch((e) => console.error('Dashboard overview load error:', e))
       .finally(() => setLoading(false));
-  }, []);
+  }, [setOverview, setActiveVehicles]);
 
   useEffect(() => {
     loadData();
-    const interval = setInterval(loadData, 1500); // 1.5s auto-refresh
+    // 60s safety refresh, 10s if socket is down
+    const pollInterval = socketConnected ? 60000 : 10000;
+    const interval = setInterval(loadData, pollInterval);
     return () => clearInterval(interval);
-  }, [loadData]);
+  }, [loadData, socketConnected]);
 
   if (loading) return <LoadingSpinner label="Compiling fleet analytics..." />;
 

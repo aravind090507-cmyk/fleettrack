@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Route, Clock, Navigation, MapPin, ArrowRight } from 'lucide-react';
+import { useTelematicsStore } from '../../../store/telematicsStore';
 import { journeysApi, trackingApi } from '../../../services/api';
 import { Journey } from '../../../types';
 import { Card } from '../../../components/ui/Card';
@@ -50,11 +51,14 @@ export const ActiveJourneys: React.FC = () => {
     }
   }, []);
 
+  const socketConnected = useTelematicsStore((s) => s.socket.connected);
+
   useEffect(() => {
     loadActive();
-    const interval = setInterval(loadActive, 1500); // 1.5s auto-refresh
+    const pollInterval = socketConnected ? 60000 : 10000;
+    const interval = setInterval(loadActive, pollInterval);
     return () => clearInterval(interval);
-  }, [loadActive]);
+  }, [loadActive, socketConnected]);
 
   return (
     <div className="space-y-6">
@@ -64,7 +68,7 @@ export const ActiveJourneys: React.FC = () => {
           <p className="text-xs text-slate-400">All vehicular movements currently underway. Click any row to view live path.</p>
         </div>
         <span className="text-[11px] font-mono text-emerald-400 bg-emerald-950/80 px-2.5 py-1 rounded-full border border-emerald-800">
-          Auto-sync 2.5s
+          {socketConnected ? 'Live Socket Stream' : 'Safety Poll 10s'}
         </span>
       </div>
 

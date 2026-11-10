@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { History, Calendar, CheckCircle, MapPin, ArrowRight, Download, Play } from 'lucide-react';
 import { journeysApi } from '../../../services/api';
+import { useTelematicsStore } from '../../../store/telematicsStore';
 import { Journey } from '../../../types';
 import { Card } from '../../../components/ui/Card';
 import { StatusBadge } from '../../../components/ui/StatusBadge';
@@ -48,11 +49,14 @@ export const JourneyHistory: React.FC = () => {
     document.body.removeChild(link);
   };
 
+  const socketConnected = useTelematicsStore((s) => s.socket.connected);
+
   useEffect(() => {
     loadHistory(true);
-    const interval = setInterval(() => loadHistory(false), 3500);
+    const pollInterval = socketConnected ? 60000 : 10000;
+    const interval = setInterval(() => loadHistory(false), pollInterval);
     return () => clearInterval(interval);
-  }, []);
+  }, [socketConnected]);
 
   return (
     <div className="space-y-6">

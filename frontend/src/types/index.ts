@@ -162,6 +162,142 @@ export interface OfflineGPSRecord {
 }
 
 export interface WebSocketMessage {
-  type: 'LOCATION_UPDATE' | 'JOURNEY_STARTED' | 'JOURNEY_COMPLETED' | 'INITIAL_STATE' | 'VEHICLE_MOVED' | 'JOURNEY_FINISHED' | 'TRIP_EVENT' | 'FLEET_STREAM_CONNECTED';
+  type: 'LOCATION_UPDATE' | 'JOURNEY_STARTED' | 'JOURNEY_COMPLETED' | 'INITIAL_STATE' | 'VEHICLE_MOVED' | 'JOURNEY_FINISHED' | 'TRIP_EVENT' | 'FLEET_STREAM_CONNECTED' | 'ENVELOPE' | 'DEVICE_STATUS';
   [key: string]: any;
+}
+
+export interface Device {
+  id: string;
+  unique_id: string;
+  name: string;
+  status: 'online' | 'unknown' | 'offline';
+  disabled: boolean;
+  last_update: string | null;
+  position_id: number | null;
+  phone?: string | null;
+  model?: string | null;
+  contact?: string | null;
+  category?: string | null;
+  attributes: Record<string, any>;
+  company_id?: string;
+  vehicle_id?: string | null;
+  vehicle?: Vehicle | null;
+}
+
+export interface DeviceDiagnostics {
+  device_id: string;
+  unique_id: string;
+  name: string;
+  status: string;
+  last_update: string | null;
+  rejection_counters: Record<string, number>;
+  last_rejected_points: Array<{
+    reason: string;
+    latitude: number;
+    longitude: number;
+    device_time: string;
+    server_time: string;
+    attributes?: Record<string, any>;
+  }>;
+  clock_skew_ms: number;
+  ingest_lag_ms: number;
+}
+
+export interface Position {
+  id: number;
+  device_id: string;
+  journey_id?: string | null;
+  protocol: string;
+  server_time: string;
+  device_time: string;
+  fix_time: string;
+  valid: boolean;
+  outdated: boolean;
+  latitude: number;
+  longitude: number;
+  altitude?: number | null;
+  speed: number;
+  course: number;
+  address?: string | null;
+  accuracy: number;
+  distance_m: number;
+  total_distance_m: number;
+  motion: boolean;
+  geofence_ids: string[];
+  attributes: Record<string, any>;
+}
+
+export interface TelematicsEvent {
+  id: string;
+  type: string;
+  event_time: string;
+  device_id: string;
+  journey_id?: string | null;
+  position_id?: number | null;
+  geofence_id?: string | null;
+  attributes: Record<string, any>;
+}
+
+export interface Geofence {
+  id: string;
+  company_id: string;
+  name: string;
+  description?: string | null;
+  area: string;
+  attributes: Record<string, any>;
+  created_at: string;
+  device_ids?: string[];
+}
+
+export interface TripReportItem {
+  device_id: string;
+  start_time: string;
+  start_position_id?: number | null;
+  start_lat: number;
+  start_lng: number;
+  start_address?: string | null;
+  end_time: string;
+  end_position_id?: number | null;
+  end_lat: number;
+  end_lng: number;
+  end_address?: string | null;
+  distance_km: number;
+  duration_seconds: number;
+  max_speed_kmh: number;
+  avg_speed_kmh: number;
+}
+
+export interface StopReportItem {
+  device_id: string;
+  start_time: string;
+  end_time: string;
+  duration_seconds: number;
+  position_id?: number | null;
+  latitude: number;
+  longitude: number;
+  address?: string | null;
+  spent_fuel: number;
+}
+
+export interface SummaryReportItem {
+  device_id: string;
+  device_name: string;
+  start_time: string;
+  end_time: string;
+  distance_km: number;
+  max_speed_kmh: number;
+  avg_speed_kmh: number;
+  engine_hours: number;
+  spent_fuel: number;
+  moving_duration_seconds: number;
+  stop_duration_seconds: number;
+  position_count: number;
+}
+
+export interface TelematicsEnvelope {
+  type: 'ENVELOPE';
+  devices?: Device[];
+  positions?: Position[];
+  events?: TelematicsEvent[];
+  server_time?: string;
 }

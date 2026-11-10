@@ -18,10 +18,13 @@ import {
   Shield,
   EyeOff,
   Route,
+  Smartphone,
+  Server,
+  Layers,
 } from 'lucide-react';
 import { useDriverStore } from '../../../store/driverStore';
-import { journeysApi, locationApi } from '../../../services/api';
-import { offlineStorage } from '../../../services/offlineStorage';
+import { journeysApi, locationApi, getApiBaseUrl } from '../../../services/api';
+import { positionUploader, UploaderState } from '../../../services/positionUploader';
 import { useGeolocation } from '../../../hooks/useGeolocation';
 import { useJourneyTimer } from '../../../hooks/useJourneyTimer';
 import { useOfflineSync } from '../../../hooks/useOfflineSync';
@@ -53,6 +56,11 @@ export const ActiveJourney: React.FC = () => {
   const [sosProgress, setSosProgress] = useState<number>(0);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [pingCount, setPingCount] = useState<number>(0);
+  const [uploaderState, setUploaderState] = useState<UploaderState>(positionUploader.getState());
+  const [copiedDeviceId, setCopiedDeviceId] = useState<boolean>(false);
+  const [copiedServerUrl, setCopiedServerUrl] = useState<boolean>(false);
+  const [lastFixTime, setLastFixTime] = useState<number>(Date.now());
+  const [fixAgeSec, setFixAgeSec] = useState<number>(0);
 
   // Guarantee clean public tracking URL (never hardcoded localhost on mobile)
   const effectiveTrackingUrl = useMemo(() => {
@@ -107,51 +115,39 @@ export const ActiveJourney: React.FC = () => {
   // Journey timer
   const { formattedTime } = useJourneyTimer(currentJourney?.started_at, !isPaused);
 
-  // Periodic GPS upload callback
+  // PositionUploader subscription
+  useEffect(() => {
+    positionUploader.setJourneyId(currentJourney?.id || null);
+    const unsubscribe = positionUploader.subscribe((state) => {
+      setUploaderState(state);
+      setOfflineQueueCount(state.queueDepth);
+    });
+    return () => {
+      unsubscribe();
+    };
+  }, [currentJourney?.id, setOfflineQueueCount]);
+
+  // Fix age counter
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setFixAgeSec(Math.max(0, Math.floor((Date.now() - lastFixTime) / 1000)));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [lastFixTime]);
+
+  // Position upload callback via PositionUploader write-ahead service
   const handleLocationPing = useCallback(
     async (ping: LocationPing) => {
       if (!currentJourney) return;
       setLastPing(ping);
       setGPSStatus('active');
+      setLastFixTime(Date.now());
+      setFixAgeSec(0);
+      setPingCount((c) => c + 1);
 
-      if (navigator.onLine) {
-        try {
-          const res = await locationApi.uploadPing(currentJourney.id, ping);
-          if (res?.status === 'recorded' || res?.status === 'accepted') {
-            setPingCount((c) => c + 1);
-          }
-        } catch (e) {
-          console.warn('Network upload failed. Buffering ping to IndexedDB...');
-          await offlineStorage.addRecord({
-            journey_id: currentJourney.id,
-            latitude: ping.latitude,
-            longitude: ping.longitude,
-            speed: ping.speed,
-            heading: ping.heading,
-            accuracy: ping.accuracy,
-            altitude: ping.altitude || undefined,
-            timestamp: ping.timestamp,
-          });
-          const count = await offlineStorage.getPendingCount(currentJourney.id);
-          setOfflineQueueCount(count);
-        }
-      } else {
-        // Device is offline: save to IndexedDB
-        await offlineStorage.addRecord({
-          journey_id: currentJourney.id,
-          latitude: ping.latitude,
-          longitude: ping.longitude,
-          speed: ping.speed,
-          heading: ping.heading,
-          accuracy: ping.accuracy,
-          altitude: ping.altitude || undefined,
-          timestamp: ping.timestamp,
-        });
-        const count = await offlineStorage.getPendingCount(currentJourney.id);
-        setOfflineQueueCount(count);
-      }
+      await positionUploader.enqueue(currentJourney.id, ping);
     },
-    [currentJourney, setGPSStatus, setLastPing, setOfflineQueueCount]
+    [currentJourney, setGPSStatus, setLastPing]
   );
 
   const initialCoords = useMemo(
@@ -419,6 +415,37 @@ export const ActiveJourney: React.FC = () => {
         </div>
       )}
 
+      {/* Clock Skew Warning Banner */}
+      {Math.abs(uploaderState.serverTimeOffsetMs) > 10000 && (
+        <div className="p-3 bg-amber-950/80 border border-amber-800 rounded-2xl flex items-start gap-2.5 shadow-lg">
+          <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5 animate-bounce" />
+          <div className="flex-1 text-xs">
+            <p className="font-bold text-amber-300">Clock Skew Warning</p>
+            <p className="text-amber-200/90 text-[11px] mt-0.5 leading-relaxed">
+              Device clock differs from server time by {Math.round(uploaderState.serverTimeOffsetMs / 1000)}s. GPS
+              timestamps are automatically calibrated.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* GPS Rejections / Filter reasons */}
+      {uploaderState.lastRejectionReasons.length > 0 && (
+        <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl text-xs space-y-1">
+          <span className="text-[10px] uppercase font-bold text-slate-400">Recent GPS Filter Flags</span>
+          <div className="flex flex-wrap gap-1.5 pt-1">
+            {uploaderState.lastRejectionReasons.map((reason, idx) => (
+              <span
+                key={idx}
+                className="text-[10px] font-mono px-2 py-0.5 rounded bg-rose-950/60 text-rose-300 border border-rose-800"
+              >
+                {reason}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Background GPS Throttling Warning Banner */}
       {backgroundWarning && (
         <div className="p-3 bg-amber-950/70 border border-amber-800 rounded-2xl flex items-start gap-2.5 shadow-lg">
@@ -542,27 +569,131 @@ export const ActiveJourney: React.FC = () => {
       </div>
 
       {/* Live Telemetry HUD */}
-      <div className="grid grid-cols-3 gap-2">
-        <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl text-center">
-          <Gauge className="w-4 h-4 text-emerald-400 mx-auto mb-1" />
-          <span className="text-[10px] text-slate-400 font-semibold block uppercase">Speed</span>
-          <span className="text-lg font-bold font-mono text-white">{position?.speed || 0}</span>
-          <span className="text-[10px] text-slate-500 ml-1">km/h</span>
-        </div>
+      {(() => {
+        const accuracy = position?.accuracy ?? 999;
+        let qualityBadge = { label: 'Bad (≥100m)', color: 'text-rose-400', bg: 'bg-rose-950/70', border: 'border-rose-800' };
+        if (accuracy < 10) {
+          qualityBadge = { label: 'Good (<10m)', color: 'text-emerald-400', bg: 'bg-emerald-950/70', border: 'border-emerald-800' };
+        } else if (accuracy < 30) {
+          qualityBadge = { label: 'OK (<30m)', color: 'text-amber-400', bg: 'bg-amber-950/70', border: 'border-amber-800' };
+        } else if (accuracy < 100) {
+          qualityBadge = { label: 'Poor (<100m)', color: 'text-orange-400', bg: 'bg-orange-950/70', border: 'border-orange-800' };
+        }
 
-        <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl text-center">
-          <Compass className="w-4 h-4 text-blue-400 mx-auto mb-1" />
-          <span className="text-[10px] text-slate-400 font-semibold block uppercase">Heading</span>
-          <span className="text-lg font-bold font-mono text-white">{position?.heading || 0}°</span>
-        </div>
+        const deviceUniqueId =
+          (currentJourney as any)?.device_id ||
+          currentJourney?.vehicle_registration ||
+          currentJourney?.vehicle_id ||
+          'VEHICLE';
+        const osmandServerUrl = `${getApiBaseUrl() || window.location.origin}/osmand`;
 
-        <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl text-center">
-          <MapPin className="w-4 h-4 text-amber-400 mx-auto mb-1" />
-          <span className="text-[10px] text-slate-400 font-semibold block uppercase">Accuracy</span>
-          <span className="text-lg font-bold font-mono text-white">±{position?.accuracy || 5}</span>
-          <span className="text-[10px] text-slate-500 ml-1">m</span>
-        </div>
-      </div>
+        return (
+          <>
+            {/* Status bar with GPS Quality, Fix Age, Queue Size */}
+            <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] uppercase font-bold text-slate-400">Signal:</span>
+                <span
+                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${qualityBadge.bg} ${qualityBadge.color} ${qualityBadge.border}`}
+                >
+                  {qualityBadge.label}
+                </span>
+              </div>
+              <div className="flex items-center gap-3 font-mono text-[11px]">
+                <span className="text-slate-400">
+                  Last Fix: <strong className="text-slate-200">{fixAgeSec}s ago</strong>
+                </span>
+                <span className="text-slate-400">
+                  Queue:{' '}
+                  <strong className={uploaderState.queueDepth > 0 ? 'text-amber-400' : 'text-emerald-400'}>
+                    {uploaderState.queueDepth}
+                  </strong>
+                </span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2">
+              <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl text-center">
+                <Gauge className="w-4 h-4 text-emerald-400 mx-auto mb-1" />
+                <span className="text-[10px] text-slate-400 font-semibold block uppercase">Speed</span>
+                <span className="text-lg font-bold font-mono text-white">{position?.speed || 0}</span>
+                <span className="text-[10px] text-slate-500 ml-1">km/h</span>
+              </div>
+
+              <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl text-center">
+                <Compass className="w-4 h-4 text-blue-400 mx-auto mb-1" />
+                <span className="text-[10px] text-slate-400 font-semibold block uppercase">Heading</span>
+                <span className="text-lg font-bold font-mono text-white">{position?.heading || 0}°</span>
+              </div>
+
+              <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl text-center">
+                <MapPin className="w-4 h-4 text-amber-400 mx-auto mb-1" />
+                <span className="text-[10px] text-slate-400 font-semibold block uppercase">Accuracy</span>
+                <span className="text-lg font-bold font-mono text-white">±{position?.accuracy || 5}</span>
+                <span className="text-[10px] text-slate-500 ml-1">m</span>
+              </div>
+            </div>
+
+            {/* Background Tracking Card (Traccar Client Integration) */}
+            <Card title="Background Tracking (Traccar Client App)">
+              <div className="space-y-3 text-xs text-slate-400">
+                <p className="text-[11px] leading-relaxed">
+                  For locked-screen 24/7 background tracking on mobile, configure the official{' '}
+                  <strong className="text-slate-200">Traccar Client</strong> app with these credentials:
+                </p>
+
+                <div className="space-y-2.5">
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase">Device Identifier</span>
+                    <div className="flex items-center gap-2 p-2 bg-slate-950 border border-slate-800 rounded-xl mt-0.5">
+                      <input
+                        type="text"
+                        readOnly
+                        value={deviceUniqueId}
+                        className="w-full bg-transparent text-xs text-emerald-400 font-mono truncate px-1 focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(deviceUniqueId);
+                          setCopiedDeviceId(true);
+                          setTimeout(() => setCopiedDeviceId(false), 2000);
+                        }}
+                        className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-medium flex items-center gap-1 transition flex-shrink-0"
+                      >
+                        {copiedDeviceId ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase">Server URL</span>
+                    <div className="flex items-center gap-2 p-2 bg-slate-950 border border-slate-800 rounded-xl mt-0.5">
+                      <input
+                        type="text"
+                        readOnly
+                        value={osmandServerUrl}
+                        className="w-full bg-transparent text-xs text-emerald-400 font-mono truncate px-1 focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(osmandServerUrl);
+                          setCopiedServerUrl(true);
+                          setTimeout(() => setCopiedServerUrl(false), 2000);
+                        }}
+                        className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-medium flex items-center gap-1 transition flex-shrink-0"
+                      >
+                        {copiedServerUrl ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </Card>
+          </>
+        );
+      })()}
 
       {/* Driver Action Controls */}
       <div className="grid grid-cols-2 gap-2.5">

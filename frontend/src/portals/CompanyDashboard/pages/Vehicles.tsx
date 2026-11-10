@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Truck, Plus, Filter, ShieldAlert, Check } from 'lucide-react';
 import { vehiclesApi } from '../../../services/api';
+import { useTelematicsStore } from '../../../store/telematicsStore';
 import { Vehicle } from '../../../types';
 import { Button } from '../../../components/ui/Button';
 import { Card } from '../../../components/ui/Card';
@@ -29,11 +30,14 @@ export const Vehicles: React.FC = () => {
       });
   };
 
+  const socketConnected = useTelematicsStore((s) => s.socket.connected);
+
   useEffect(() => {
     loadVehicles(true);
-    const interval = setInterval(() => loadVehicles(false), 3500);
+    const pollInterval = socketConnected ? 60000 : 10000;
+    const interval = setInterval(() => loadVehicles(false), pollInterval);
     return () => clearInterval(interval);
-  }, [statusFilter]);
+  }, [statusFilter, socketConnected]);
 
   const handleCreateVehicle = async (e: React.FormEvent) => {
     e.preventDefault();
