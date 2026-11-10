@@ -477,7 +477,10 @@ export const FleetMap: React.FC<FleetMapProps> = ({
                     <h5 className="font-bold text-sm">{selectedTransit.vehicle_registration || 'Vehicle'}</h5>
                     <p className="text-xs text-slate-600">Driver: {selectedTransit.driver_name || 'Driver'}</p>
                     <p className="text-xs text-emerald-700 font-bold mt-1">
-                      Distance: {selectedTransit.total_distance_km || 0} km
+                      Distance:{' '}
+                      {(selectedTransit.total_distance_km || 0) < 1
+                        ? `${Math.round((selectedTransit.total_distance_km || 0) * 1000)} m`
+                        : `${(selectedTransit.total_distance_km || 0).toFixed(2)} km`}
                     </p>
                   </div>
                 </Popup>

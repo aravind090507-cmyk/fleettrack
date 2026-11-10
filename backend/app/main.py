@@ -77,6 +77,34 @@ async def lifespan(app: FastAPI):
                 .values(status="COMPLETED")
             )
             await db.execute(stmt)
+
+            # Reconcile distance metrics for historical completed journeys whose distance was distorted by device odometer
+            from app.models.location import Location
+            from app.services.journey_service import haversine_distance
+            recalc_stmt = select(Journey).where(Journey.status == "COMPLETED")
+            recalc_res = await db.execute(recalc_stmt)
+            completed_journeys = recalc_res.scalars().all()
+            for cj in completed_journeys:
+                locs_res = await db.execute(
+                    select(Location)
+                    .where(Location.journey_id == cj.id)
+                    .order_by(Location.recorded_at.asc())
+                )
+                j_locs = locs_res.scalars().all()
+                if j_locs:
+                    tot_m = sum(l.distance_m for l in j_locs if l.distance_m is not None and l.distance_m > 0)
+                    if tot_m > 0:
+                        cj.total_distance_km = round(tot_m / 1000.0, 3)
+                    elif len(j_locs) > 1:
+                        calc_km = 0.0
+                        for i in range(1, len(j_locs)):
+                            calc_km += haversine_distance(
+                                j_locs[i - 1].latitude, j_locs[i - 1].longitude,
+                                j_locs[i].latitude, j_locs[i].longitude
+                            )
+                        cj.total_distance_km = round(calc_km, 3)
+                    else:
+                        cj.total_distance_km = 0.0
             await db.commit()
     except Exception as e:
         logger.warning("Mock journey cleanup notice: %s", e)

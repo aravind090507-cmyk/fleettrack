@@ -152,6 +152,27 @@ class PipelineRunner:
                     }
                     dev_state.last_position = last_pos
 
+            # If device enters a new active journey, ensure last_position does not bridge from an old journey
+            if journey and journey.started_at:
+                j_started = journey.started_at.replace(tzinfo=timezone.utc) if journey.started_at.tzinfo is None else journey.started_at
+                if last_pos and last_pos.get("recorded_at"):
+                    lp_rec = last_pos["recorded_at"]
+                    if lp_rec.tzinfo is None:
+                        lp_rec = lp_rec.replace(tzinfo=timezone.utc)
+                    if lp_rec < j_started:
+                        # Reset tracking baseline to journey origin
+                        last_pos = {
+                            "latitude": journey.origin_lat,
+                            "longitude": journey.origin_lng,
+                            "speed": 0.0,
+                            "heading": 0.0,
+                            "recorded_at": j_started,
+                            "total_distance_m": 0.0,
+                            "motion": False,
+                            "geofence_ids": [],
+                        }
+                        dev_state.last_position = last_pos
+
             # 3. Outdated handler
             is_outdated, _ = self.outdated_handler.process(pos, last_pos)
             pos["outdated"] = is_outdated
@@ -255,9 +276,11 @@ class PipelineRunner:
             device.last_update = rec_at
             device.motion_state = pos["motion"]
 
-            # Update Journey summary if active journey exists
-            if journey and not pos.get("outdated", False):
-                journey.total_distance_km = round(pos["total_distance_m"] / 1000.0, 3)
+            # Update Journey summary if active journey exists (accumulate real journey distance, not device odometer)
+            if journey and journey.status == "IN_PROGRESS" and not pos.get("outdated", False):
+                delta_km = pos.get("distance_m", 0.0) / 1000.0
+                if delta_km > 0:
+                    journey.total_distance_km = round((journey.total_distance_km or 0.0) + delta_km, 3)
 
             # Update cache
             dev_state.last_position = pos

@@ -142,7 +142,7 @@ async def _handle_osmand_payload(params: Dict[str, Any], db: AsyncSession) -> Re
             "longitude": pipe_res.position["longitude"],
             "speed": pipe_res.position["speed"],
             "heading": pipe_res.position.get("heading", 0.0),
-            "total_distance_km": round(pipe_res.position["total_distance_m"] / 1000.0, 3),
+            "total_distance_km": journey.total_distance_km if journey else 0.0,
             "timestamp": rec_iso,
             "recorded_at": rec_iso,
         }

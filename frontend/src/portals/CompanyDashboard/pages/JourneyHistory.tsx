@@ -119,8 +119,12 @@ export const JourneyHistory: React.FC = () => {
                         {new Date(j.started_at).toLocaleDateString()}
                       </td>
                       <td className="py-3 px-4 font-mono">{minutes} mins</td>
-                      <td className="py-3 px-4 font-mono font-bold text-emerald-400">
-                        {j.total_distance_km} km
+                      <td className="py-3 px-4 font-mono font-bold text-emerald-400" title={`${j.total_distance_km} km`}>
+                        {j.total_distance_km != null
+                          ? j.total_distance_km < 1
+                            ? `${Math.round(j.total_distance_km * 1000)} m`
+                            : `${j.total_distance_km.toFixed(2)} km`
+                          : '0 m'}
                       </td>
                       <td className="py-3 px-4">
                         <StatusBadge status={j.status} size="sm" />

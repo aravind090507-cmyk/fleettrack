@@ -208,14 +208,21 @@ async def end_journey(
     loc_result = await db.execute(loc_stmt)
     locations = loc_result.scalars().all()
 
+    # Prefer summing the pipeline-filtered distance_m (which accounts for stationary jitter snap),
+    # or calculate haversine between consecutive fixes
     total_km = 0.0
-    for i in range(1, len(locations)):
-        total_km += haversine_distance(
-            locations[i - 1].latitude,
-            locations[i - 1].longitude,
-            locations[i].latitude,
-            locations[i].longitude,
-        )
+    if locations:
+        total_dist_m = sum(l.distance_m for l in locations if l.distance_m is not None and l.distance_m > 0)
+        if total_dist_m > 0:
+            total_km = total_dist_m / 1000.0
+        elif len(locations) > 1:
+            for i in range(1, len(locations)):
+                total_km += haversine_distance(
+                    locations[i - 1].latitude,
+                    locations[i - 1].longitude,
+                    locations[i].latitude,
+                    locations[i].longitude,
+                )
 
     # Update journey
     journey.status = "COMPLETED"
