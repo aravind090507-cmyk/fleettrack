@@ -59,15 +59,19 @@ async def lifespan(app: FastAPI):
     redis_svc = get_redis_service()
     await redis_svc.initialize()
 
-    # 4. Start background device status sweeper
+    # 4. Start background device status sweeper and WebSocket pub/sub subscriber
     sweeper = DeviceStatusSweeper(timeout_seconds=120, check_interval_seconds=30)
     sweeper.start()
+    from app.websocket.manager import get_ws_manager
+    ws_mgr = get_ws_manager()
+    await ws_mgr.start_subscriber(redis_svc)
 
     logger.info("Fleet Tracking Engine startup complete.")
     yield
 
     # Clean shutdown
     logger.info("Shutting down Fleet Tracking Engine...")
+    ws_mgr.stop_subscriber()
     sweeper.stop()
     await redis_svc.close()
     from app.database.session import engine

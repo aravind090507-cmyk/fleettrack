@@ -102,12 +102,31 @@ async def get_active_vehicles_with_telemetry(
     result = await db.execute(stmt)
     vehicles = result.scalars().all()
 
+    # Bulk fetch latest location for active journeys in a single set-based query
+    active_j_map = {v.id: next((j for j in v.journeys if j.status == "IN_PROGRESS"), None) for v in vehicles}
+    active_j_ids = [j.id for j in active_j_map.values() if j]
+
+    latest_loc_by_journey = {}
+    if active_j_ids:
+        subq = (
+            select(Location.journey_id, func.max(Location.recorded_at).label("max_rec"))
+            .where(Location.journey_id.in_(active_j_ids))
+            .group_by(Location.journey_id)
+            .subquery()
+        )
+        stmt_bulk = (
+            select(Location)
+            .join(subq, (Location.journey_id == subq.c.journey_id) & (Location.recorded_at == subq.c.max_rec))
+        )
+        bulk_locs = (await db.execute(stmt_bulk)).scalars().all()
+        for loc in bulk_locs:
+            latest_loc_by_journey[loc.journey_id] = loc
+
     redis_svc = get_redis_service()
     output = []
 
     for v in vehicles:
-        # Find active journey if any
-        active_j = next((j for j in v.journeys if j.status == "IN_PROGRESS"), None)
+        active_j = active_j_map.get(v.id)
         active_j_id = active_j.id if active_j else None
 
         # Check Redis for live position
@@ -128,15 +147,7 @@ async def get_active_vehicles_with_telemetry(
             if latest_cache.get("timestamp"):
                 rec_at = datetime.fromisoformat(latest_cache["timestamp"])
         elif active_j:
-            # Fallback to database latest location
-            loc_stmt = (
-                select(Location)
-                .where(Location.journey_id == active_j.id)
-                .order_by(Location.recorded_at.desc())
-                .limit(1)
-            )
-            loc_res = await db.execute(loc_stmt)
-            loc = loc_res.scalar_one_or_none()
+            loc = latest_loc_by_journey.get(active_j.id)
             if loc:
                 lat = loc.latitude
                 lng = loc.longitude
@@ -215,7 +226,6 @@ async def get_active_journeys_dashboard(
         .options(
             selectinload(Journey.vehicle),
             selectinload(Journey.driver),
-            selectinload(Journey.locations),
             selectinload(Journey.trip_events),
         )
         .order_by(Journey.started_at.desc())
@@ -224,6 +234,24 @@ async def get_active_journeys_dashboard(
         stmt = stmt.where(Journey.company_id == current_user.company_id)
     result = await db.execute(stmt)
     journeys = result.scalars().all()
+
+    # Bulk query latest location per active journey (eliminates full location table scans)
+    j_ids = [j.id for j in journeys]
+    latest_loc_map = {}
+    if j_ids:
+        subq = (
+            select(Location.journey_id, func.max(Location.recorded_at).label("max_rec"))
+            .where(Location.journey_id.in_(j_ids))
+            .group_by(Location.journey_id)
+            .subquery()
+        )
+        stmt_bulk = (
+            select(Location)
+            .join(subq, (Location.journey_id == subq.c.journey_id) & (Location.recorded_at == subq.c.max_rec))
+        )
+        bulk_locs = (await db.execute(stmt_bulk)).scalars().all()
+        for loc in bulk_locs:
+            latest_loc_map[loc.journey_id] = loc
 
     output = []
     redis_svc = get_redis_service()
@@ -243,8 +271,7 @@ async def get_active_journeys_dashboard(
                 timestamp=datetime.fromisoformat(redis_loc["timestamp"]) if redis_loc.get("timestamp") else j.started_at,
             )
         else:
-            sorted_locs = sorted(j.locations, key=lambda l: l.recorded_at) if j.locations else []
-            latest_loc = sorted_locs[-1] if sorted_locs else None
+            latest_loc = latest_loc_map.get(j.id)
             if latest_loc:
                 latest_ping_dto = LocationPing(
                     latitude=latest_loc.latitude,

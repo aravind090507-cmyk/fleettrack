@@ -126,6 +126,7 @@ async def post_single_location_ping(
         await ws_mgr.broadcast_to_journey(journey.id, loc_payload)
         if journey.company_id:
             await ws_mgr.broadcast_to_fleet(loc_payload, company_id=journey.company_id)
+            await ws_mgr.queue_coalesced_update(company_id=journey.company_id, position=loc_payload)
 
     status_str = "recorded" if res.status == PipelineStatus.RECORDED else res.status.value
     now_utc = datetime.now(timezone.utc)
@@ -258,6 +259,7 @@ async def post_batch_location_pings(
         await ws_mgr.broadcast_to_journey(journey.id, loc_payload)
         if journey.company_id:
             await ws_mgr.broadcast_to_fleet(loc_payload, company_id=journey.company_id)
+            await ws_mgr.queue_coalesced_update(company_id=journey.company_id, position=loc_payload)
 
     return LocationIngestResult(
         status="batch_recorded",

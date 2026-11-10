@@ -255,6 +255,10 @@ async def end_journey(
     return journey
 
 
+# In-memory throttle tracker for tracking token access counter commits (at most once every 60s)
+_token_last_access_commit: dict[str, float] = {}
+
+
 async def validate_tracking_token(
     db: AsyncSession,
     token: str,
@@ -300,8 +304,16 @@ async def validate_tracking_token(
     if not journey or journey.status != "IN_PROGRESS":
         return None
 
-    # Increment access counter
-    tracking_link.access_count += 1
-    await db.commit()
+    # Increment access counter with throttle (commit once per minute to eliminate DB lock contention)
+    import time
+    now_mono = time.monotonic()
+    last_commit = _token_last_access_commit.get(token_hash, 0.0)
+    if now_mono - last_commit >= 60.0:
+        tracking_link.access_count += 1
+        _token_last_access_commit[token_hash] = now_mono
+        try:
+            await db.commit()
+        except Exception:
+            pass
 
     return journey, tracking_link
