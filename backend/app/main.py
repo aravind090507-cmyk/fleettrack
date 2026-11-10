@@ -20,6 +20,10 @@ from app.api.vehicles import router as vehicles_router, seed_demo_vehicles
 from app.api.websocket_routes import router as ws_router
 from app.api.osmand import router as osmand_router
 from app.api.devices import router as devices_router
+from app.api.positions import router as positions_router
+from app.api.events import router as events_router
+from app.api.geofences import router as geofences_router
+from app.api.reports import router as reports_router
 from app.pipeline.status_sweeper import DeviceStatusSweeper
 from app.config.settings import get_settings
 from app.database.session import AsyncSessionLocal, init_db
@@ -120,6 +124,10 @@ app.include_router(dashboard_router)
 app.include_router(ws_router)
 app.include_router(osmand_router)
 app.include_router(devices_router)
+app.include_router(positions_router)
+app.include_router(events_router)
+app.include_router(geofences_router)
+app.include_router(reports_router)
 
 
 @app.get("/health", tags=["Health"])
