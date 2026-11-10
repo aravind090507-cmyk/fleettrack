@@ -63,7 +63,7 @@ async def lifespan(app: FastAPI):
     # 3. Clean up any leftover mock/test dispatches so only real dispatches populate
     try:
         from app.models.journey import Journey
-        from sqlalchemy import update
+        from sqlalchemy import update, select
         async with AsyncSessionLocal() as db:
             stmt = (
                 update(Journey)
