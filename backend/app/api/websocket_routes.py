@@ -27,6 +27,10 @@ router = APIRouter(tags=["WebSockets"])
 settings = get_settings()
 
 
+import fnmatch
+import re
+
+
 def is_allowed_origin(websocket: WebSocket) -> bool:
     """Validate WebSocket Origin header against configured CORS origins in production."""
     if settings.APP_ENVIRONMENT != "production":
@@ -35,8 +39,16 @@ def is_allowed_origin(websocket: WebSocket) -> bool:
     if not origin:
         return True  # Mobile/hardware clients or direct sockets may omit Origin
     origin_clean = origin.rstrip("/")
-    explicit = [o.rstrip("/") for o in settings.CORS_ORIGINS if o != "*"]
-    return any(origin_clean == allowed for allowed in explicit)
+    default_allowed_re = r"^https://.*\.vercel\.app$|^https://.*\.up\.railway\.app$|^https://.*\.loca\.lt$|^http://localhost(:\d+)?$|^http://127\.0\.0\.1(:\d+)?$"
+    if re.match(default_allowed_re, origin_clean):
+        return True
+    for allowed in settings.CORS_ORIGINS:
+        if allowed == "*":
+            continue
+        cleaned_allowed = allowed.rstrip("/")
+        if fnmatch.fnmatch(origin_clean, cleaned_allowed) or origin_clean == cleaned_allowed:
+            return True
+    return False
 
 
 @router.websocket("/ws/track/{token}")

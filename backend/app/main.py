@@ -95,23 +95,24 @@ app = FastAPI(
 )
 
 # Configure Cross-Origin Resource Sharing (CORS)
-if settings.APP_ENVIRONMENT == "production":
-    explicit_origins = [o.rstrip("/") for o in settings.CORS_ORIGINS if o != "*"]
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=explicit_origins,
-        allow_credentials=True,
-        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"],
-        allow_headers=["*"],
-    )
-else:
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origin_regex=r"^https?://.*",
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+cors_origin_regex = (
+    r"^https://.*\.vercel\.app$"
+    r"|^https://.*\.up\.railway\.app$"
+    r"|^https://.*\.loca\.lt$"
+    r"|^http://localhost(:\d+)?$"
+    r"|^http://127\.0\.0\.1(:\d+)?$"
+)
+
+explicit_origins = [o.rstrip("/") for o in settings.CORS_ORIGINS if "*" not in o]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=explicit_origins,
+    allow_origin_regex=cors_origin_regex,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"],
+    allow_headers=["*"],
+)
 
 # Mount REST API Routers
 app.include_router(auth_router)
