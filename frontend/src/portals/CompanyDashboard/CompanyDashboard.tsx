@@ -16,13 +16,13 @@ import { ReplayPage } from './pages/ReplayPage';
 
 export const CompanyDashboard: React.FC = () => {
   return (
-    <div className="flex h-screen bg-slate-950 text-slate-100 overflow-hidden">
+    <div className="flex h-screen bg-bespoke-dark text-bespoke-offwhite overflow-hidden font-sans">
       <SocketController />
       <EventsDrawer />
       <Sidebar />
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <Header title="Fleet Management Console" subtitle="Real-time vehicular navigation and dispatch monitoring" />
-        <main className="flex-1 overflow-y-auto p-8">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-bespoke-dark">
+        <Header title="Fleet Advisory & Telematics" subtitle="Real-time asset navigation, geofence surveillance & dispatch intelligence" />
+        <main className="flex-1 overflow-y-auto p-6 md:p-8 bg-bespoke-dark">
           <Routes>
             <Route index element={<Overview />} />
             <Route path="live-map" element={<LiveMap />} />

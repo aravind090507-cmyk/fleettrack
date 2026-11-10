@@ -467,9 +467,9 @@ export const LiveMap: React.FC = () => {
         {/* 1. Real-time Clickable Active Trips Bar across top of map */}
         <div className="absolute top-4 left-4 right-96 z-20 flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none pointer-events-auto">
           {activeJourneys.length === 0 ? (
-            <div className="px-3.5 py-1.5 bg-slate-900/90 border border-slate-800 rounded-full text-xs font-semibold text-slate-400 backdrop-blur-md shadow-lg flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-slate-600" />
-              <span>No active trips running — Ready for dispatches</span>
+            <div className="px-3.5 py-1.5 bg-bespoke-surface/90 border border-bespoke-border rounded-full text-xs font-mono uppercase tracking-[0.08em] text-bespoke-champagne/70 backdrop-blur-md shadow-lg flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-bespoke-dim" />
+              <span>No active dispatches — Assets standby</span>
             </div>
           ) : (
             activeJourneys.map((j) => {
@@ -482,35 +482,35 @@ export const LiveMap: React.FC = () => {
                 <button
                   key={j.journey_id}
                   onClick={() => handleSelectTransit(j)}
-                  className={`flex-shrink-0 flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-bold transition-all shadow-xl backdrop-blur-md cursor-pointer ${
+                  className={`flex-shrink-0 flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-mono transition-all shadow-xl backdrop-blur-md cursor-pointer ${
                     isSelected
-                      ? 'bg-emerald-950/95 border-emerald-400 text-white ring-2 ring-emerald-500/50 scale-105'
+                      ? 'bg-bespoke-surface border-bespoke-gold text-bespoke-offwhite ring-1 ring-bespoke-gold/50 scale-105'
                       : isSos
-                      ? 'bg-rose-950/90 border-rose-500 text-rose-200 animate-pulse'
+                      ? 'bg-bespoke-error/25 border-bespoke-error text-bespoke-linen animate-pulse'
                       : isBreakdown
                       ? 'bg-amber-950/90 border-amber-500 text-amber-200'
                       : isBreak
                       ? 'bg-yellow-950/90 border-yellow-500 text-yellow-200'
-                      : 'bg-slate-900/90 border-slate-800 hover:border-emerald-500 text-slate-200 hover:bg-slate-800'
+                      : 'bg-bespoke-surface/90 border-bespoke-border hover:border-bespoke-gold/40 text-bespoke-champagne hover:bg-bespoke-card'
                   }`}
                 >
                   <span
-                    className={`w-2 h-2 rounded-full ${
+                    className={`w-1.5 h-1.5 rounded-full ${
                       isSos
-                        ? 'bg-rose-500 animate-ping'
+                        ? 'bg-bespoke-error animate-ping'
                         : isBreakdown
                         ? 'bg-amber-400 animate-bounce'
                         : isBreak
                         ? 'bg-yellow-400'
-                        : 'bg-emerald-400 animate-pulse'
+                        : 'bg-bespoke-gold animate-pulse'
                     }`}
                   />
-                  <span className="font-mono">{j.vehicle_registration}</span>
-                  <span className="text-[10px] text-slate-300 font-semibold truncate max-w-[130px]" title={`${j.origin_name} → ${j.destination_name}`}>
+                  <span className="font-mono tracking-wider font-semibold">{j.vehicle_registration}</span>
+                  <span className="text-[10px] text-bespoke-champagne/80 truncate max-w-[130px]" title={`${j.origin_name} → ${j.destination_name}`}>
                     {j.origin_name} &rarr; {j.destination_name}
                   </span>
                   {isSos && (
-                    <span className="bg-rose-600 text-white px-1.5 py-0.2 rounded text-[9px] uppercase font-black">
+                    <span className="bg-bespoke-error text-white px-1.5 py-0.2 rounded text-[9px] uppercase font-black">
                       SOS
                     </span>
                   )}
@@ -524,7 +524,7 @@ export const LiveMap: React.FC = () => {
                       BREAK
                     </span>
                   )}
-                  <span className="font-mono text-[10px] text-emerald-400 font-bold bg-slate-950/90 px-1.5 py-0.5 rounded-md border border-slate-800">
+                  <span className="font-mono text-[10px] text-bespoke-gold font-medium bg-bespoke-black/80 px-1.5 py-0.5 rounded border border-bespoke-border">
                     {j.latest_location?.speed || 0} km/h
                   </span>
                 </button>
@@ -601,46 +601,46 @@ export const LiveMap: React.FC = () => {
               criticalAlert ? 'top-32' : 'top-16'
             }`}
           >
-            <div className="bg-slate-900/95 border border-emerald-500/50 backdrop-blur-xl p-4 rounded-2xl shadow-2xl space-y-3">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-emerald-950 border border-emerald-800 flex items-center justify-center text-emerald-400">
+            <div className="bg-bespoke-surface/95 border border-bespoke-gold/40 backdrop-blur-xl p-4 rounded-xl shadow-2xl space-y-3">
+              <div className="flex items-center justify-between border-b border-bespoke-border pb-2.5">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-7 h-7 rounded bg-bespoke-card border border-bespoke-gold/30 flex items-center justify-center text-bespoke-gold">
                     <Route className="w-4 h-4" />
                   </div>
                   <div>
-                    <h4 className="text-xs font-black text-white font-mono uppercase tracking-wider">
+                    <h4 className="text-xs font-medium text-bespoke-offwhite font-mono uppercase tracking-[0.1em]">
                       {selectedTransit.vehicle_registration || 'TRANSIT'}
                     </h4>
-                    <p className="text-[11px] text-slate-400">Driver: {selectedTransit.driver_name || 'Assigned'}</p>
+                    <p className="text-[11px] text-bespoke-champagne/70">Driver: {selectedTransit.driver_name || 'Assigned'}</p>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2">
                   {selectedTransit.latest_event_type === 'SOS' ? (
-                    <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-rose-950 text-rose-300 border border-rose-600 animate-pulse">
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-bespoke-error/20 text-bespoke-linen border border-bespoke-error animate-pulse">
                       🚨 SOS ACTIVE
                     </span>
                   ) : selectedTransit.latest_event_type === 'BREAKDOWN' ? (
-                    <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-950 text-amber-300 border border-amber-600">
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-600">
                       ⚠️ BREAKDOWN
                     </span>
                   ) : selectedTransit.latest_event_type === 'BREAK_START' ? (
-                    <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-yellow-950 text-yellow-300 border border-yellow-600">
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-yellow-950 text-yellow-300 border border-yellow-600">
                       ☕ ON BREAK
                     </span>
                   ) : selectedTransit.status === 'COMPLETED' ? (
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-950/80 text-blue-400 border border-blue-800">
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-bespoke-card text-bespoke-champagne border border-bespoke-border">
                       COMPLETED
                     </span>
                   ) : (
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-950/80 text-emerald-400 border border-emerald-800 flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-bespoke-gold/10 text-bespoke-gold border border-bespoke-gold/30 flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-bespoke-gold animate-ping" />
                       LIVE TRANSIT
                     </span>
                   )}
                   <button
                     onClick={handleClearTransit}
-                    className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+                    className="p-1 rounded text-bespoke-champagne/60 hover:text-white hover:bg-bespoke-card transition cursor-pointer"
                     title="Close Transit View"
                   >
                     <X className="w-4 h-4" />
@@ -649,43 +649,43 @@ export const LiveMap: React.FC = () => {
               </div>
 
               {/* Origin -> Destination Route Display */}
-              <div className="grid grid-cols-2 gap-2 bg-slate-950/80 p-2.5 rounded-xl border border-slate-800/80 text-xs">
+              <div className="grid grid-cols-2 gap-2 bg-bespoke-dark/90 p-2.5 rounded border border-bespoke-border text-xs">
                 <div>
-                  <span className="text-[10px] text-emerald-400 font-bold uppercase block flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                  <span className="text-[10px] text-bespoke-gold font-mono tracking-wider uppercase block flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-bespoke-gold" />
                     Origin Start
                   </span>
-                  <p className="font-semibold text-slate-200 truncate">{selectedTransit.origin_name}</p>
+                  <p className="font-medium text-bespoke-linen truncate">{selectedTransit.origin_name}</p>
                 </div>
                 <div>
-                  <span className="text-[10px] text-rose-400 font-bold uppercase block flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
+                  <span className="text-[10px] text-bespoke-champagne font-mono tracking-wider uppercase block flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-bespoke-champagne" />
                     Target Goal
                   </span>
-                  <p className="font-semibold text-slate-200 truncate">{selectedTransit.destination_name}</p>
+                  <p className="font-medium text-bespoke-offwhite truncate">{selectedTransit.destination_name}</p>
                 </div>
               </div>
 
               {/* Real-time stats footer & Replay trigger */}
-              <div className="flex items-center justify-between text-[11px] text-slate-400 pt-0.5 border-t border-slate-800/80">
+              <div className="flex items-center justify-between text-[11px] text-bespoke-champagne/70 pt-0.5 border-t border-bespoke-border">
                 <div className="flex items-center gap-1.5">
-                  <Gauge className="w-3.5 h-3.5 text-emerald-400" />
+                  <Gauge className="w-3.5 h-3.5 text-bespoke-gold" />
                   <span>
                     GPS Breadcrumbs:{' '}
-                    <strong className="text-white font-mono">{journeyPath.length} pings</strong>
+                    <strong className="text-bespoke-offwhite font-mono">{journeyPath.length} pings</strong>
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-emerald-400 font-mono font-bold">
+                  <span className="text-bespoke-gold font-mono font-medium">
                     {selectedTransit.latest_speed || 0} km/h
                   </span>
                   <button
                     type="button"
                     onClick={handleStartReplay}
-                    className="flex items-center gap-1 px-2.5 py-1 bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 border border-indigo-500/40 rounded-lg text-[10px] font-bold transition shadow-sm cursor-pointer"
+                    className="flex items-center gap-1 px-2.5 py-1 bg-bespoke-card hover:bg-bespoke-surface text-bespoke-champagne border border-bespoke-border hover:border-bespoke-gold/40 rounded text-[10px] font-mono uppercase tracking-[0.08em] transition shadow-sm cursor-pointer"
                     title="Traccar-style route playback"
                   >
-                    <Play className="w-3 h-3 text-indigo-400" />
+                    <Play className="w-3 h-3 text-bespoke-gold" />
                     <span>Replay</span>
                   </button>
                 </div>
@@ -696,29 +696,29 @@ export const LiveMap: React.FC = () => {
 
         {/* Traccar-style Interactive Trip Playback Bar */}
         {isReplaying && historyPings.length > 0 && (
-          <div className="absolute bottom-5 left-4 right-96 bg-slate-900/95 border border-indigo-500/40 backdrop-blur-xl p-4 rounded-2xl shadow-2xl z-20 space-y-3">
+          <div className="absolute bottom-5 left-4 right-96 bg-bespoke-surface/95 border border-bespoke-border backdrop-blur-xl p-4 rounded-xl shadow-2xl z-20 space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-indigo-400 animate-pulse" />
-                <span className="text-xs font-black text-white uppercase tracking-wider">
+                <span className="w-2 h-2 rounded-full bg-bespoke-gold animate-pulse" />
+                <span className="text-xs font-mono uppercase tracking-[0.1em] text-bespoke-offwhite">
                   Route Replay: {selectedTransit?.vehicle_registration || 'Vehicle'}
                 </span>
-                <span className="text-[10px] bg-indigo-950 text-indigo-300 px-2 py-0.5 rounded-full border border-indigo-700/60 font-mono">
+                <span className="text-[10px] bg-bespoke-black text-bespoke-champagne px-2 py-0.5 rounded border border-bespoke-border font-mono">
                   Point {playbackIndex + 1} of {historyPings.length}
                 </span>
               </div>
 
               <div className="flex items-center gap-2">
                 {/* Speed Multipliers */}
-                <div className="flex bg-slate-950 p-0.5 rounded-lg border border-slate-800 text-[10px] font-bold">
+                <div className="flex bg-bespoke-black p-0.5 rounded border border-bespoke-border text-[10px] font-mono">
                   {[1, 2, 5].map((s) => (
                     <button
                       key={s}
                       onClick={() => setPlaybackSpeed(s)}
                       className={`px-2 py-0.5 rounded transition ${
                         playbackSpeed === s
-                          ? 'bg-indigo-600 text-white shadow'
-                          : 'text-slate-400 hover:text-white'
+                          ? 'bg-bespoke-gold text-bespoke-black font-semibold shadow'
+                          : 'text-bespoke-champagne/60 hover:text-white'
                       }`}
                     >
                       {s}x
@@ -729,7 +729,7 @@ export const LiveMap: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleStopReplay}
-                  className="text-xs text-slate-400 hover:text-rose-400 px-2 py-1 rounded-lg hover:bg-slate-800 transition font-bold cursor-pointer"
+                  className="text-xs text-bespoke-champagne/60 hover:text-bespoke-error px-2 py-1 rounded hover:bg-bespoke-card transition font-mono uppercase tracking-wider cursor-pointer"
                 >
                   ✕ Close
                 </button>
@@ -741,7 +741,7 @@ export const LiveMap: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setIsPlaying(!isPlaying)}
-                className="p-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl shadow-lg transition flex-shrink-0 cursor-pointer"
+                className="p-2 bg-bespoke-gold hover:bg-bespoke-goldHover text-bespoke-black rounded shadow-lg transition flex-shrink-0 cursor-pointer"
               >
                 {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
               </button>
@@ -755,27 +755,27 @@ export const LiveMap: React.FC = () => {
                   setPlaybackIndex(Number(e.target.value));
                   setIsPlaying(false);
                 }}
-                className="w-full accent-indigo-500 cursor-pointer h-2 bg-slate-800 rounded-lg appearance-none"
+                className="w-full accent-[#cb886c] cursor-pointer h-1.5 bg-bespoke-border rounded appearance-none"
               />
             </div>
 
             {/* Telemetry metrics bar */}
-            <div className="grid grid-cols-4 gap-2 text-center text-xs bg-slate-950/70 p-2 rounded-xl border border-slate-800">
+            <div className="grid grid-cols-4 gap-2 text-center text-xs bg-bespoke-dark/80 p-2 rounded border border-bespoke-border">
               <div>
-                <span className="text-[9px] uppercase font-bold text-slate-500 block">Speed</span>
-                <span className="font-mono font-black text-indigo-400">
+                <span className="text-[9px] uppercase tracking-wider font-mono text-bespoke-dim block">Speed</span>
+                <span className="font-mono font-medium text-bespoke-gold">
                   {Math.round(historyPings[playbackIndex]?.speed || 0)} km/h
                 </span>
               </div>
               <div>
-                <span className="text-[9px] uppercase font-bold text-slate-500 block">Heading</span>
-                <span className="font-mono font-bold text-slate-200">
+                <span className="text-[9px] uppercase tracking-wider font-mono text-bespoke-dim block">Heading</span>
+                <span className="font-mono text-bespoke-linen">
                   {Math.round(historyPings[playbackIndex]?.heading || 0)}°
                 </span>
               </div>
               <div>
-                <span className="text-[9px] uppercase font-bold text-slate-500 block">Recorded At</span>
-                <span className="font-mono font-medium text-slate-300 text-[10px]">
+                <span className="text-[9px] uppercase tracking-wider font-mono text-bespoke-dim block">Recorded At</span>
+                <span className="font-mono text-bespoke-champagne text-[10px]">
                   {historyPings[playbackIndex]?.recorded_at
                     ? new Date(historyPings[playbackIndex].recorded_at).toLocaleTimeString()
                     : historyPings[playbackIndex]?.timestamp
@@ -784,9 +784,9 @@ export const LiveMap: React.FC = () => {
                 </span>
               </div>
               <div>
-                <span className="text-[9px] uppercase font-bold text-slate-500 block">Ignition</span>
-                <span className={`text-[10px] font-bold ${
-                  (historyPings[playbackIndex]?.speed || 0) > 2 ? 'text-emerald-400' : 'text-slate-400'
+                <span className="text-[9px] uppercase tracking-wider font-mono text-bespoke-dim block">Ignition</span>
+                <span className={`text-[10px] font-mono ${
+                  (historyPings[playbackIndex]?.speed || 0) > 2 ? 'text-bespoke-green' : 'text-bespoke-dim'
                 }`}>
                   {(historyPings[playbackIndex]?.speed || 0) > 2 ? '⚡ ON' : 'OFF'}
                 </span>
@@ -797,32 +797,32 @@ export const LiveMap: React.FC = () => {
       </div>
 
       {/* Floating Right Control Panel */}
-      <div className="w-88 bg-slate-900/95 border-l border-slate-800 backdrop-blur-md flex flex-col z-20 shadow-2xl">
-        <div className="p-4 border-b border-slate-800 space-y-3">
+      <div className="w-88 bg-bespoke-surface/95 border-l border-bespoke-border backdrop-blur-md flex flex-col z-20 shadow-2xl">
+        <div className="p-4 border-b border-bespoke-border space-y-3">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
-              <Radio className="w-4 h-4 text-emerald-400" />
+            <h3 className="text-xs font-semibold text-bespoke-offwhite uppercase tracking-[0.12em] flex items-center gap-2">
+              <Radio className="w-3.5 h-3.5 text-bespoke-gold" />
               <span>Fleet Dispatch Hub</span>
             </h3>
             <span
-              className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+              className={`text-[10px] font-mono px-2 py-0.5 rounded border ${
                 isConnected
-                  ? 'bg-emerald-950/80 text-emerald-400 border-emerald-800'
-                  : 'bg-emerald-950/50 text-emerald-300 border-emerald-700'
+                  ? 'bg-bespoke-gold/10 text-bespoke-gold border-bespoke-gold/30'
+                  : 'bg-bespoke-card text-bespoke-champagne border-bespoke-border'
               }`}
             >
-              {isConnected ? 'LIVE WS' : 'AUTO-POLLING 2.5s'}
+              {isConnected ? 'LIVE WS' : 'AUTO-POLL 10s'}
             </span>
           </div>
 
           {/* Tab Selector: Active Transits vs All Vehicles */}
-          <div className="grid grid-cols-2 gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs">
+          <div className="grid grid-cols-2 gap-1 bg-bespoke-black p-1 rounded border border-bespoke-border text-xs">
             <button
               onClick={() => setActiveTab('transits')}
-              className={`py-1.5 rounded-lg font-bold flex items-center justify-center gap-1.5 transition cursor-pointer ${
+              className={`py-1.5 rounded font-mono text-[11px] uppercase tracking-wider flex items-center justify-center gap-1.5 transition cursor-pointer ${
                 activeTab === 'transits'
-                  ? 'bg-emerald-600 text-white shadow-md'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-bespoke-card text-bespoke-gold border border-bespoke-border shadow-md'
+                  : 'text-bespoke-champagne/60 hover:text-bespoke-champagne'
               }`}
             >
               <Route className="w-3.5 h-3.5" />
@@ -830,10 +830,10 @@ export const LiveMap: React.FC = () => {
             </button>
             <button
               onClick={() => setActiveTab('vehicles')}
-              className={`py-1.5 rounded-lg font-bold flex items-center justify-center gap-1.5 transition cursor-pointer ${
+              className={`py-1.5 rounded font-mono text-[11px] uppercase tracking-wider flex items-center justify-center gap-1.5 transition cursor-pointer ${
                 activeTab === 'vehicles'
-                  ? 'bg-slate-800 text-white shadow-md'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-bespoke-card text-bespoke-gold border border-bespoke-border shadow-md'
+                  : 'text-bespoke-champagne/60 hover:text-bespoke-champagne'
               }`}
             >
               <Car className="w-3.5 h-3.5" />
@@ -842,34 +842,34 @@ export const LiveMap: React.FC = () => {
           </div>
 
           <div className="relative">
-            <Search className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
+            <Search className="w-3.5 h-3.5 text-bespoke-dim absolute left-3 top-2.5" />
             <input
               type="text"
-              placeholder={activeTab === 'transits' ? 'Search destination, driver, vehicle...' : 'Search registration, model...'}
+              placeholder={activeTab === 'transits' ? 'Search destination, driver...' : 'Search registration...'}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+              className="w-full pl-9 pr-3 py-2 bg-bespoke-black border border-bespoke-border rounded text-xs text-bespoke-offwhite placeholder-bespoke-dim focus:outline-none focus:border-bespoke-gold/60"
             />
           </div>
 
           <button
             type="button"
             onClick={handlePromptImportToken}
-            className="w-full py-1.5 px-3 bg-slate-800/90 hover:bg-slate-700/90 border border-slate-700 rounded-xl text-[11px] font-bold text-slate-300 hover:text-white transition flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+            className="w-full py-1.5 px-3 bg-bespoke-card hover:bg-bespoke-surface border border-bespoke-border hover:border-bespoke-gold/30 rounded text-[11px] font-mono tracking-wider uppercase text-bespoke-champagne hover:text-white transition flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
           >
-            <ExternalLink className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Track Trip by Link or Token</span>
+            <ExternalLink className="w-3.5 h-3.5 text-bespoke-gold" />
+            <span>Track Trip by Token</span>
           </button>
         </div>
 
         {/* List Content: Transits or Units */}
-        <div className="flex-1 overflow-y-auto divide-y divide-slate-800/60 p-2 space-y-1">
+        <div className="flex-1 overflow-y-auto divide-y divide-bespoke-border/60 p-2 space-y-1">
           {activeTab === 'transits' ? (
             filteredJourneys.length === 0 ? (
-              <div className="p-8 text-center text-xs text-slate-500">
-                <Route className="w-8 h-8 text-slate-700 mx-auto mb-2" />
-                <p>No active transits currently underway.</p>
-                <p className="text-[11px] text-slate-600 mt-1">Start a journey from the mobile driver app to view live path.</p>
+              <div className="p-8 text-center text-xs text-bespoke-dim font-mono uppercase tracking-wider">
+                <Route className="w-6 h-6 text-bespoke-border mx-auto mb-2" />
+                <p>No active transits underway.</p>
+                <p className="text-[10px] text-bespoke-dim/70 mt-1 font-sans">Start a journey from mobile driver portal to stream live path.</p>
               </div>
             ) : (
               filteredJourneys.map((j) => {
@@ -882,59 +882,59 @@ export const LiveMap: React.FC = () => {
                   <div
                     key={j.journey_id}
                     onClick={() => handleSelectTransit(j)}
-                    className={`p-3 rounded-xl cursor-pointer transition-all ${
+                    className={`p-3 rounded cursor-pointer transition-all ${
                       isSelected
-                        ? 'bg-emerald-950/60 border border-emerald-500/80 shadow-lg shadow-emerald-950/50'
+                        ? 'bg-bespoke-card border border-bespoke-gold/60 shadow-lg'
                         : isSos
-                        ? 'bg-rose-950/40 border border-rose-800/70 hover:bg-rose-950/60'
+                        ? 'bg-bespoke-error/20 border border-bespoke-error/60 hover:bg-bespoke-error/30'
                         : isBreakdown
                         ? 'bg-amber-950/40 border border-amber-800/70 hover:bg-amber-950/60'
-                        : 'hover:bg-slate-800/60 border border-transparent bg-slate-950/40'
+                        : 'hover:bg-bespoke-card/50 border border-transparent bg-bespoke-dark/30'
                     }`}
                   >
                     <div className="flex items-center justify-between mb-1.5">
-                      <span className="font-bold text-sm text-white font-mono">{j.vehicle_registration}</span>
+                      <span className="font-mono text-sm text-bespoke-offwhite font-medium tracking-wider">{j.vehicle_registration}</span>
                       {isSos ? (
-                        <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-rose-950 text-rose-300 border border-rose-600 animate-pulse">
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-bespoke-error/20 text-bespoke-linen border border-bespoke-error animate-pulse">
                           🚨 SOS ACTIVE
                         </span>
                       ) : isBreakdown ? (
-                        <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-950 text-amber-300 border border-amber-600">
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-600">
                           ⚠️ BREAKDOWN
                         </span>
                       ) : isBreak ? (
-                        <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-yellow-950 text-yellow-300 border border-yellow-600">
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-yellow-950 text-yellow-300 border border-yellow-600">
                           ☕ ON BREAK
                         </span>
                       ) : (
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800 uppercase flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-bespoke-gold/10 text-bespoke-gold border border-bespoke-gold/30 uppercase flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-bespoke-gold animate-pulse" />
                           In Transit
                         </span>
                       )}
                     </div>
 
                     <div className="space-y-1 mb-2 text-xs">
-                      <div className="flex items-center gap-1.5 text-slate-300 truncate">
-                        <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
+                      <div className="flex items-center gap-1.5 text-bespoke-champagne truncate">
+                        <span className="w-1.5 h-1.5 rounded-full bg-bespoke-gold shrink-0" />
                         <span className="truncate">{j.origin_name}</span>
                       </div>
-                      <div className="flex items-center gap-1.5 text-white font-semibold truncate">
-                        <span className="w-2 h-2 rounded-full bg-rose-400 shrink-0" />
+                      <div className="flex items-center gap-1.5 text-bespoke-offwhite font-medium truncate">
+                        <span className="w-1.5 h-1.5 rounded-full bg-bespoke-champagne shrink-0" />
                         <span className="truncate">{j.destination_name}</span>
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1 border-t border-slate-800/80">
-                      <span>Driver: <strong className="text-slate-300">{j.driver_name}</strong></span>
-                      <span className="font-mono text-emerald-400 font-bold">
+                    <div className="flex items-center justify-between text-[11px] text-bespoke-champagne/70 pt-1 border-t border-bespoke-border">
+                      <span>Driver: <strong className="text-bespoke-linen font-normal">{j.driver_name}</strong></span>
+                      <span className="font-mono text-bespoke-gold font-medium">
                         {j.latest_location?.speed || 0} km/h
                       </span>
                     </div>
 
                     {isSelected && (
-                      <div className="mt-2 pt-2 border-t border-emerald-900/60 text-[10px] text-emerald-400 font-semibold flex items-center justify-between">
-                        <span>Showing Route Path & Pins</span>
+                      <div className="mt-2 pt-2 border-t border-bespoke-border text-[10px] text-bespoke-gold font-mono uppercase tracking-wider flex items-center justify-between">
+                        <span>Active Trajectory</span>
                         <ArrowRight className="w-3 h-3 animate-pulse" />
                       </div>
                     )}
@@ -955,29 +955,29 @@ export const LiveMap: React.FC = () => {
                       handleSelectTransit(matchingJourney);
                     }
                   }}
-                  className={`p-3 rounded-xl cursor-pointer transition-all ${
+                  className={`p-3 rounded cursor-pointer transition-all ${
                     isSelected
-                      ? 'bg-emerald-950/50 border border-emerald-800/80'
-                      : 'hover:bg-slate-800/60 border border-transparent'
+                      ? 'bg-bespoke-card border border-bespoke-gold/60'
+                      : 'hover:bg-bespoke-card/50 border border-transparent bg-bespoke-dark/30'
                   }`}
                 >
                   <div className="flex items-center justify-between mb-1">
-                    <span className="font-bold text-sm text-white font-mono">{v.registration_number}</span>
+                    <span className="font-mono text-sm text-bespoke-offwhite font-medium tracking-wider">{v.registration_number}</span>
                     <StatusBadge status={v.status} size="sm" />
                   </div>
-                  <p className="text-xs text-slate-400 mb-1">{v.model}</p>
+                  <p className="text-xs text-bespoke-muted mb-1">{v.model}</p>
                   {v.origin_name && v.destination_name && (
-                    <div className="text-[11px] text-slate-300 flex items-center gap-1 my-1.5 truncate bg-slate-950/60 p-1.5 rounded-lg border border-slate-800">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
-                      <span className="truncate text-emerald-300 font-medium">{v.origin_name}</span>
-                      <span className="text-slate-500">&rarr;</span>
-                      <span className="w-1.5 h-1.5 rounded-full bg-rose-400 shrink-0" />
-                      <span className="truncate text-white font-medium">{v.destination_name}</span>
+                    <div className="text-[11px] text-bespoke-champagne flex items-center gap-1 my-1.5 truncate bg-bespoke-black/80 p-1.5 rounded border border-bespoke-border">
+                      <span className="w-1.5 h-1.5 rounded-full bg-bespoke-gold shrink-0" />
+                      <span className="truncate text-bespoke-goldLight font-medium">{v.origin_name}</span>
+                      <span className="text-bespoke-dim">&rarr;</span>
+                      <span className="w-1.5 h-1.5 rounded-full bg-bespoke-champagne shrink-0" />
+                      <span className="truncate text-bespoke-offwhite font-medium">{v.destination_name}</span>
                     </div>
                   )}
-                  <div className="flex items-center justify-between text-[11px] text-slate-400">
+                  <div className="flex items-center justify-between text-[11px] text-bespoke-champagne/70">
                     <span>Driver: {v.assigned_driver_name || 'None'}</span>
-                    <span className="font-mono text-emerald-400 font-bold">{v.latest_speed || 0} km/h</span>
+                    <span className="font-mono text-bespoke-gold font-medium">{v.latest_speed || 0} km/h</span>
                   </div>
                 </div>
               );

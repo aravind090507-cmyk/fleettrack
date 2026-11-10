@@ -324,57 +324,57 @@ export const ActiveJourney: React.FC = () => {
   return (
     <div className="space-y-4 pb-8">
       {/* Top Journey Status Banner */}
-      <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl flex items-center justify-between">
+      <div className="p-4 bg-bespoke-surface border border-bespoke-border rounded-xl flex items-center justify-between">
         <div>
-          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">Vehicle</span>
-          <p className="text-base font-black text-emerald-400">{currentJourney?.vehicle_registration || 'VAN-01'}</p>
+          <span className="text-[10px] font-mono font-medium text-bespoke-dim uppercase tracking-[0.12em] block">Vehicle</span>
+          <p className="text-base font-medium font-mono text-bespoke-gold">{currentJourney?.vehicle_registration || 'VAN-01'}</p>
         </div>
         <div className="text-right">
-          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">Duration</span>
-          <p className="text-base font-black font-mono text-white">{formattedTime}</p>
+          <span className="text-[10px] font-mono font-medium text-bespoke-dim uppercase tracking-[0.12em] block">Duration</span>
+          <p className="text-base font-light font-mono text-bespoke-offwhite">{formattedTime}</p>
         </div>
       </div>
 
       {/* Starting Location & Destination Route Card */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl space-y-3">
-        <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+      <div className="bg-bespoke-surface border border-bespoke-border rounded-xl p-4 shadow-xl space-y-3">
+        <div className="flex items-center justify-between border-b border-bespoke-border pb-2">
           <div className="flex items-center gap-2">
-            <Route className="w-4 h-4 text-emerald-400" />
-            <span className="text-xs font-bold text-white uppercase tracking-wider">Active Journey Endpoints</span>
+            <Route className="w-4 h-4 text-bespoke-gold" />
+            <span className="text-xs font-mono uppercase tracking-[0.1em] text-bespoke-offwhite">Active Journey Endpoints</span>
           </div>
-          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-950 text-emerald-400 border border-emerald-800">
+          <span className="px-2.5 py-0.5 rounded text-[10px] font-mono uppercase bg-bespoke-gold/10 text-bespoke-gold border border-bespoke-gold/30">
             {currentJourney?.status || 'IN_PROGRESS'}
           </span>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
           {/* Starting Location (Source) */}
-          <div className="bg-slate-950/70 p-3 rounded-xl border border-slate-800 space-y-1">
-            <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-400" />
-              Source (Starting Location)
+          <div className="bg-bespoke-black/80 p-3 rounded border border-bespoke-border space-y-1">
+            <span className="text-[10px] font-mono uppercase tracking-wider text-bespoke-gold flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-bespoke-gold" />
+              Source Point
             </span>
-            <p className="text-sm font-bold text-white break-words">
+            <p className="text-sm font-medium text-bespoke-linen break-words">
               {currentJourney?.origin_name || 'Starting Point'}
             </p>
             {currentJourney?.origin_lat != null && currentJourney?.origin_lng != null && (
-              <p className="text-[10px] text-slate-500 font-mono">
+              <p className="text-[10px] text-bespoke-dim font-mono">
                 {currentJourney.origin_lat.toFixed(5)}, {currentJourney.origin_lng.toFixed(5)}
               </p>
             )}
           </div>
 
           {/* Destination (Target) */}
-          <div className="bg-slate-950/70 p-3 rounded-xl border border-slate-800 space-y-1">
-            <span className="text-[10px] font-bold text-rose-400 uppercase tracking-wider flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-rose-400" />
-              Destination (Ending Location)
+          <div className="bg-bespoke-black/80 p-3 rounded border border-bespoke-border space-y-1">
+            <span className="text-[10px] font-mono uppercase tracking-wider text-bespoke-champagne flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-bespoke-champagne" />
+              Destination Point
             </span>
-            <p className="text-sm font-bold text-white break-words">
+            <p className="text-sm font-medium text-bespoke-offwhite break-words">
               {currentJourney?.destination_name || 'Destination Point'}
             </p>
             {currentJourney?.destination_lat != null && currentJourney?.destination_lng != null && (
-              <p className="text-[10px] text-slate-500 font-mono">
+              <p className="text-[10px] text-bespoke-dim font-mono">
                 {currentJourney.destination_lat.toFixed(5)}, {currentJourney.destination_lng.toFixed(5)}
               </p>
             )}
@@ -469,37 +469,37 @@ export const ActiveJourney: React.FC = () => {
       {/* Ephemeral Tracking Link Sharing Card */}
       <Card title="Temporary Public Tracking Link">
         <div className="space-y-3">
-          <p className="text-xs text-slate-400 leading-relaxed">
+          <p className="text-xs text-bespoke-champagne/70 leading-relaxed">
             {isLinkRevoked
               ? 'Public link access has been manually revoked.'
-              : 'Share this secure link with clients or dispatchers. Valid only while in transit.'}
+              : 'Share this secure advisory link with clients or dispatchers. Valid only while in transit.'}
           </p>
 
           {!isLinkRevoked && (
             <>
-              <div className="flex items-center gap-2 p-2 bg-slate-950 border border-slate-800 rounded-xl">
+              <div className="flex items-center gap-2 p-2 bg-bespoke-black border border-bespoke-border rounded">
                 <input
                   type="text"
                   readOnly
                   value={effectiveTrackingUrl || ''}
-                  className="w-full bg-transparent text-xs text-emerald-400 font-mono truncate px-2 focus:outline-none"
+                  className="w-full bg-transparent text-xs text-bespoke-gold font-mono truncate px-2 focus:outline-none"
                 />
                 <button
                   onClick={handleCopyLink}
-                  className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-medium flex items-center gap-1 transition-all flex-shrink-0"
+                  className="p-2 bg-bespoke-card hover:bg-bespoke-surface text-bespoke-champagne border border-bespoke-border rounded text-xs font-mono uppercase tracking-wider flex items-center gap-1 transition-all flex-shrink-0"
                 >
-                  {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                  {copied ? <Check className="w-3.5 h-3.5 text-bespoke-green" /> : <Copy className="w-3.5 h-3.5" />}
                   <span>{copied ? 'Copied' : 'Copy'}</span>
                 </button>
               </div>
 
               <div className="grid grid-cols-2 gap-2">
                 <Button variant="secondary" size="sm" onClick={handleNativeShare}>
-                  <Share2 className="w-4 h-4 text-emerald-400" />
+                  <Share2 className="w-4 h-4 text-bespoke-gold" />
                   <span>Share Link</span>
                 </Button>
                 <Button variant="secondary" size="sm" onClick={() => setShowQrModal(true)}>
-                  <QrCode className="w-4 h-4 text-blue-400" />
+                  <QrCode className="w-4 h-4 text-bespoke-champagne" />
                   <span>View QR</span>
                 </Button>
               </div>
@@ -507,7 +507,7 @@ export const ActiveJourney: React.FC = () => {
               <button
                 type="button"
                 onClick={handleRevokeLink}
-                className="w-full py-1 text-[11px] text-slate-500 hover:text-rose-400 transition font-medium flex items-center justify-center gap-1.5"
+                className="w-full py-1 text-[11px] text-bespoke-dim hover:text-bespoke-error transition font-mono uppercase tracking-wider flex items-center justify-center gap-1.5"
               >
                 <EyeOff className="w-3.5 h-3.5" />
                 <span>Revoke public link access immediately</span>

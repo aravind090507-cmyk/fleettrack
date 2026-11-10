@@ -11,20 +11,20 @@ export const ConnectionStatus: React.FC<ConnectionStatusProps> = ({ isOnline, qu
   return (
     <div
       className={clsx(
-        'inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold border backdrop-blur-md transition-all',
+        'inline-flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-mono tracking-[0.1em] uppercase border backdrop-blur-md transition-all',
         isOnline
-          ? 'bg-emerald-950/60 text-emerald-300 border-emerald-800/50'
-          : 'bg-amber-950/80 text-amber-300 border-amber-800/80 shadow-lg animate-pulse'
+          ? 'bg-bespoke-green/10 text-bespoke-green border-bespoke-green/30'
+          : 'bg-bespoke-error/15 text-bespoke-champagne border-bespoke-error/40 shadow-lg animate-pulse'
       )}
     >
       {isOnline ? (
         <>
-          <Wifi className="w-3.5 h-3.5 text-emerald-400" />
+          <Wifi className="w-3.5 h-3.5 text-bespoke-green" />
           <span>LIVE ONLINE</span>
         </>
       ) : (
         <>
-          <WifiOff className="w-3.5 h-3.5 text-amber-400" />
+          <WifiOff className="w-3.5 h-3.5 text-bespoke-error" />
           <span>OFFLINE {queuedCount > 0 && `(${queuedCount} queued)`}</span>
         </>
       )}

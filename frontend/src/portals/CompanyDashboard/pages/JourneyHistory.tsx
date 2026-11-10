@@ -62,13 +62,13 @@ export const JourneyHistory: React.FC = () => {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h2 className="text-xl font-bold text-white tracking-tight">Trip Archives & Historical Records</h2>
-          <p className="text-xs text-slate-400">Completed journey records, duration metrics, and distance audit trails. Click any trip to view its path on the map.</p>
+          <h2 className="text-xl font-light text-bespoke-offwhite tracking-wide uppercase">Trip Archives & Historical Records</h2>
+          <p className="text-xs text-bespoke-champagne/70">Completed journey records, duration metrics, and distance audit trails. Click any trip to view its path on the map.</p>
         </div>
         {history.length > 0 && (
           <button
             onClick={exportToCsv}
-            className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/30 rounded-xl text-xs font-bold transition shadow-sm w-fit"
+            className="flex items-center gap-1.5 px-3.5 py-1.5 bg-bespoke-card hover:bg-bespoke-surface text-bespoke-gold border border-bespoke-border hover:border-bespoke-gold/40 rounded text-[11px] font-mono uppercase tracking-[0.1em] transition shadow-sm w-fit"
           >
             <Download className="w-3.5 h-3.5" />
             <span>Export CSV</span>
@@ -80,46 +80,47 @@ export const JourneyHistory: React.FC = () => {
         {loading ? (
           <LoadingSpinner />
         ) : history.length === 0 ? (
-          <div className="text-center py-12 text-slate-500 text-xs">
+          <div className="text-center py-12 text-bespoke-dim text-xs font-mono uppercase tracking-wider">
             No completed journeys recorded in archive yet.
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="text-[10px] text-slate-400 uppercase tracking-wider border-b border-slate-800">
+              <thead className="bg-bespoke-black/80 text-[10px] text-bespoke-champagne uppercase tracking-[0.12em] border-b border-bespoke-border">
                 <tr>
-                  <th className="py-3 px-4">Vehicle</th>
-                  <th className="py-3 px-4">Driver</th>
-                  <th className="py-3 px-4">Origin & Destination</th>
-                  <th className="py-3 px-4">Date</th>
-                  <th className="py-3 px-4">Duration</th>
-                  <th className="py-3 px-4">Total Distance</th>
-                  <th className="py-3 px-4">Status</th>
-                  <th className="py-3 px-4 text-right">Action</th>
+                  <th className="py-3 px-4 font-normal">Vehicle</th>
+                  <th className="py-3 px-4 font-normal">Driver</th>
+                  <th className="py-3 px-4 font-normal">Origin & Destination</th>
+                  <th className="py-3 px-4 font-normal">Date</th>
+                  <th className="py-3 px-4 font-normal">Duration</th>
+                  <th className="py-3 px-4 font-normal">Total Distance</th>
+                  <th className="py-3 px-4 font-normal">Status</th>
+                  <th className="py-3 px-4 font-normal text-right">Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/60 text-slate-300">
+              <tbody className="divide-y divide-bespoke-border/60 text-bespoke-champagne">
                 {history.map((j) => {
                   const minutes = Math.floor(j.duration_seconds / 60);
                   return (
                     <tr
                       key={j.id}
                       onClick={() => navigate(`/company/live-map?journeyId=${j.id}`)}
-                      className="hover:bg-slate-800/50 cursor-pointer transition-colors"
+                      className="hover:bg-bespoke-card/60 cursor-pointer transition-colors"
                     >
-                      <td className="py-3 px-4 font-bold font-mono text-white">
+                      <td className="py-3 px-4 font-medium font-mono text-bespoke-offwhite tracking-wider">
                         {j.vehicle_registration || 'ASSET'}
                       </td>
-                      <td className="py-3 px-4">{j.driver_name || 'Driver'}</td>
+                      <td className="py-3 px-4 text-bespoke-champagne">{j.driver_name || 'Driver'}</td>
                       <td className="py-3 px-4">
-                        <span className="text-slate-400">{j.origin_name}</span> →{' '}
-                        <span className="font-semibold text-white">{j.destination_name}</span>
+                        <span className="text-bespoke-muted">{j.origin_name}</span>{' '}
+                        <span className="text-bespoke-dim">&rarr;</span>{' '}
+                        <span className="font-medium text-bespoke-linen">{j.destination_name}</span>
                       </td>
-                      <td className="py-3 px-4 text-slate-400">
+                      <td className="py-3 px-4 text-bespoke-muted font-mono">
                         {new Date(j.started_at).toLocaleDateString()}
                       </td>
-                      <td className="py-3 px-4 font-mono">{minutes} mins</td>
-                      <td className="py-3 px-4 font-mono font-bold text-emerald-400" title={`${j.total_distance_km} km`}>
+                      <td className="py-3 px-4 font-mono text-bespoke-champagne">{minutes} mins</td>
+                      <td className="py-3 px-4 font-mono font-medium text-bespoke-goldLight" title={`${j.total_distance_km} km`}>
                         {j.total_distance_km != null
                           ? j.total_distance_km < 1
                             ? `${Math.round(j.total_distance_km * 1000)} m`
@@ -130,16 +131,16 @@ export const JourneyHistory: React.FC = () => {
                         <StatusBadge status={j.status} size="sm" />
                       </td>
                       <td className="py-3 px-4 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
+                        <div className="flex items-center justify-end gap-2">
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               navigate(`/company/live-map?journeyId=${j.id}&replay=true`);
                             }}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 rounded-lg text-[11px] font-bold transition shadow-sm cursor-pointer"
+                            className="inline-flex items-center gap-1 px-2.5 py-1 bg-bespoke-card hover:bg-bespoke-surface text-bespoke-champagne border border-bespoke-border hover:border-bespoke-gold/40 rounded text-[11px] font-mono uppercase tracking-[0.08em] transition shadow-sm cursor-pointer"
                             title="Interactive Route Replay"
                           >
-                            <Play className="w-3 h-3 text-indigo-400" />
+                            <Play className="w-3 h-3 text-bespoke-gold" />
                             <span>Replay</span>
                           </button>
                           <button
@@ -147,9 +148,9 @@ export const JourneyHistory: React.FC = () => {
                               e.stopPropagation();
                               navigate(`/company/live-map?journeyId=${j.id}`);
                             }}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-[11px] font-bold transition cursor-pointer"
+                            className="inline-flex items-center gap-1 px-3 py-1 bg-bespoke-gold hover:bg-bespoke-goldHover text-bespoke-black rounded text-[11px] font-semibold uppercase tracking-[0.08em] transition cursor-pointer"
                           >
-                            <MapPin className="w-3 h-3 text-emerald-400" />
+                            <MapPin className="w-3 h-3" />
                             <span>View Path</span>
                           </button>
                         </div>

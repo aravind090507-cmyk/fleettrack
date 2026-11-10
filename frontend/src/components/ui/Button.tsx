@@ -17,19 +17,19 @@ export const Button: React.FC<ButtonProps> = ({
   ...props
 }) => {
   const base =
-    'inline-flex items-center justify-center font-medium rounded-xl transition-all duration-200 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none select-none';
+    'inline-flex items-center justify-center font-medium rounded-xl transition-all duration-200 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none select-none tracking-wide';
 
   const variants = {
     primary:
-      'bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-900/40 border border-emerald-500/30',
+      'bg-[#cb886c] hover:bg-[#d9977c] text-[#0d0d0d] font-semibold shadow-lg shadow-[#cb886c]/20 border border-[#cb886c]/40',
     secondary:
-      'bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-700 shadow-sm',
+      'bg-[#1a1b1f] hover:bg-[#222429] text-[#f4f5f2] border border-[#2a2b30] hover:border-[#cb886c]/40 shadow-sm',
     danger:
-      'bg-rose-600 hover:bg-rose-500 text-white shadow-lg shadow-rose-900/40 border border-rose-500/30',
+      'bg-[#b63b51] hover:bg-[#c9455d] text-white shadow-lg shadow-[#b63b51]/30 border border-[#b63b51]/40',
     warning:
-      'bg-amber-600 hover:bg-amber-500 text-white shadow-lg shadow-amber-900/40 border border-amber-500/30',
+      'bg-[#d97706] hover:bg-[#b45309] text-white shadow-lg shadow-amber-950/40 border border-amber-600/30',
     ghost:
-      'hover:bg-slate-800 text-slate-300 hover:text-white',
+      'hover:bg-[#1a1b1f] text-[#dac9be] hover:text-[#f4f5f2] border border-transparent hover:border-[#26272b]',
   };
 
   const sizes = {

@@ -20,16 +20,16 @@ export const DriverLayout: React.FC<DriverLayoutProps> = ({ children }) => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col max-w-md mx-auto border-x border-slate-900 shadow-2xl">
+    <div className="min-h-screen bg-bespoke-dark text-bespoke-offwhite flex flex-col max-w-md mx-auto border-x border-bespoke-border shadow-2xl font-sans">
       {/* Mobile Header */}
-      <header className="h-16 px-4 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between sticky top-0 z-30 backdrop-blur-md">
+      <header className="h-16 px-4 bg-bespoke-surface/95 border-b border-bespoke-border flex items-center justify-between sticky top-0 z-30 backdrop-blur-md">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center shadow-md">
-            <Radio className="w-4 h-4 text-white animate-pulse" />
+          <div className="w-8 h-8 rounded bg-bespoke-card border border-bespoke-gold/40 flex items-center justify-center shadow-md">
+            <Radio className="w-4 h-4 text-bespoke-gold animate-pulse" />
           </div>
           <div>
-            <h1 className="text-sm font-bold tracking-tight text-white leading-tight">Driver Portal</h1>
-            <p className="text-[10px] text-slate-400 truncate max-w-[120px]">{user?.name || 'Driver'}</p>
+            <h1 className="text-xs font-light tracking-[0.12em] uppercase text-bespoke-offwhite leading-tight">Driver Telematics</h1>
+            <p className="text-[10px] text-bespoke-champagne/70 truncate max-w-[120px] font-mono">{user?.name || 'Driver'}</p>
           </div>
         </div>
 
@@ -38,7 +38,7 @@ export const DriverLayout: React.FC<DriverLayoutProps> = ({ children }) => {
           <button
             onClick={handleLogout}
             title="Sign Out"
-            className="p-2 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-lg transition-colors"
+            className="p-2 text-bespoke-champagne/60 hover:text-bespoke-error hover:bg-bespoke-card rounded transition-colors"
           >
             <LogOut className="w-4 h-4" />
           </button>
@@ -46,7 +46,7 @@ export const DriverLayout: React.FC<DriverLayoutProps> = ({ children }) => {
       </header>
 
       {/* Main Content Area */}
-      <main className="flex-1 p-4 flex flex-col">{children}</main>
+      <main className="flex-1 p-4 flex flex-col bg-bespoke-dark">{children}</main>
     </div>
   );
 };

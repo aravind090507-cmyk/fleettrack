@@ -306,16 +306,16 @@ export const FleetMap: React.FC<FleetMapProps> = ({
   const [followSelected, setFollowSelected] = useState<boolean>(true);
 
   return (
-    <div className="relative w-full h-full min-h-[450px] rounded-2xl overflow-hidden border border-slate-800 shadow-2xl">
+    <div className="relative w-full h-full min-h-[450px] rounded-xl overflow-hidden border border-bespoke-border shadow-2xl">
       {/* Top Map Controls Overlay */}
       <div className="absolute top-3 right-3 z-[1000] flex items-center gap-2">
         <button
           type="button"
           onClick={() => setFollowSelected((f) => !f)}
-          className={`px-3 py-1.5 rounded-xl text-xs font-bold shadow-lg transition backdrop-blur-md border ${
+          className={`px-3 py-1.5 rounded text-xs font-mono uppercase tracking-[0.08em] shadow-lg transition backdrop-blur-md border ${
             followSelected
-              ? 'bg-emerald-600/90 text-white border-emerald-500 shadow-emerald-950/50'
-              : 'bg-slate-900/90 text-slate-300 border-slate-700 hover:text-white'
+              ? 'bg-bespoke-gold text-bespoke-black border-bespoke-gold font-semibold shadow-bespoke-gold/20'
+              : 'bg-bespoke-surface/90 text-bespoke-champagne border-bespoke-border hover:text-white'
           }`}
         >
           {followSelected ? '🎯 Following Vehicle' : '📍 Free Pan'}
@@ -350,9 +350,9 @@ export const FleetMap: React.FC<FleetMapProps> = ({
             <Polyline
               positions={fullPolyline}
               pathOptions={{
-                color: '#059669',
-                weight: 7,
-                opacity: 0.4,
+                color: '#a3644b',
+                weight: 6,
+                opacity: 0.35,
                 lineCap: 'round',
                 lineJoin: 'round',
               }}
@@ -361,7 +361,7 @@ export const FleetMap: React.FC<FleetMapProps> = ({
             <Polyline
               positions={fullPolyline}
               pathOptions={{
-                color: '#10b981',
+                color: '#cb886c',
                 weight: 3.5,
                 opacity: 0.95,
                 lineCap: 'round',

@@ -10,39 +10,39 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, size = 'md' })
   const normalized = status.toUpperCase();
 
   const colorStyles: Record<string, string> = {
-    IN_PROGRESS: 'bg-emerald-950/80 text-emerald-400 border-emerald-700/50',
-    IN_TRANSIT: 'bg-emerald-950/80 text-emerald-400 border-emerald-700/50',
-    AVAILABLE: 'bg-blue-950/80 text-blue-400 border-blue-700/50',
-    COMPLETED: 'bg-slate-800/80 text-slate-400 border-slate-700/50',
-    PAUSED: 'bg-amber-950/80 text-amber-400 border-amber-700/50',
-    MAINTENANCE: 'bg-amber-950/80 text-amber-400 border-amber-700/50',
-    OFFLINE: 'bg-rose-950/80 text-rose-400 border-rose-700/50',
-    CANCELLED: 'bg-rose-950/80 text-rose-400 border-rose-700/50',
+    IN_PROGRESS: 'bg-[#cb886c]/15 text-[#ebcfbc] border-[#cb886c]/30',
+    IN_TRANSIT: 'bg-[#cb886c]/15 text-[#ebcfbc] border-[#cb886c]/30',
+    AVAILABLE: 'bg-[#45c045]/15 text-[#9ae6b4] border-[#45c045]/30',
+    COMPLETED: 'bg-[#f4f5f2]/10 text-[#dac9be] border-[#dac9be]/25',
+    PAUSED: 'bg-[#d97706]/15 text-[#fcd34d] border-[#d97706]/30',
+    MAINTENANCE: 'bg-[#d97706]/15 text-[#fcd34d] border-[#d97706]/30',
+    OFFLINE: 'bg-[#b63b51]/15 text-[#fda4af] border-[#b63b51]/30',
+    CANCELLED: 'bg-[#b63b51]/15 text-[#fda4af] border-[#b63b51]/30',
   };
 
-  const style = colorStyles[normalized] || 'bg-slate-800 text-slate-300 border-slate-700';
+  const style = colorStyles[normalized] || 'bg-[#1a1b1f] text-[#dac9be] border-[#26272b]';
 
   const sizeClasses = {
-    sm: 'text-xs px-2 py-0.5',
-    md: 'text-xs px-2.5 py-1',
-    lg: 'text-sm px-3 py-1.5',
+    sm: 'text-[10px] tracking-[0.08em] px-2 py-0.5 uppercase',
+    md: 'text-xs tracking-[0.08em] px-2.5 py-1 uppercase',
+    lg: 'text-xs tracking-[0.08em] px-3 py-1.5 uppercase',
   };
 
   return (
     <span
       className={clsx(
-        'inline-flex items-center gap-1.5 font-medium rounded-full border shadow-sm',
+        'inline-flex items-center gap-1.5 font-medium rounded-full border shadow-sm select-none',
         style,
         sizeClasses[size]
       )}
     >
       <span
         className={clsx('w-1.5 h-1.5 rounded-full', {
-          'bg-emerald-400 animate-pulse': normalized === 'IN_PROGRESS' || normalized === 'IN_TRANSIT',
-          'bg-blue-400': normalized === 'AVAILABLE',
+          'bg-[#cb886c] animate-pulse': normalized === 'IN_PROGRESS' || normalized === 'IN_TRANSIT',
+          'bg-[#45c045]': normalized === 'AVAILABLE',
           'bg-amber-400': normalized === 'PAUSED' || normalized === 'MAINTENANCE',
-          'bg-rose-400': normalized === 'OFFLINE' || normalized === 'CANCELLED',
-          'bg-slate-400': normalized === 'COMPLETED',
+          'bg-[#b63b51]': normalized === 'OFFLINE' || normalized === 'CANCELLED',
+          'bg-[#dac9be]': normalized === 'COMPLETED',
         })}
       />
       {normalized.replace('_', ' ')}

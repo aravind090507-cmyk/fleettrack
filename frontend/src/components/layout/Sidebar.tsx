@@ -39,27 +39,27 @@ export const Sidebar: React.FC = () => {
   ];
 
   return (
-    <aside className="w-64 bg-slate-900 border-r border-slate-800 flex flex-col h-screen select-none">
+    <aside className="w-64 bg-[#0d0d0d] border-r border-[#222428] flex flex-col h-screen select-none">
       {/* Brand */}
-      <div className="h-16 px-6 flex items-center gap-3 border-b border-slate-800">
-        <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center shadow-lg shadow-emerald-950">
-          <Radio className="w-5 h-5 text-white animate-pulse" />
+      <div className="h-16 px-6 flex items-center gap-3 border-b border-[#222428]">
+        <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#cb886c] to-[#ebcfbc] flex items-center justify-center shadow-lg shadow-black/80">
+          <Radio className="w-4 h-4 text-[#0d0d0d] font-bold animate-pulse" />
         </div>
         <div>
-          <h1 className="text-base font-bold tracking-tight text-white flex items-center gap-1.5">
+          <h1 className="text-sm font-bold tracking-[0.08em] text-[#f4f5f2] flex items-center gap-1.5 uppercase">
             FleetTrack
-            <span className="text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-              Pro
+            <span className="text-[9px] font-semibold tracking-[0.1em] uppercase px-1.5 py-0.5 rounded bg-[#cb886c]/15 text-[#ebcfbc] border border-[#cb886c]/30">
+              Bespoke
             </span>
           </h1>
-          <p className="text-[11px] text-slate-400">Enterprise Operations</p>
+          <p className="text-[10px] tracking-[0.08em] text-[#9c9c9c] uppercase">Private Telematics</p>
         </div>
       </div>
 
       {/* Nav Links */}
-      <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto">
-        <p className="px-3 py-2 text-[11px] font-semibold tracking-wider text-slate-500 uppercase">
-          Navigation
+      <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+        <p className="px-3 py-2 text-[10px] font-semibold tracking-[0.14em] text-[#636363] uppercase">
+          Operations
         </p>
         {navItems.map((item) => {
           const Icon = item.icon;
@@ -70,10 +70,10 @@ export const Sidebar: React.FC = () => {
               end={item.end}
               className={({ isActive }) =>
                 clsx(
-                  'flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-150',
+                  'flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-medium tracking-wide transition-all duration-150',
                   isActive
-                    ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-900/30'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                    ? 'bg-[#cb886c] text-[#0d0d0d] font-semibold shadow-lg shadow-[#cb886c]/20'
+                    : 'text-[#9c9c9c] hover:text-[#f4f5f2] hover:bg-[#151619] hover:border hover:border-[#26272b]'
                 )
               }
             >
@@ -85,19 +85,19 @@ export const Sidebar: React.FC = () => {
       </nav>
 
       {/* User profile footer */}
-      <div className="p-4 border-t border-slate-800 bg-slate-900/50">
+      <div className="p-4 border-t border-[#222428] bg-[#111215]/80">
         <div className="flex items-center justify-between mb-3 px-1">
           <div className="truncate">
-            <p className="text-sm font-semibold text-slate-200 truncate">{user?.name || 'Manager'}</p>
-            <p className="text-xs text-slate-400 truncate">{user?.email || 'manager@fleetcorp.com'}</p>
+            <p className="text-xs font-semibold text-[#f4f5f2] truncate">{user?.name || 'Manager'}</p>
+            <p className="text-[10px] text-[#9c9c9c] truncate">{user?.email || 'manager@fleetcorp.com'}</p>
           </div>
-          <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+          <span className="text-[9px] uppercase tracking-[0.08em] font-bold px-2 py-0.5 rounded-full bg-[#1a1b1f] text-[#dac9be] border border-[#2a2b30]">
             {user?.role || 'MANAGER'}
           </span>
         </div>
         <button
           onClick={handleLogout}
-          className="w-full flex items-center justify-center gap-2 py-2 px-3 text-xs font-medium text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 rounded-lg transition-colors border border-rose-900/30"
+          className="w-full flex items-center justify-center gap-2 py-2 px-3 text-xs font-medium text-[#f87171] hover:text-white hover:bg-[#b63b51]/30 rounded-xl transition-all border border-[#b63b51]/30"
         >
           <LogOut className="w-3.5 h-3.5" />
           <span>Sign Out</span>

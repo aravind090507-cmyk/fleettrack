@@ -12,13 +12,13 @@ export const Card: React.FC<CardProps> = ({ children, className, title, action }
   return (
     <div
       className={clsx(
-        'bg-slate-900/90 border border-slate-800/80 rounded-2xl shadow-xl shadow-slate-950/50 backdrop-blur-sm overflow-hidden',
+        'bg-[#151619] border border-[#26272b] rounded-2xl shadow-2xl shadow-black/60 backdrop-blur-sm overflow-hidden transition-all duration-200',
         className
       )}
     >
       {title && (
-        <div className="px-5 py-4 border-b border-slate-800/80 flex items-center justify-between">
-          <h3 className="text-sm font-semibold tracking-wide text-slate-200 uppercase">{title}</h3>
+        <div className="px-5 py-3.5 border-b border-[#26272b] flex items-center justify-between bg-[#111215]/50">
+          <h3 className="text-xs font-semibold tracking-[0.1em] text-[#dac9be] uppercase">{title}</h3>
           {action && <div>{action}</div>}
         </div>
       )}

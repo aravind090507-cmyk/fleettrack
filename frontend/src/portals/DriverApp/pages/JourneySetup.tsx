@@ -429,18 +429,18 @@ export const JourneySetup: React.FC = () => {
   return (
     <div className="space-y-4">
       {/* Header Banner */}
-      <div className="bg-gradient-to-r from-emerald-950/80 to-slate-900 p-3.5 rounded-2xl border border-emerald-800/40">
-        <h2 className="text-sm font-bold text-white flex items-center gap-2">
-          <Navigation className="w-4 h-4 text-emerald-400" />
+      <div className="bg-bespoke-surface p-4 rounded-xl border border-bespoke-border">
+        <h2 className="text-sm font-light text-bespoke-offwhite uppercase tracking-[0.12em] flex items-center gap-2">
+          <Navigation className="w-4 h-4 text-bespoke-gold" />
           <span>Interactive Dispatch Setup</span>
         </h2>
-        <p className="text-[11px] text-slate-400 mt-0.5">
-          Select your Start and Goal pins using Map Tap, Location Search, or Coordinates (tested down to 5–10m).
+        <p className="text-[11px] text-bespoke-champagne/70 mt-1">
+          Select your Start and Goal pins using Map Tap, Location Search, or Coordinates (calibrated to 5–10m).
         </p>
       </div>
 
       {error && (
-        <div className="p-3 rounded-xl bg-rose-950/80 border border-rose-800 text-rose-300 text-xs flex items-center gap-2">
+        <div className="p-3 rounded bg-bespoke-error/20 border border-bespoke-error text-bespoke-linen text-xs flex items-center gap-2 font-mono">
           <AlertCircle className="w-4 h-4 flex-shrink-0" />
           <span>{error}</span>
         </div>
@@ -450,14 +450,14 @@ export const JourneySetup: React.FC = () => {
       <Card
         title="Vehicle / Device Unit"
         action={
-          <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800 text-[11px]">
+          <div className="flex items-center gap-1 bg-bespoke-black p-1 rounded border border-bespoke-border text-[11px] font-mono">
             <button
               type="button"
               onClick={() => setVehicleInputMode('custom')}
-              className={`px-2.5 py-1 rounded-md font-bold transition cursor-pointer ${
+              className={`px-2.5 py-1 rounded transition cursor-pointer uppercase tracking-wider ${
                 vehicleInputMode === 'custom'
-                  ? 'bg-emerald-600 text-white shadow'
-                  : 'text-slate-400 hover:text-white'
+                  ? 'bg-bespoke-card text-bespoke-gold border border-bespoke-border shadow'
+                  : 'text-bespoke-champagne/60 hover:text-white'
               }`}
             >
               ✏️ Enter Details
@@ -465,10 +465,10 @@ export const JourneySetup: React.FC = () => {
             <button
               type="button"
               onClick={() => setVehicleInputMode('picker')}
-              className={`px-2.5 py-1 rounded-md font-bold transition cursor-pointer ${
+              className={`px-2.5 py-1 rounded transition cursor-pointer uppercase tracking-wider ${
                 vehicleInputMode === 'picker'
-                  ? 'bg-emerald-600 text-white shadow'
-                  : 'text-slate-400 hover:text-white'
+                  ? 'bg-bespoke-card text-bespoke-gold border border-bespoke-border shadow'
+                  : 'text-bespoke-champagne/60 hover:text-white'
               }`}
             >
               📋 Fleet List

@@ -22,17 +22,17 @@ export const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
     <div className="flex flex-col items-center justify-center gap-3">
       <div
         className={clsx(
-          'rounded-full border-slate-700 border-t-emerald-500 animate-spin',
+          'rounded-full border-bespoke-border border-t-bespoke-gold animate-spin',
           sizeClasses[size]
         )}
       />
-      {label && <p className="text-sm text-slate-400 font-medium">{label}</p>}
+      {label && <p className="text-xs text-bespoke-champagne font-mono tracking-[0.1em] uppercase">{label}</p>}
     </div>
   );
 
   if (fullScreen) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-bespoke-black/85 backdrop-blur-md">
         {content}
       </div>
     );
