@@ -23,6 +23,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY --from=builder /install /usr/local
 COPY backend/app /app/app
+COPY backend/alembic /app/alembic
+COPY backend/alembic.ini /app/alembic.ini
 
 ENV PYTHONUNBUFFERED=1
 ENV APP_ENVIRONMENT=production

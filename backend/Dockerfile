@@ -23,6 +23,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY --from=builder /install /usr/local
 COPY app /app/app
+COPY alembic /app/alembic
+COPY alembic.ini /app/alembic.ini
 
 ENV PYTHONUNBUFFERED=1
 ENV APP_ENVIRONMENT=production
