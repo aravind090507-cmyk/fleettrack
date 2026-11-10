@@ -379,7 +379,7 @@ export const reportsApi = {
 export const healthApi = {
   check: async () => {
     try {
-      const { data } = await api.get('/health', { timeout: 4000 });
+      const { data } = await api.get('/health', { timeout: 10000 });
       return data as { status: string; database: string; redis: string };
     } catch {
       return null;

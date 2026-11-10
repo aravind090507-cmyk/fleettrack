@@ -235,6 +235,9 @@ async def end_journey(
         link.revoked_at = now
         await redis_svc.revoke_tracking_token(link.token_hash)
 
+    # Evict cached vehicle location from Redis so resting vehicle speed is stationary (0 km/h)
+    await redis_svc.delete_latest_vehicle_location(journey.vehicle_id)
+
     await db.commit()
     await db.refresh(journey)
 

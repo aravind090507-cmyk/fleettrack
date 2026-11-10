@@ -138,29 +138,40 @@ async def get_active_vehicles_with_telemetry(
         heading = None
         rec_at = None
 
-        if latest_cache:
-            from datetime import datetime
-            lat = latest_cache.get("latitude")
-            lng = latest_cache.get("longitude")
-            speed = latest_cache.get("speed")
-            heading = latest_cache.get("heading")
-            if latest_cache.get("timestamp"):
-                rec_at = datetime.fromisoformat(latest_cache["timestamp"])
-        elif active_j:
-            loc = latest_loc_by_journey.get(active_j.id)
-            if loc:
-                lat = loc.latitude
-                lng = loc.longitude
-                speed = loc.speed
-                heading = loc.heading
-                rec_at = loc.recorded_at
+        if active_j:
+            if latest_cache:
+                from datetime import datetime
+                lat = latest_cache.get("latitude")
+                lng = latest_cache.get("longitude")
+                speed = latest_cache.get("speed")
+                heading = latest_cache.get("heading")
+                if latest_cache.get("timestamp"):
+                    rec_at = datetime.fromisoformat(latest_cache["timestamp"])
             else:
-                # Fallback to origin coordinates when journey just started and 0 pings yet
-                lat = active_j.origin_lat
-                lng = active_j.origin_lng
-                speed = 0.0
-                heading = 0.0
-                rec_at = active_j.started_at
+                loc = latest_loc_by_journey.get(active_j.id)
+                if loc:
+                    lat = loc.latitude
+                    lng = loc.longitude
+                    speed = loc.speed
+                    heading = loc.heading
+                    rec_at = loc.recorded_at
+                else:
+                    # Fallback to origin coordinates when journey just started and 0 pings yet
+                    lat = active_j.origin_lat
+                    lng = active_j.origin_lng
+                    speed = 0.0
+                    heading = 0.0
+                    rec_at = active_j.started_at
+        else:
+            # Vehicle is available/stationary: no active journey
+            speed = 0.0
+            heading = 0.0
+            if latest_cache:
+                from datetime import datetime
+                lat = latest_cache.get("latitude")
+                lng = latest_cache.get("longitude")
+                if latest_cache.get("timestamp"):
+                    rec_at = datetime.fromisoformat(latest_cache["timestamp"])
 
         # Resolve latest event for vehicle (SOS, BREAKDOWN, BREAK_START)
         latest_ev_type = None

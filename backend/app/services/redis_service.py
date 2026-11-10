@@ -163,6 +163,20 @@ class RedisService:
         val = self._memory_kv.get(key)
         return json.loads(val) if val else None
 
+    async def delete_latest_vehicle_location(self, vehicle_id: str) -> bool:
+        key = f"vehicle:{vehicle_id}:latest"
+        deleted = False
+        if self._is_connected and self._client:
+            try:
+                res = await self._client.delete(key)
+                deleted = bool(res)
+            except Exception as e:
+                logger.error("Redis delete location error: %s", e)
+        if key in self._memory_kv:
+            del self._memory_kv[key]
+            deleted = True
+        return deleted
+
     # --- Real-Time Pub/Sub Telemetry Distribution ---
     async def publish_location_update(self, journey_id: str, payload: Dict[str, Any]):
         channel = f"channel:journey:{journey_id}"

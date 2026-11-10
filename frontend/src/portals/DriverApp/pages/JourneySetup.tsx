@@ -100,8 +100,8 @@ export const JourneySetup: React.FC = () => {
 
   // Vehicle Selection Mode: 'picker' | 'custom'
   const [vehicleInputMode, setVehicleInputMode] = useState<'picker' | 'custom'>('picker');
-  const [customPlate, setCustomPlate] = useState<string>('KA-01-AB-1234');
-  const [customModel, setCustomModel] = useState<string>('Delivery Van');
+  const [customPlate, setCustomPlate] = useState<string>('');
+  const [customModel, setCustomModel] = useState<string>('');
   const [customType, setCustomType] = useState<string>('VAN');
 
   // Interactive Pinning Coordinates
@@ -110,7 +110,7 @@ export const JourneySetup: React.FC = () => {
   const [originName, setOriginName] = useState<string>('My Starting Location');
   const [destinationName, setDestinationName] = useState<string>('Destination Point');
   const [pinningMode, setPinningMode] = useState<'origin' | 'destination'>('destination');
-  const [description, setDescription] = useState<string>('Walking test trip (10m)');
+  const [description, setDescription] = useState<string>('');
 
   // Map view target
   const [mapTarget, setMapTarget] = useState<[number, number]>([12.9716, 77.5946]);
@@ -370,8 +370,13 @@ export const JourneySetup: React.FC = () => {
       };
 
       if (vehicleInputMode === 'custom' || selectedVehicleId === 'custom' || !selectedVehicleId || vehicles.length === 0) {
-        payload.vehicle_registration = (customPlate || 'KA-01-AB-1234').trim().toUpperCase();
-        payload.vehicle_model = (customModel || 'Fleet Vehicle').trim();
+        if (!customPlate.trim()) {
+          setError('Please enter a vehicle registration number');
+          setIsLoading(false);
+          return;
+        }
+        payload.vehicle_registration = customPlate.trim().toUpperCase();
+        payload.vehicle_model = customModel.trim() || 'Fleet Vehicle';
         payload.vehicle_type = customType;
       } else {
         payload.vehicle_id = selectedVehicleId;

@@ -100,49 +100,19 @@ export const LiveMap: React.FC = () => {
         dashboardApi.getRecentEvents().catch(() => [] as TripAlert[]),
       ]);
 
-      let resolvedJourneys = [...jData];
-
-      // Cross-container sync: check if active token in localStorage needs self-healing import
-      const localToken = localStorage.getItem('fleet_active_token');
-      if (localToken && !resolvedJourneys.some((j) => (j as any).tracking_token === localToken)) {
-        try {
-          const info = await trackingApi.getInfo(localToken);
-          if (info && info.journey_id) {
-            const alreadyInList = resolvedJourneys.some((j) => j.journey_id === info.journey_id);
-            if (!alreadyInList) {
-              resolvedJourneys.push({
-                journey_id: info.journey_id,
-                vehicle_id: info.vehicle_id,
-                driver_id: info.driver_id,
-                origin_name: info.origin_name,
-                origin_lat: info.origin_lat,
-                origin_lng: info.origin_lng,
-                destination_name: info.destination_name,
-                destination_lat: info.destination_lat,
-                destination_lng: info.destination_lng,
-                status: info.status || 'IN_PROGRESS',
-                vehicle_registration: info.vehicle_registration,
-                driver_name: info.driver_name,
-                latest_location: info.latest_location,
-                latest_event_type: null,
-                started_at: info.started_at,
-              } as ActiveJourneyTelemetry);
-            }
-          }
-        } catch (err: any) {
-          if (err.response?.status === 410) {
-            localStorage.removeItem('fleet_active_token');
-          }
-        }
-      }
+      const resolvedJourneys = [...jData];
 
       setVehicles(vData);
       setActiveJourneys(resolvedJourneys);
       setRecentEvents(eData);
 
-      // If a transit is currently selected, update its path
+      // If no active journeys exist, clear any active selections
       const current = selectedTransitRef.current;
-      if (current && (current.journey_id || current.id)) {
+      if (resolvedJourneys.length === 0) {
+        setSelectedTransit(null);
+        setSelectedVehicleId(null);
+        setJourneyPath([]);
+      } else if (current && (current.journey_id || current.id)) {
         const jId = current.journey_id || current.id!;
         const history = await locationApi.getHistory(jId);
         if (history && history.length > 0) {

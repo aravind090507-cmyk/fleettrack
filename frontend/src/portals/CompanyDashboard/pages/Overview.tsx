@@ -79,7 +79,14 @@ export const Overview: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60 text-slate-300">
-              {activeVehicles.map((v) => (
+              {activeVehicles.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="py-8 text-center text-slate-500 text-xs">
+                    No active dispatches
+                  </td>
+                </tr>
+              ) : (
+                activeVehicles.map((v) => (
                 <tr key={v.vehicle_id} className="hover:bg-slate-800/40 transition-colors">
                   <td className="py-3 px-4 font-bold text-white font-mono">{v.registration_number}</td>
                   <td className="py-3 px-4">{v.model}</td>
@@ -114,7 +121,7 @@ export const Overview: React.FC = () => {
                       : 'Stationary'}
                   </td>
                 </tr>
-              ))}
+              )))}
             </tbody>
           </table>
         </div>

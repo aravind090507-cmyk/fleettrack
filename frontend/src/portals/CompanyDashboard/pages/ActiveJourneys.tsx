@@ -16,34 +16,7 @@ export const ActiveJourneys: React.FC = () => {
   const loadActive = useCallback(async () => {
     try {
       const data = await journeysApi.getActive();
-      let list = [...data];
-      const localToken = localStorage.getItem('fleet_active_token');
-      if (localToken && !list.some((j) => (j as any).tracking_token === localToken)) {
-        try {
-          const info = await trackingApi.getInfo(localToken);
-          if (info && info.journey_id && !list.some((j) => j.id === info.journey_id)) {
-            list.push({
-              id: info.journey_id,
-              vehicle_id: info.vehicle_id || 'veh-active',
-              driver_id: info.driver_id || 'drv-active',
-              origin_name: info.origin_name,
-              origin_lat: info.origin_lat,
-              origin_lng: info.origin_lng,
-              destination_name: info.destination_name,
-              destination_lat: info.destination_lat,
-              destination_lng: info.destination_lng,
-              status: info.status as any,
-              total_distance_km: 0,
-              duration_seconds: 0,
-              started_at: info.started_at,
-              created_at: info.started_at,
-              vehicle_registration: info.vehicle_registration,
-              driver_name: info.driver_name,
-            });
-          }
-        } catch {}
-      }
-      setJourneys(list);
+      setJourneys(data || []);
     } catch (e) {
       console.error(e);
     } finally {
@@ -77,7 +50,7 @@ export const ActiveJourneys: React.FC = () => {
           <LoadingSpinner />
         ) : journeys.length === 0 ? (
           <div className="text-center py-12 text-slate-500 text-xs">
-            No active journeys in transit currently.
+            No active dispatches
           </div>
         ) : (
           <div className="overflow-x-auto">

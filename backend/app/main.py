@@ -60,7 +60,28 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.error("Demo seeding error: %s", e)
 
-    # 3. Connect to Redis (or fallback to in-memory)
+    # 3. Clean up any leftover mock/test dispatches so only real dispatches populate
+    try:
+        from app.models.journey import Journey
+        from sqlalchemy import update
+        async with AsyncSessionLocal() as db:
+            stmt = (
+                update(Journey)
+                .where(Journey.status == "IN_PROGRESS")
+                .where(
+                    (Journey.origin_name.ilike("%Warehouse Alpha%"))
+                    | (Journey.destination_name.ilike("%Distribution Beta%"))
+                    | (Journey.description.ilike("%Walking test trip%"))
+                    | (Journey.origin_name.ilike("%Current Device Location%"))
+                )
+                .values(status="COMPLETED")
+            )
+            await db.execute(stmt)
+            await db.commit()
+    except Exception as e:
+        logger.warning("Mock journey cleanup notice: %s", e)
+
+    # 4. Connect to Redis (or fallback to in-memory)
     redis_svc = get_redis_service()
     await redis_svc.initialize()
 
