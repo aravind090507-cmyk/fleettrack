@@ -116,8 +116,10 @@ export const ActiveJourney: React.FC = () => {
 
       if (navigator.onLine) {
         try {
-          await locationApi.uploadPing(currentJourney.id, ping);
-          setPingCount((c) => c + 1);
+          const res = await locationApi.uploadPing(currentJourney.id, ping);
+          if (res?.status === 'recorded' || res?.status === 'accepted') {
+            setPingCount((c) => c + 1);
+          }
         } catch (e) {
           console.warn('Network upload failed. Buffering ping to IndexedDB...');
           await offlineStorage.addRecord({
@@ -152,17 +154,27 @@ export const ActiveJourney: React.FC = () => {
     [currentJourney, setGPSStatus, setLastPing, setOfflineQueueCount]
   );
 
+  const initialCoords = useMemo(
+    () => ({
+      lat: currentJourney?.origin_lat || 12.9716,
+      lng: currentJourney?.origin_lng || 77.5946,
+    }),
+    [currentJourney?.origin_lat, currentJourney?.origin_lng]
+  );
+
+  const destinationCoords = useMemo(
+    () => ({
+      lat: currentJourney?.destination_lat || 12.9750,
+      lng: currentJourney?.destination_lng || 77.5980,
+    }),
+    [currentJourney?.destination_lat, currentJourney?.destination_lng]
+  );
+
   // Active GPS watcher hook with clean error feedback
   const { position, error: gpsError, isSimulating, startWatching, stopWatching } = useGeolocation({
     simulated: simulatedMode,
-    initialCoords: {
-      lat: currentJourney?.origin_lat || 12.9716,
-      lng: currentJourney?.origin_lng || 77.5946,
-    },
-    destinationCoords: {
-      lat: currentJourney?.destination_lat || 12.9750,
-      lng: currentJourney?.destination_lng || 77.5980,
-    },
+    initialCoords,
+    destinationCoords,
     onLocationUpdate: handleLocationPing,
   });
 

@@ -79,15 +79,6 @@ export const PublicTrackingPage: React.FC = () => {
     fetchLiveState();
   }, [fetchLiveState]);
 
-  // High-frequency 1.5s auto-polling fallback (guarantees real-time GPS sync even without WebSockets)
-  useEffect(() => {
-    if (isEnded || !token) return;
-    const interval = setInterval(() => {
-      fetchLiveState();
-    }, 1500);
-    return () => clearInterval(interval);
-  }, [fetchLiveState, isEnded, token]);
-
   // Handle live WebSocket telemetry updates
   const handleWebSocketMessage = useCallback((msg: WebSocketMessage) => {
     if (msg.type === 'LOCATION_UPDATE') {
@@ -100,18 +91,40 @@ export const PublicTrackingPage: React.FC = () => {
         recorded_at: msg.recorded_at,
       };
       setCurrentLocation(newLoc);
-      setRouteHistory((prev) => [...prev, [msg.latitude, msg.longitude]]);
+      setRouteHistory((prev) => {
+        if (prev.length > 0) {
+          const last = prev[prev.length - 1];
+          if (Math.abs(last[0] - msg.latitude) < 0.00001 && Math.abs(last[1] - msg.longitude) < 0.00001) {
+            return prev;
+          }
+        }
+        return [...prev, [msg.latitude, msg.longitude]];
+      });
     } else if (msg.type === 'JOURNEY_COMPLETED') {
       setIsEnded(true);
     }
+  }, []);
+
+  const handleJourneyCompleted = useCallback(() => {
+    setIsEnded(true);
   }, []);
 
   const wsUrl = token ? `/ws/track/${token}` : null;
   const { isConnected } = useWebSocket({
     url: wsUrl,
     onMessage: handleWebSocketMessage,
-    onJourneyCompleted: () => setIsEnded(true),
+    onJourneyCompleted: handleJourneyCompleted,
+    onReconnect: fetchLiveState,
   });
+
+  // Safety REST fallback polling every 10s only while WebSocket is disconnected
+  useEffect(() => {
+    if (isEnded || !token || isConnected) return;
+    const interval = setInterval(() => {
+      fetchLiveState();
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [fetchLiveState, isEnded, token, isConnected]);
 
   if (isLoading) {
     return <LoadingSpinner label="Resolving temporary tracking link..." fullScreen />;

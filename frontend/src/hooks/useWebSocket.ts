@@ -6,6 +6,8 @@ interface UseWebSocketOptions {
   url: string | null;
   onMessage?: (msg: WebSocketMessage) => void;
   onJourneyCompleted?: () => void;
+  onOpen?: () => void;
+  onReconnect?: () => void;
   autoReconnect?: boolean;
 }
 
@@ -13,20 +15,62 @@ export function useWebSocket({
   url,
   onMessage,
   onJourneyCompleted,
+  onOpen,
+  onReconnect,
   autoReconnect = true,
 }: UseWebSocketOptions) {
   const [isConnected, setIsConnected] = useState<boolean>(false);
   const [lastMessage, setLastMessage] = useState<WebSocketMessage | null>(null);
+
+  // Keep latest callbacks in refs so caller re-renders never trigger reconnects
+  const optionsRef = useRef({
+    onMessage,
+    onJourneyCompleted,
+    onOpen,
+    onReconnect,
+    autoReconnect,
+  });
+
+  useEffect(() => {
+    optionsRef.current = {
+      onMessage,
+      onJourneyCompleted,
+      onOpen,
+      onReconnect,
+      autoReconnect,
+    };
+  });
+
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectAttemptsRef = useRef<number>(0);
   const reconnectTimeoutRef = useRef<any>(null);
   const heartbeatIntervalRef = useRef<any>(null);
   const isTerminatedRef = useRef<boolean>(false);
+  const isInitialConnectionRef = useRef<boolean>(true);
+
+  const cleanupSocket = useCallback(() => {
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
+    }
+    if (heartbeatIntervalRef.current) {
+      clearInterval(heartbeatIntervalRef.current);
+      heartbeatIntervalRef.current = null;
+    }
+    if (wsRef.current) {
+      wsRef.current.onopen = null;
+      wsRef.current.onclose = null;
+      wsRef.current.onmessage = null;
+      wsRef.current.onerror = null;
+      wsRef.current.close();
+      wsRef.current = null;
+    }
+  }, []);
 
   const connect = useCallback(() => {
     if (!url || isTerminatedRef.current) return;
 
-    // Resolve full WebSocket URL (supports Vercel, Railway, or local proxy)
+    // Resolve full WebSocket URL
     let fullUrl = url;
     if (url.startsWith('/')) {
       const explicitWs = import.meta.env.VITE_WS_URL;
@@ -46,14 +90,27 @@ export function useWebSocket({
     }
 
     try {
+      if (wsRef.current && (wsRef.current.readyState === WebSocket.OPEN || wsRef.current.readyState === WebSocket.CONNECTING)) {
+        return;
+      }
+
       const ws = new WebSocket(fullUrl);
       wsRef.current = ws;
 
       ws.onopen = () => {
         setIsConnected(true);
+        const wasReconnect = !isInitialConnectionRef.current;
         reconnectAttemptsRef.current = 0;
 
-        // Start ping heartbeat
+        // Trigger onOpen / onReconnect callbacks for REST state resynchronization
+        if (wasReconnect && optionsRef.current.onReconnect) {
+          optionsRef.current.onReconnect();
+        } else if (optionsRef.current.onOpen) {
+          optionsRef.current.onOpen();
+        }
+        isInitialConnectionRef.current = false;
+
+        // Ping heartbeat every 25s
         if (heartbeatIntervalRef.current) clearInterval(heartbeatIntervalRef.current);
         heartbeatIntervalRef.current = setInterval(() => {
           if (ws.readyState === WebSocket.OPEN) {
@@ -67,14 +124,18 @@ export function useWebSocket({
         try {
           const parsed = JSON.parse(event.data) as WebSocketMessage;
           setLastMessage(parsed);
-          if (onMessage) onMessage(parsed);
+          if (optionsRef.current.onMessage) {
+            optionsRef.current.onMessage(parsed);
+          }
 
           if (parsed.type === 'JOURNEY_COMPLETED') {
             isTerminatedRef.current = true;
-            if (onJourneyCompleted) onJourneyCompleted();
+            if (optionsRef.current.onJourneyCompleted) {
+              optionsRef.current.onJourneyCompleted();
+            }
           }
         } catch (e) {
-          console.error('Failed to parse WebSocket payload:', e);
+          console.debug('Failed to parse WebSocket payload:', e);
         }
       };
 
@@ -82,15 +143,24 @@ export function useWebSocket({
         setIsConnected(false);
         if (heartbeatIntervalRef.current) clearInterval(heartbeatIntervalRef.current);
 
+        // Code 4410: journey concluded or token revoked -> permanent termination, NEVER reconnect
         if (event.code === 4410) {
           isTerminatedRef.current = true;
-          if (onJourneyCompleted) onJourneyCompleted();
+          if (optionsRef.current.onJourneyCompleted) {
+            optionsRef.current.onJourneyCompleted();
+          }
           return;
         }
 
-        if (autoReconnect && !isTerminatedRef.current && reconnectAttemptsRef.current < 5) {
-          const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 15000);
+        // Unlimited exponential backoff with jitter capped at 30 seconds
+        if (optionsRef.current.autoReconnect && !isTerminatedRef.current) {
+          const attempts = reconnectAttemptsRef.current;
+          const baseDelay = Math.min(1000 * Math.pow(1.5, attempts), 28000);
+          const jitter = Math.random() * 2000;
+          const delay = Math.min(baseDelay + jitter, 30000);
+
           reconnectAttemptsRef.current += 1;
+          if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
           reconnectTimeoutRef.current = setTimeout(() => {
             connect();
           }, delay);
@@ -98,25 +168,38 @@ export function useWebSocket({
       };
 
       ws.onerror = (err) => {
-        console.warn('WebSocket stream error:', err);
+        console.debug('WebSocket stream notice:', err);
       };
     } catch (e) {
-      console.error('Failed to establish WebSocket connection:', e);
+      console.debug('Failed to establish WebSocket connection:', e);
     }
-  }, [autoReconnect, onJourneyCompleted, onMessage, url]);
+  }, [url]);
 
+  // Main lifecycle effect: strictly depends ONLY on url
   useEffect(() => {
     isTerminatedRef.current = false;
+    isInitialConnectionRef.current = true;
+    reconnectAttemptsRef.current = 0;
     connect();
 
-    return () => {
-      if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
-      if (heartbeatIntervalRef.current) clearInterval(heartbeatIntervalRef.current);
-      if (wsRef.current) {
-        wsRef.current.close();
+    // Reconnect on network online or tab visibility change
+    const handleReactivation = () => {
+      if (document.visibilityState === 'visible' && !isTerminatedRef.current) {
+        if (!wsRef.current || wsRef.current.readyState === WebSocket.CLOSED) {
+          connect();
+        }
       }
     };
-  }, [connect]);
+
+    window.addEventListener('online', handleReactivation);
+    document.addEventListener('visibilitychange', handleReactivation);
+
+    return () => {
+      window.removeEventListener('online', handleReactivation);
+      document.removeEventListener('visibilitychange', handleReactivation);
+      cleanupSocket();
+    };
+  }, [url, connect, cleanupSocket]);
 
   const sendMessage = useCallback((msg: any) => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {

@@ -156,13 +156,6 @@ export const LiveMap: React.FC = () => {
     }
   };
 
-  // Periodic fast auto-refresh every 1.5 seconds (ensures rock-solid sync even without WS)
-  useEffect(() => {
-    loadFleetData();
-    const interval = setInterval(loadFleetData, 1500);
-    return () => clearInterval(interval);
-  }, [loadFleetData]);
-
   // Handle URL query parameter journey selection (e.g. from ActiveJourneys or History page)
   useEffect(() => {
     if (queryJourneyId) {
@@ -369,11 +362,19 @@ export const LiveMap: React.FC = () => {
           loadFleetData();
         }
 
-        // 3. If currently viewing this transit, immediately append point to polyline & update speed
+        // 3. If currently viewing this transit, append point to polyline (deduplicating identical coordinates) & update speed
         const current = selectedTransitRef.current;
         if (current && (current.journey_id === jId || (current as any).vehicle_id === vId)) {
           setSelectedTransit((prev) => (prev ? { ...prev, latest_speed: msg.speed } : prev));
-          setJourneyPath((prev) => [...prev, [msg.latitude, msg.longitude]]);
+          setJourneyPath((prev) => {
+            if (prev.length > 0) {
+              const last = prev[prev.length - 1];
+              if (Math.abs(last[0] - msg.latitude) < 0.00001 && Math.abs(last[1] - msg.longitude) < 0.00001) {
+                return prev;
+              }
+            }
+            return [...prev, [msg.latitude, msg.longitude]];
+          });
         }
       } else if (
         msg.type === 'JOURNEY_STARTED' ||
@@ -392,7 +393,16 @@ export const LiveMap: React.FC = () => {
   const { isConnected } = useWebSocket({
     url: wsUrl,
     onMessage: handleWebSocketMessage,
+    onReconnect: loadFleetData,
   });
+
+  // REST polling: only poll frequently (10s) while WebSocket is disconnected; otherwise 60s safety refresh
+  useEffect(() => {
+    loadFleetData();
+    const pollInterval = isConnected ? 60000 : 10000;
+    const interval = setInterval(loadFleetData, pollInterval);
+    return () => clearInterval(interval);
+  }, [loadFleetData, isConnected]);
 
   // Most critical unread incident across fleet (SOS takes highest precedence)
   const criticalAlert = useMemo(() => {
