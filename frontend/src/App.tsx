@@ -6,6 +6,7 @@ import { LoginPage } from './pages/LoginPage';
 import { DriverApp } from './portals/DriverApp/DriverApp';
 import { CompanyDashboard } from './portals/CompanyDashboard/CompanyDashboard';
 import { PublicTrackingPage } from './portals/PublicTracking/PublicTrackingPage';
+import { BackendUnreachableBanner } from './components/ui/BackendUnreachableBanner';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -50,6 +51,7 @@ export const App: React.FC = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
+        <BackendUnreachableBanner />
         <Routes>
           {/* Public Authentication */}
           <Route path="/login" element={<LoginPage />} />

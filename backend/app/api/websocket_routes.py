@@ -20,9 +20,23 @@ from app.security.jwt import decode_access_token
 from app.services.journey_service import validate_tracking_token
 from app.services.redis_service import get_redis_service
 from app.websocket.manager import get_ws_manager
+from app.config.settings import get_settings
 
 logger = logging.getLogger("fleettrack.ws_routes")
 router = APIRouter(tags=["WebSockets"])
+settings = get_settings()
+
+
+def is_allowed_origin(websocket: WebSocket) -> bool:
+    """Validate WebSocket Origin header against configured CORS origins in production."""
+    if settings.APP_ENVIRONMENT != "production":
+        return True
+    origin = websocket.headers.get("origin")
+    if not origin:
+        return True  # Mobile/hardware clients or direct sockets may omit Origin
+    origin_clean = origin.rstrip("/")
+    explicit = [o.rstrip("/") for o in settings.CORS_ORIGINS if o != "*"]
+    return any(origin_clean == allowed for allowed in explicit)
 
 
 @router.websocket("/ws/track/{token}")
@@ -32,6 +46,11 @@ async def websocket_public_tracking(websocket: WebSocket, token: str):
     Validates token hash before connection upgrade.
     Terminates with code 4410 when journey completes.
     """
+    if not is_allowed_origin(websocket):
+        logger.warning("Rejecting public tracking WebSocket: disallowed origin %s", websocket.headers.get("origin"))
+        await websocket.close(code=4403, reason="Forbidden: origin not allowed")
+        return
+
     ws_mgr = get_ws_manager()
     redis_svc = get_redis_service()
 
@@ -98,6 +117,11 @@ async def websocket_live_fleet(websocket: WebSocket, token: str = ""):
     Authenticated full-fleet live telemetry stream for corporate management console.
     Requires Bearer JWT in the connection query string.
     """
+    if not is_allowed_origin(websocket):
+        logger.warning("Rejecting fleet WebSocket: disallowed origin %s", websocket.headers.get("origin"))
+        await websocket.close(code=4403, reason="Forbidden: origin not allowed")
+        return
+
     ws_mgr = get_ws_manager()
 
     if not token:

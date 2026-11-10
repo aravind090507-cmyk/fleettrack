@@ -66,10 +66,6 @@ class GPSValidator:
         return speed_kmh <= 200.0
 
 
-# Cache to track last ping timestamp per journey for rate limiting
-_last_ping_cache: dict[str, float] = {}
-
-
 async def ingest_location_ping(
     db: AsyncSession,
     journey: Journey,
@@ -102,16 +98,7 @@ async def ingest_location_ping(
         logger.warning("Rejected ping with implausible speed: %s km/h", ping.speed)
         return None
 
-    # 5. Rate limiting per journey (maximum 1 ping every 0.75 seconds)
-    import time
-    now_mono = time.monotonic()
-    last_mono = _last_ping_cache.get(journey.id, 0.0)
-    if now_mono - last_mono < 0.75:
-        # Throttle without error
-        return None
-    _last_ping_cache[journey.id] = now_mono
-
-    # 6. Persist to SQLite / PostgreSQL
+    # 5. Persist to SQLite / PostgreSQL
     loc = Location(
         journey_id=journey.id,
         latitude=ping.latitude,

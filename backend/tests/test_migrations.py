@@ -1,9 +1,12 @@
 import os
 import tempfile
+from pathlib import Path
 import pytest
 from alembic.config import Config
 from alembic import command
 import sqlalchemy as sa
+
+ALEMBIC_INI_PATH = str(Path(__file__).resolve().parent.parent / "alembic.ini")
 
 def test_alembic_upgrade_and_downgrade():
     """Test that alembic upgrade head and downgrade base work cleanly."""
@@ -12,7 +15,7 @@ def test_alembic_upgrade_and_downgrade():
 
     try:
         url = f"sqlite:///{db_path}"
-        alembic_cfg = Config("alembic.ini")
+        alembic_cfg = Config(ALEMBIC_INI_PATH)
         alembic_cfg.set_main_option("sqlalchemy.url", url)
 
         # 1. Upgrade to head
@@ -67,7 +70,7 @@ def test_migration_device_backfill():
 
     try:
         url = f"sqlite:///{db_path}"
-        alembic_cfg = Config("alembic.ini")
+        alembic_cfg = Config(ALEMBIC_INI_PATH)
         alembic_cfg.set_main_option("sqlalchemy.url", url)
 
         # 1. Upgrade to baseline (001)

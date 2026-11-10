@@ -15,7 +15,7 @@ export default defineConfig(async ({ command }) => {
   }
 
   return {
-    base: '/',
+    base: process.env.VITE_BASE_PATH || process.env.BASE_URL || '/',
     plugins,
     server: {
       port: 5173,

@@ -88,7 +88,9 @@ git push origin main
    - `ALGORITHM`: `HS256`
    - `ACCESS_TOKEN_EXPIRE_MINUTES`: `1440`
    - `TRACKING_LINK_EXPIRE_HOURS`: `24`
-   - `CORS_ORIGINS`: `["https://*.vercel.app","http://localhost:5173"]` (Add your Vercel URL once generated).
+   - `CORS_ORIGINS`: `["https://*.vercel.app","http://localhost:5173"]` (Add your Vercel URL once generated; wildcards `*` are rejected in production).
+   - `TELEMATICS_PROFILE`: `vehicle` (default for commercial vehicles) or `walk_test` (for walking/indoor testing).
+   - `SEED_DEMO_DATA`: `false` (default in production; set `true` only for staging demo environments).
 4. Go to **Networking**:
    - Click **Generate Domain** (e.g., `fleettrack-backend.up.railway.app`).
    - Ensure the port maps to `8000` (or `$PORT`).
@@ -131,6 +133,9 @@ Add the following variables under **Project Settings** → **Environment Variabl
 |---|---|---|
 | `VITE_API_URL` | `https://<your-railway-domain>` | Railway FastAPI backend URL (e.g. `https://fleettrack-backend.up.railway.app`) |
 | `VITE_WS_URL` | `wss://<your-railway-domain>` | Railway WebSocket URL (e.g. `wss://fleettrack-backend.up.railway.app`) |
+
+> ⚠️ **CRITICAL: Vercel WebSockets Notice**
+> Vercel Edge and Serverless functions do **NOT** support persistent WebSocket proxying. Do not attempt to route `/ws` through Vercel rewrites. The frontend must connect directly to Railway (`wss://<your-railway-domain>/ws/...`) via `VITE_WS_URL`.
 
 ### 4.4 Deploy
 1. Click **Deploy**.
@@ -198,14 +203,43 @@ Open `http://localhost:5173`. Vite automatically proxies `/api` and `/ws` to `ht
 
 ### Running Automated Test Suites:
 ```bash
-# Backend pytest suite:
+# Backend pytest suite (all 35 unit, integration, and load tests):
 cd backend
 python -m pytest tests -v
 
-# Backend full E2E pipeline test:
-python test_e2e_tracking.py
+# Frontend test suite:
+cd frontend
+npm test
 
 # Frontend production build verification:
-cd frontend
 npm run build
 ```
+
+---
+
+## 7. Hardware GPS Ingestion & Telematics Pipeline
+
+FleetTrack includes an embedded port of Traccar's telematics pipeline, supporting hardware GPS units and the official Traccar Client mobile application without Java dependencies.
+
+### 7.1 Ingestion Endpoints (OsmAnd Protocol)
+Hardware trackers and the Traccar Client app (Android/iOS) can post telemetry to either:
+- `http://<your-railway-domain>/osmand` (Standard OsmAnd port)
+- `http://<your-railway-domain>/api/osmand` (API-namespaced OsmAnd port)
+
+Both `GET` query parameters and `POST` body are supported:
+- Parameters: `id`, `lat`, `lon`, `timestamp` (or `time`), `speed`, `bearing` (or `heading`), `altitude`, `accuracy`, `batt`, `charge`.
+- Response: `HTTP 200 OK` (plain text `OK`).
+
+### 7.2 Telematics Profiles
+Configured via the `TELEMATICS_PROFILE` environment variable:
+- `vehicle` (Production Default):
+  - Max speed: 180 km/h (filters impossible teleport spikes).
+  - Accuracy threshold: 100 meters.
+  - Stationary jitter threshold: 10 meters (snaps creeping GPS noise).
+  - Motion speed threshold: 2.5 knots (~4.6 km/h).
+- `walk_test` (Walk & Indoor Testing):
+  - Max speed: 0 (disabled).
+  - Accuracy threshold: 150 meters.
+  - Stationary jitter threshold: 5 meters (captures short walks).
+  - Motion speed threshold: 0.5 knots (~0.9 km/h).
+

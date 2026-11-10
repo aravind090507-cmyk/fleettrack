@@ -101,6 +101,9 @@ class Settings(BaseSettings):
     GPS_MAX_ACCURACY_METERS: float = 120.0
     GPS_MAX_SPEED_KMH: float = 220.0
 
+    # Demo data seeding flag
+    SEED_DEMO_DATA: bool = os.environ.get("SEED_DEMO_DATA", "true").lower() in ("true", "1", "yes")
+
     # Application
     APP_ENVIRONMENT: str = os.environ.get("APP_ENVIRONMENT", "development")
 

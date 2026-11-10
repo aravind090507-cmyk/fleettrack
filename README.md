@@ -119,6 +119,22 @@ Mobile browsers (iOS Safari and Android Chrome) require **HTTPS** to allow GPS G
 
 ---
 
+## 🛰️ Traccar-Compatible Telematics Pipeline
+
+FleetTrack includes an embedded Python port of Traccar's telematics processing pipeline, providing commercial fleet capabilities without running Java or standalone Traccar services:
+
+- **OsmAnd Protocol Ingestion**: Mounts at both `/osmand` and `/api/osmand` (`GET` and `POST`) for hardware GPS trackers (Teltonika, Coban, Queclink, TK103) and the official Traccar Client app.
+- **Pipeline Handlers**:
+  - `FilterHandler`: Eliminates invalid lat/lon coordinates, 0,0 Null Island coordinates, low accuracy fixes (>100m), duplicate timestamps, and teleportation spikes (>180 km/h).
+  - `DistanceHandler`: Accumulates true odometer distance using Vincenty/Haversine geodesics while snapping stationary GPS jitter (<10m).
+  - `MotionHandler`: Evaluates true movement states based on speed and motion thresholds.
+  - `GeofenceHandler`: Real-time point-in-polygon (ray casting with antimeridian 180° wrapping), circular radius, and polyline corridor geofencing.
+  - `EventDetector`: Detects ignition changes, overspeeding against per-device thresholds, geofence enter/exit, and device offline timeouts.
+- **Configurable Profiles**: Select between `vehicle` (highway/fleet default) and `walk_test` (micro-distance indoor walk testing) via `TELEMATICS_PROFILE`.
+- **Live Replay & Telematics Store**: Normalized Zustand store with 200ms coalesced WebSocket streaming, device status tracking, and breadcrumb scrubber.
+
+---
+
 ## 🐳 Docker Deployment (Production)
 
 ```bash
@@ -131,6 +147,7 @@ docker compose logs -f
 
 ---
 
-## 📄 License
+## 📄 License & Attribution
 
-MIT License. Developed for Corporate Fleet Operations & Geospatial Telematics.
+- **License**: MIT License. Developed for Corporate Fleet Operations & Geospatial Telematics.
+- **Attribution**: Portions of the spatial mathematics, distance calculations, filter handlers, and OsmAnd protocol ingestion are derived from [Traccar](https://github.com/traccar/traccar), licensed under the Apache License, Version 2.0 (see `NOTICE`).

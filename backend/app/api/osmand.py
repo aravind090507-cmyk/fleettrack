@@ -182,3 +182,17 @@ async def osmand_post_ping(request: Request, db: AsyncSession = Depends(get_db))
             pass
 
     return await _handle_osmand_payload(params, db)
+
+
+# Root alias router for /osmand (standard Traccar client URL without /api prefix)
+root_osmand_router = APIRouter(tags=["OsmAnd Root"])
+
+
+@root_osmand_router.get("/osmand")
+async def root_get_ping(request: Request, db: AsyncSession = Depends(get_db)):
+    return await osmand_get_ping(request, db)
+
+
+@root_osmand_router.post("/osmand")
+async def root_post_ping(request: Request, db: AsyncSession = Depends(get_db)):
+    return await osmand_post_ping(request, db)

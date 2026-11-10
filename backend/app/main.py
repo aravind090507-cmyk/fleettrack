@@ -18,7 +18,7 @@ from app.api.location import router as location_router, search_router
 from app.api.tracking import router as tracking_router
 from app.api.vehicles import router as vehicles_router, seed_demo_vehicles
 from app.api.websocket_routes import router as ws_router
-from app.api.osmand import router as osmand_router
+from app.api.osmand import router as osmand_router, root_osmand_router
 from app.api.devices import router as devices_router
 from app.api.positions import router as positions_router
 from app.api.events import router as events_router
@@ -51,13 +51,14 @@ async def lifespan(app: FastAPI):
         if settings.APP_ENVIRONMENT == "production":
             raise RuntimeError(f"Database connectivity failed during production startup: {e}")
 
-    # 2. Seed initial demo credentials and vehicles
-    try:
-        async with AsyncSessionLocal() as db:
-            await seed_demo_users(db)
-            await seed_demo_vehicles(db)
-    except Exception as e:
-        logger.error("Demo seeding error: %s", e)
+    # 2. Seed initial demo credentials and vehicles if enabled
+    if settings.SEED_DEMO_DATA:
+        try:
+            async with AsyncSessionLocal() as db:
+                await seed_demo_users(db)
+                await seed_demo_vehicles(db)
+        except Exception as e:
+            logger.error("Demo seeding error: %s", e)
 
     # 3. Connect to Redis (or fallback to in-memory)
     redis_svc = get_redis_service()
@@ -94,20 +95,19 @@ app = FastAPI(
 )
 
 # Configure Cross-Origin Resource Sharing (CORS)
-cors_origins = settings.CORS_ORIGINS
-if "*" in cors_origins or settings.APP_ENVIRONMENT != "production":
+if settings.APP_ENVIRONMENT == "production":
+    explicit_origins = [o.rstrip("/") for o in settings.CORS_ORIGINS if o != "*"]
     app.add_middleware(
         CORSMiddleware,
-        allow_origin_regex=r"^https?://.*",
+        allow_origins=explicit_origins,
         allow_credentials=True,
-        allow_methods=["*"],
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"],
         allow_headers=["*"],
     )
 else:
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=cors_origins,
-        allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1|.*\.vercel\.app|.*\.railway\.app)(:\d+)?$",
+        allow_origin_regex=r"^https?://.*",
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -123,6 +123,7 @@ app.include_router(tracking_router)
 app.include_router(dashboard_router)
 app.include_router(ws_router)
 app.include_router(osmand_router)
+app.include_router(root_osmand_router)
 app.include_router(devices_router)
 app.include_router(positions_router)
 app.include_router(events_router)

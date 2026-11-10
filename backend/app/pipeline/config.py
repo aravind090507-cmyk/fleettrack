@@ -4,6 +4,31 @@ Mirroring Traccar's AttributeUtil.lookup (device attributes -> company settings 
 
 from typing import Any, Dict, Optional
 
+import os
+from typing import Any, Dict, Optional
+
+# Profiles for vehicle vs walking/indoor test modes
+PROFILES: Dict[str, Dict[str, Any]] = {
+    "vehicle": {
+        "filter.accuracy": 150.0,
+        "coordinates.minError": 10.0,
+        "speed.motionThreshold": 2.0,
+        "speed.overspeedThreshold": 100.0,
+        "report.trip.minimalTripDistance": 100.0,
+        "report.trip.minimalTripDuration": 30,
+        "report.trip.minimalParkingDuration": 120,
+    },
+    "walk_test": {
+        "filter.accuracy": 300.0,
+        "coordinates.minError": 3.0,
+        "speed.motionThreshold": 0.5,
+        "speed.overspeedThreshold": 25.0,
+        "report.trip.minimalTripDistance": 10.0,
+        "report.trip.minimalTripDuration": 10,
+        "report.trip.minimalParkingDuration": 30,
+    },
+}
+
 # System defaults matching Traccar keys
 DEFAULT_CONFIG: Dict[str, Any] = {
     # Filters
@@ -35,6 +60,11 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     # Status sweep
     "status.timeout": 120,         # seconds before device marked unknown
 }
+
+# Apply environment profile if configured
+_active_profile_name = os.environ.get("TELEMATICS_PROFILE", "vehicle")
+if _active_profile_name in PROFILES:
+    DEFAULT_CONFIG.update(PROFILES[_active_profile_name])
 
 
 def lookup_config(

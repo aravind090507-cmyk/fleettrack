@@ -31,14 +31,7 @@ export const getApiBaseUrl = (): string => {
     import.meta.env.VITE_API_BASE_URL ||
     ''
   ).replace(/\/$/, '');
-  if (envUrl) return envUrl;
-
-  // When running on Vercel preview or production deployments, default to Railway backend
-  if (typeof window !== 'undefined' && window.location.hostname.includes('vercel.app')) {
-    return 'https://fleettrack-production-dba9.up.railway.app';
-  }
-
-  return '';
+  return envUrl;
 };
 
 const api = axios.create({
@@ -379,6 +372,18 @@ export const reportsApi = {
     query.append('to', params.to);
     const { data } = await api.get(`/api/reports/summary?${query.toString()}`);
     return data as SummaryReportItem[];
+  },
+};
+
+// --- Health Endpoint ---
+export const healthApi = {
+  check: async () => {
+    try {
+      const { data } = await api.get('/health', { timeout: 4000 });
+      return data as { status: string; database: string; redis: string };
+    } catch {
+      return null;
+    }
   },
 };
 
