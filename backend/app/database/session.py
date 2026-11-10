@@ -1,6 +1,6 @@
 """
 Async SQLAlchemy engine and session management.
-Supports both SQLite (local dev) and PostgreSQL (Neon production).
+Supports both SQLite (local dev) and PostgreSQL (Neon/Railway production with PostGIS).
 """
 from __future__ import annotations
 
@@ -49,6 +49,7 @@ async def get_db():
             async with AsyncSessionLocal() as init_session:
                 await seed_demo_users(init_session)
                 await seed_demo_vehicles(init_session)
+                await backfill_devices(init_session)
             _db_initialized = True
         except Exception as e:
             logger.warning("DB init or seed notice: %s", e)
@@ -71,6 +72,9 @@ async def init_db():
     import app.models.location  # noqa: F401
     import app.models.tracking_link  # noqa: F401
     import app.models.trip_event  # noqa: F401
+    import app.models.device  # noqa: F401
+    import app.models.event  # noqa: F401
+    import app.models.geofence  # noqa: F401
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -81,3 +85,51 @@ async def init_db():
                     await conn.execute(text(f"ALTER TABLE {table} ADD COLUMN company_id VARCHAR(36)"))
                 except Exception:
                     pass
+            # Check and alter new Phase 2 columns if running on an existing populated SQLite database
+            for col_sql in [
+                "ALTER TABLE journeys ADD COLUMN device_id VARCHAR(36)",
+                "ALTER TABLE journeys ADD COLUMN destination_geofence_id VARCHAR(36)",
+                "ALTER TABLE locations ADD COLUMN device_id VARCHAR(36)",
+                "ALTER TABLE locations ADD COLUMN valid BOOLEAN DEFAULT 1",
+                "ALTER TABLE locations ADD COLUMN outdated BOOLEAN DEFAULT 0",
+                "ALTER TABLE locations ADD COLUMN protocol VARCHAR(20) DEFAULT 'web'",
+                "ALTER TABLE locations ADD COLUMN device_time TIMESTAMP",
+                "ALTER TABLE locations ADD COLUMN distance_m FLOAT DEFAULT 0.0",
+                "ALTER TABLE locations ADD COLUMN total_distance_m FLOAT DEFAULT 0.0",
+                "ALTER TABLE locations ADD COLUMN motion BOOLEAN DEFAULT 0",
+                "ALTER TABLE locations ADD COLUMN geofence_ids JSON",
+                "ALTER TABLE locations ADD COLUMN attributes JSON",
+                "ALTER TABLE locations ADD COLUMN geom TEXT",
+            ]:
+                try:
+                    await conn.execute(text(col_sql))
+                except Exception:
+                    pass
+
+
+async def backfill_devices(db: AsyncSession):
+    """Backfill: ensure each vehicle has a corresponding Device record."""
+    from sqlalchemy import select
+    from app.models.vehicle import Vehicle
+    from app.models.device import Device
+
+    try:
+        vehicles = (await db.execute(select(Vehicle))).scalars().all()
+        for v in vehicles:
+            if not v.company_id:
+                continue
+            existing = (await db.execute(select(Device).where(Device.vehicle_id == v.id))).scalar_one_or_none()
+            if not existing:
+                device = Device(
+                    company_id=v.company_id,
+                    unique_id=f"web-{v.id}",
+                    name=f"Web Tracker - {v.registration_number}",
+                    vehicle_id=v.id,
+                    status="unknown",
+                    attributes={"protocol": "web", "auto_created": True},
+                )
+                db.add(device)
+        await db.commit()
+    except Exception as e:
+        logger.warning("Device backfill notice: %s", e)
+        await db.rollback()
