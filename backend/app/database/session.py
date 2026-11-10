@@ -76,14 +76,18 @@ async def init_db():
     import app.models.event  # noqa: F401
     import app.models.geofence  # noqa: F401
 
-    async with engine.begin() as conn:
-        if not settings.DATABASE_URL.startswith("sqlite"):
-            from sqlalchemy import text
-            try:
-                await conn.execute(text("CREATE EXTENSION IF NOT EXISTS postgis;"))
+    if not settings.DATABASE_URL.startswith("sqlite"):
+        from sqlalchemy import text
+        try:
+            async with engine.connect() as ext_conn:
+                await ext_conn.execution_options(isolation_level="AUTOCOMMIT").execute(
+                    text("CREATE EXTENSION IF NOT EXISTS postgis;")
+                )
                 logger.info("Ensured PostGIS extension is active")
-            except Exception as e:
-                logger.warning("Notice on PostGIS extension creation: %s", e)
+        except Exception as e:
+            logger.warning("Notice on PostGIS extension creation: %s", e)
+
+    async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
         if settings.DATABASE_URL.startswith("sqlite"):
             from sqlalchemy import text
