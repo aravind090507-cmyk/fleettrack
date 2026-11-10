@@ -78,14 +78,17 @@ async def init_db():
 
     if not settings.DATABASE_URL.startswith("sqlite"):
         from sqlalchemy import text
+        from app.models.types import set_postgis_available
         try:
             async with engine.connect() as ext_conn:
                 await ext_conn.execution_options(isolation_level="AUTOCOMMIT").execute(
                     text("CREATE EXTENSION IF NOT EXISTS postgis;")
                 )
+                set_postgis_available(True)
                 logger.info("Ensured PostGIS extension is active")
         except Exception as e:
-            logger.warning("Notice on PostGIS extension creation: %s", e)
+            set_postgis_available(False)
+            logger.warning("Notice on PostGIS extension creation (falling back to spatial text): %s", e)
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
