@@ -136,7 +136,7 @@ export const LoginPage: React.FC = () => {
           
           {/* Quick 1-Click Access Buttons */}
           <div className="space-y-2 border-b border-zinc-100 pb-4 mb-2">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400 block text-center">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-700 block text-center">
               Quick 1-Click Test Access
             </span>
             <div className="grid grid-cols-2 gap-2.5">
@@ -151,7 +151,7 @@ export const LoginPage: React.FC = () => {
                 </div>
                 <div className="truncate">
                   <span className="text-xs font-bold text-zinc-900 block truncate">Driver App</span>
-                  <span className="text-[10px] text-zinc-500 font-mono block">driver1</span>
+                  <span className="text-[10px] text-zinc-700 font-mono font-medium block">driver1</span>
                 </div>
               </button>
 
@@ -166,7 +166,7 @@ export const LoginPage: React.FC = () => {
                 </div>
                 <div className="truncate">
                   <span className="text-xs font-bold text-zinc-900 block truncate">Fleet Ops</span>
-                  <span className="text-[10px] text-zinc-500 font-mono block">manager</span>
+                  <span className="text-[10px] text-zinc-700 font-mono font-medium block">manager</span>
                 </div>
               </button>
             </div>
@@ -181,7 +181,7 @@ export const LoginPage: React.FC = () => {
 
             {isRegistering && (
               <div>
-                <label className="block text-[11px] font-bold text-zinc-600 uppercase tracking-wider mb-1">
+                <label className="block text-[11px] font-bold text-zinc-800 uppercase tracking-wider mb-1">
                   Full Name
                 </label>
                 <input
@@ -190,13 +190,13 @@ export const LoginPage: React.FC = () => {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="e.g. Alexander Rivera"
-                  className="w-full px-4 py-2.5 bg-black/[0.03] border border-black/[0.08] rounded-xl text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#0071E3] focus:bg-white text-sm transition-all"
+                  className="w-full px-4 py-2.5 bg-black/[0.03] border border-black/[0.08] rounded-xl text-zinc-900 placeholder-zinc-500 font-semibold focus:outline-none focus:ring-2 focus:ring-[#0071E3] focus:bg-white text-sm transition-all"
                 />
               </div>
             )}
 
             <div>
-              <label className="block text-[11px] font-bold text-zinc-600 uppercase tracking-wider mb-1">
+              <label className="block text-[11px] font-bold text-zinc-800 uppercase tracking-wider mb-1">
                 Email Address
               </label>
               <input
@@ -205,12 +205,12 @@ export const LoginPage: React.FC = () => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="your.email@example.com"
-                className="w-full px-4 py-2.5 bg-black/[0.03] border border-black/[0.08] rounded-xl text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#0071E3] focus:bg-white text-sm transition-all"
+                className="w-full px-4 py-2.5 bg-black/[0.03] border border-black/[0.08] rounded-xl text-zinc-900 placeholder-zinc-500 font-semibold focus:outline-none focus:ring-2 focus:ring-[#0071E3] focus:bg-white text-sm transition-all"
               />
             </div>
 
             <div>
-              <label className="block text-[11px] font-bold text-zinc-600 uppercase tracking-wider mb-1">
+              <label className="block text-[11px] font-bold text-zinc-800 uppercase tracking-wider mb-1">
                 Password
               </label>
               <input
@@ -219,13 +219,13 @@ export const LoginPage: React.FC = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••••••"
-                className="w-full px-4 py-2.5 bg-black/[0.03] border border-black/[0.08] rounded-xl text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#0071E3] focus:bg-white text-sm transition-all"
+                className="w-full px-4 py-2.5 bg-black/[0.03] border border-black/[0.08] rounded-xl text-zinc-900 placeholder-zinc-500 font-semibold focus:outline-none focus:ring-2 focus:ring-[#0071E3] focus:bg-white text-sm transition-all"
               />
             </div>
 
             {isRegistering && (
               <div>
-                <label className="block text-[11px] font-bold text-zinc-600 uppercase tracking-wider mb-1">
+                <label className="block text-[11px] font-bold text-zinc-800 uppercase tracking-wider mb-1">
                   Assigned Operating Role
                 </label>
                 <div className="grid grid-cols-2 gap-2">

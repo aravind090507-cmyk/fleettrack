@@ -62,7 +62,7 @@ export const Vehicles: React.FC = () => {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold text-zinc-900 tracking-tight">Fleet Asset Inventory</h2>
-          <p className="text-xs text-zinc-500 font-medium">Manage corporate assets, telematics devices, and operational statuses.</p>
+          <p className="text-xs text-zinc-600 font-medium mt-0.5">Manage corporate assets, telematics devices, and operational statuses.</p>
         </div>
 
         <Button variant="primary" onClick={() => setShowAddModal(true)}>
@@ -74,11 +74,11 @@ export const Vehicles: React.FC = () => {
       <Card>
         <div className="flex items-center justify-between pb-4 border-b border-black/[0.04]">
           <div className="flex items-center gap-2">
-            <Filter className="w-4 h-4 text-zinc-400" />
+            <Filter className="w-4 h-4 text-zinc-600" />
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="bg-white border border-zinc-200/80 rounded-full px-3.5 py-1.5 text-xs text-zinc-800 focus:outline-none focus:ring-2 focus:ring-[#0071E3] font-semibold shadow-sm"
+              className="bg-white border border-zinc-200/80 rounded-full px-3.5 py-1.5 text-xs text-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#0071E3] font-semibold shadow-sm"
             >
               <option value="">All Statuses</option>
               <option value="AVAILABLE">Available</option>
@@ -87,7 +87,7 @@ export const Vehicles: React.FC = () => {
               <option value="OFFLINE">Offline</option>
             </select>
           </div>
-          <span className="text-xs font-semibold text-zinc-500">{vehicles.length} assets registered</span>
+          <span className="text-xs font-bold text-zinc-700">{vehicles.length} assets registered</span>
         </div>
 
         {loading ? (
@@ -95,7 +95,7 @@ export const Vehicles: React.FC = () => {
         ) : (
           <div className="overflow-x-auto rounded-2xl border border-black/[0.03] mt-3">
             <table className="w-full text-left text-xs">
-              <thead className="bg-zinc-50/80 text-[10px] text-zinc-500 uppercase font-bold tracking-wider border-b border-black/[0.04]">
+              <thead className="bg-zinc-50/80 text-[10px] text-zinc-700 uppercase font-bold tracking-wider border-b border-black/[0.04]">
                 <tr>
                   <th className="py-3 px-4 font-bold">Plate Registration</th>
                   <th className="py-3 px-4 font-bold">Vehicle Model</th>
@@ -105,12 +105,12 @@ export const Vehicles: React.FC = () => {
                   <th className="py-3 px-4 font-bold">Assigned Driver</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-black/[0.03] text-zinc-700 bg-white/40">
+              <tbody className="divide-y divide-black/[0.03] text-zinc-800 bg-white/40">
                 {vehicles.map((v) => (
                   <tr key={v.id} className="hover:bg-zinc-50/60 transition-colors">
                     <td className="py-3 px-4 font-bold font-mono text-zinc-900 tracking-tight">{v.registration_number}</td>
                     <td className="py-3 px-4 font-medium text-zinc-800">{v.model}</td>
-                    <td className="py-3 px-4 text-zinc-500">{v.vehicle_type}</td>
+                    <td className="py-3 px-4 text-zinc-700 font-medium">{v.vehicle_type}</td>
                     <td className="py-3 px-4">
                       <StatusBadge status={v.status} size="sm" />
                     </td>

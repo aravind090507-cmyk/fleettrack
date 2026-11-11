@@ -309,26 +309,26 @@ export const PublicTrackingPage: React.FC = () => {
 
           {/* Metric Grid */}
           <div className="grid grid-cols-4 gap-2 my-3">
-            <div className="bg-white/75 rounded-2xl p-2.5 text-center border border-white/70 shadow-sm">
-              <div className="text-[10px] font-semibold text-zinc-400 uppercase">Speed</div>
+            <div className="bg-white/90 rounded-2xl p-2.5 text-center border border-black/[0.06] shadow-sm">
+              <div className="text-[10px] font-bold text-zinc-700 uppercase tracking-wider">Speed</div>
               <div className="text-sm font-bold text-zinc-900 mt-0.5">
-                {currentLocation?.speed || 0} <span className="text-[10px] font-normal text-zinc-500">km/h</span>
+                {currentLocation?.speed || 0} <span className="text-[10px] font-semibold text-zinc-600">km/h</span>
               </div>
             </div>
-            <div className="bg-white/75 rounded-2xl p-2.5 text-center border border-white/70 shadow-sm">
-              <div className="text-[10px] font-semibold text-zinc-400 uppercase">ETA</div>
-              <div className="text-sm font-bold text-emerald-600 mt-0.5">{etaDisplay}</div>
+            <div className="bg-white/90 rounded-2xl p-2.5 text-center border border-black/[0.06] shadow-sm">
+              <div className="text-[10px] font-bold text-zinc-700 uppercase tracking-wider">ETA</div>
+              <div className="text-sm font-bold text-emerald-700 mt-0.5">{etaDisplay}</div>
             </div>
-            <div className="bg-white/75 rounded-2xl p-2.5 text-center border border-white/70 shadow-sm">
-              <div className="text-[10px] font-semibold text-zinc-400 uppercase">Remaining</div>
+            <div className="bg-white/90 rounded-2xl p-2.5 text-center border border-black/[0.06] shadow-sm">
+              <div className="text-[10px] font-bold text-zinc-700 uppercase tracking-wider">Remaining</div>
               <div className="text-sm font-bold text-zinc-900 mt-0.5">
                 {trackingInfo.distance_remaining_km != null ? trackingInfo.distance_remaining_km.toFixed(1) : '--'}
-                <span className="text-[10px] font-normal text-zinc-500"> km</span>
+                <span className="text-[10px] font-semibold text-zinc-600"> km</span>
               </div>
             </div>
-            <div className="bg-white/75 rounded-2xl p-2.5 text-center border border-white/70 shadow-sm">
-              <div className="text-[10px] font-semibold text-zinc-400 uppercase">Status</div>
-              <div className="text-xs font-bold text-blue-600 mt-1">
+            <div className="bg-white/90 rounded-2xl p-2.5 text-center border border-black/[0.06] shadow-sm">
+              <div className="text-[10px] font-bold text-zinc-700 uppercase tracking-wider">Status</div>
+              <div className="text-xs font-bold text-[#0071E3] mt-1">
                 {isConnected ? 'Live' : 'Syncing'}
               </div>
             </div>
@@ -336,7 +336,7 @@ export const PublicTrackingPage: React.FC = () => {
 
           {/* Progress bar */}
           <div className="my-2.5">
-            <div className="flex items-center justify-between text-[11px] font-semibold text-zinc-600 mb-1">
+            <div className="flex items-center justify-between text-[11px] font-bold text-zinc-800 mb-1">
               <span className="truncate max-w-[140px]">{trackingInfo.origin_name}</span>
               <span className="text-blue-600 font-mono">{totalApprox}%</span>
               <span className="truncate max-w-[140px] text-right">{trackingInfo.destination_name}</span>

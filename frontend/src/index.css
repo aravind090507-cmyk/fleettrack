@@ -10,6 +10,21 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
+
+  /* High contrast defaults for labels, inputs and muted text on Apple light canvas */
+  label {
+    color: #3a3a3c;
+    font-weight: 600;
+  }
+
+  input, select, textarea {
+    color: #1d1d1f;
+  }
+
+  input::placeholder, textarea::placeholder {
+    color: #8e8e93;
+    opacity: 1;
+  }
 }
 
 /* Apple Leaflet Container & Map Layout */
@@ -83,18 +98,18 @@
   animation: appleRadar 2.2s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
 }
 
-/* Bespoke Luxury Custom scrollbars */
+/* Apple Custom translucent scrollbars */
 ::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+  width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #0d0d0d;
+  background: rgba(0, 0, 0, 0.03);
 }
 ::-webkit-scrollbar-thumb {
-  background: #26272b;
-  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.22);
+  border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #cb886c;
+  background: rgba(0, 0, 0, 0.35);
 }

@@ -517,59 +517,59 @@ export const ActiveJourney: React.FC = () => {
       {/* Live Telemetry HUD */}
       {(() => {
         const accuracy = position?.accuracy ?? 999;
-        let qualityBadge = { label: 'Bad (≥100m)', color: 'text-rose-400', bg: 'bg-rose-950/70', border: 'border-rose-800' };
+        let qualityBadge = { label: 'Bad (≥100m)', color: 'text-rose-700', bg: 'bg-rose-50', border: 'border-rose-200' };
         if (accuracy < 10) {
-          qualityBadge = { label: 'Good (<10m)', color: 'text-emerald-400', bg: 'bg-emerald-950/70', border: 'border-emerald-800' };
+          qualityBadge = { label: 'Good (<10m)', color: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-200' };
         } else if (accuracy < 30) {
-          qualityBadge = { label: 'OK (<30m)', color: 'text-amber-400', bg: 'bg-amber-950/70', border: 'border-amber-800' };
+          qualityBadge = { label: 'OK (<30m)', color: 'text-amber-800', bg: 'bg-amber-50', border: 'border-amber-200' };
         } else if (accuracy < 100) {
-          qualityBadge = { label: 'Poor (<100m)', color: 'text-orange-400', bg: 'bg-orange-950/70', border: 'border-orange-800' };
+          qualityBadge = { label: 'Poor (<100m)', color: 'text-orange-800', bg: 'bg-orange-50', border: 'border-orange-200' };
         }
 
         return (
           <>
             {/* Status bar with GPS Quality, Fix Age, Queue Size */}
-            <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs">
+            <div className="flex flex-wrap items-center justify-between gap-2 p-3 bg-white/90 border border-black/10 rounded-2xl text-xs shadow-sm">
               <div className="flex items-center gap-2">
-                <span className="text-[10px] uppercase font-bold text-slate-400">Signal:</span>
+                <span className="text-[11px] uppercase font-bold text-zinc-700">Signal:</span>
                 <span
-                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${qualityBadge.bg} ${qualityBadge.color} ${qualityBadge.border}`}
+                  className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${qualityBadge.bg} ${qualityBadge.color} ${qualityBadge.border}`}
                 >
                   {qualityBadge.label}
                 </span>
               </div>
               <div className="flex items-center gap-3 font-mono text-[11px]">
-                <span className="text-slate-400">
-                  Last Fix: <strong className="text-slate-200">{fixAgeSec}s ago</strong>
+                <span className="text-zinc-600 font-medium">
+                  Last Fix: <strong className="text-zinc-900 font-bold">{fixAgeSec}s ago</strong>
                 </span>
-                <span className="text-slate-400">
+                <span className="text-zinc-600 font-medium">
                   Queue:{' '}
-                  <strong className={uploaderState.queueDepth > 0 ? 'text-amber-400' : 'text-emerald-400'}>
+                  <strong className={uploaderState.queueDepth > 0 ? 'text-amber-600 font-bold' : 'text-emerald-600 font-bold'}>
                     {uploaderState.queueDepth}
                   </strong>
                 </span>
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-2">
-              <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl text-center">
-                <Gauge className="w-4 h-4 text-emerald-400 mx-auto mb-1" />
-                <span className="text-[10px] text-slate-400 font-semibold block uppercase">Speed</span>
-                <span className="text-lg font-bold font-mono text-white">{position?.speed || 0}</span>
-                <span className="text-[10px] text-slate-500 ml-1">km/h</span>
+            <div className="grid grid-cols-3 gap-2.5">
+              <div className="p-3 bg-white/90 border border-black/10 rounded-2xl text-center shadow-sm">
+                <Gauge className="w-4 h-4 text-[#0071E3] mx-auto mb-1" />
+                <span className="text-[10px] text-zinc-600 font-bold block uppercase tracking-wider">Speed</span>
+                <span className="text-xl font-bold font-mono text-zinc-900">{position?.speed || 0}</span>
+                <span className="text-[10px] text-zinc-600 ml-1 font-medium">km/h</span>
               </div>
 
-              <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl text-center">
-                <Compass className="w-4 h-4 text-blue-400 mx-auto mb-1" />
-                <span className="text-[10px] text-slate-400 font-semibold block uppercase">Heading</span>
-                <span className="text-lg font-bold font-mono text-white">{position?.heading || 0}°</span>
+              <div className="p-3 bg-white/90 border border-black/10 rounded-2xl text-center shadow-sm">
+                <Compass className="w-4 h-4 text-blue-600 mx-auto mb-1" />
+                <span className="text-[10px] text-zinc-600 font-bold block uppercase tracking-wider">Heading</span>
+                <span className="text-xl font-bold font-mono text-zinc-900">{position?.heading || 0}°</span>
               </div>
 
-              <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl text-center">
-                <MapPin className="w-4 h-4 text-amber-400 mx-auto mb-1" />
-                <span className="text-[10px] text-slate-400 font-semibold block uppercase">Accuracy</span>
-                <span className="text-lg font-bold font-mono text-white">±{position?.accuracy || 5}</span>
-                <span className="text-[10px] text-slate-500 ml-1">m</span>
+              <div className="p-3 bg-white/90 border border-black/10 rounded-2xl text-center shadow-sm">
+                <MapPin className="w-4 h-4 text-amber-600 mx-auto mb-1" />
+                <span className="text-[10px] text-zinc-600 font-bold block uppercase tracking-wider">Accuracy</span>
+                <span className="text-xl font-bold font-mono text-zinc-900">±{position?.accuracy || 5}</span>
+                <span className="text-[10px] text-zinc-600 ml-1 font-medium">m</span>
               </div>
             </div>
           </>
@@ -629,10 +629,10 @@ export const ActiveJourney: React.FC = () => {
 
       {/* Confirmation Modal */}
       {showEndModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-2xl">
-            <h3 className="text-lg font-bold text-white text-center">Conclude This Journey?</h3>
-            <p className="text-xs text-slate-400 text-center leading-relaxed">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-md">
+          <div className="bg-white border border-black/10 rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-2xl">
+            <h3 className="text-lg font-bold text-zinc-900 text-center">Conclude This Journey?</h3>
+            <p className="text-xs text-zinc-600 text-center leading-relaxed font-medium">
               Ending this journey will permanently revoke the public tracking link (HTTP 410 Gone) and stop GPS
               collection.
             </p>
@@ -650,13 +650,13 @@ export const ActiveJourney: React.FC = () => {
 
       {/* QR Code Sharing Modal */}
       {showQrModal && effectiveTrackingUrl && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-xs w-full space-y-4 shadow-2xl text-center">
-            <h3 className="text-base font-bold text-white">Scan Live Tracking Link</h3>
-            <div className="p-4 bg-white rounded-2xl flex items-center justify-center mx-auto shadow-inner w-fit">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-md">
+          <div className="bg-white border border-black/10 rounded-3xl p-6 max-w-xs w-full space-y-4 shadow-2xl text-center">
+            <h3 className="text-base font-bold text-zinc-900">Scan Live Tracking Link</h3>
+            <div className="p-4 bg-white rounded-2xl flex items-center justify-center mx-auto shadow-sm border border-black/[0.08] w-fit">
               <QRCodeSVG value={effectiveTrackingUrl} size={180} level="M" />
             </div>
-            <p className="text-[11px] text-slate-400 leading-tight">
+            <p className="text-xs text-zinc-600 leading-tight font-medium">
               Anyone scanning this code can monitor delivery progress in real time.
             </p>
             <Button variant="secondary" size="sm" className="w-full mt-2" onClick={() => setShowQrModal(false)}>

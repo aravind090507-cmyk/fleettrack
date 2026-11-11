@@ -38,7 +38,7 @@ export const ActiveJourneys: React.FC = () => {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold text-zinc-900 tracking-tight">Active Dispatches & Transits</h2>
-          <p className="text-xs text-zinc-500 font-medium">All vehicular movements currently underway. Click any row to view live path.</p>
+          <p className="text-xs text-zinc-600 font-medium mt-0.5">All vehicular movements currently underway. Click any row to view live path.</p>
         </div>
         <span className="text-xs font-bold px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/80 shadow-sm">
           {socketConnected ? 'Live Socket Stream' : 'Safety Poll 10s'}
@@ -49,13 +49,13 @@ export const ActiveJourneys: React.FC = () => {
         {loading && journeys.length === 0 ? (
           <LoadingSpinner />
         ) : journeys.length === 0 ? (
-          <div className="text-center py-12 text-zinc-400 text-xs font-mono uppercase tracking-wider">
+          <div className="text-center py-12 text-zinc-600 text-xs font-semibold uppercase tracking-wider">
             No active dispatches
           </div>
         ) : (
           <div className="overflow-x-auto rounded-2xl border border-black/[0.03]">
             <table className="w-full text-left text-xs">
-              <thead className="bg-zinc-50/80 text-[10px] text-zinc-500 uppercase font-bold tracking-wider border-b border-black/[0.04]">
+              <thead className="bg-zinc-50/80 text-[10px] text-zinc-700 uppercase font-bold tracking-wider border-b border-black/[0.04]">
                 <tr>
                   <th className="py-3 px-4 font-bold">Vehicle</th>
                   <th className="py-3 px-4 font-bold">Driver</th>
@@ -66,7 +66,7 @@ export const ActiveJourneys: React.FC = () => {
                   <th className="py-3 px-4 font-bold text-right">Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-black/[0.03] text-zinc-700 bg-white/40">
+              <tbody className="divide-y divide-black/[0.03] text-zinc-800 bg-white/40">
                 {journeys.map((j) => (
                   <tr
                     key={j.id}
@@ -76,10 +76,10 @@ export const ActiveJourneys: React.FC = () => {
                     <td className="py-3 px-4 font-bold font-mono text-[#0071E3] tracking-tight">
                       {j.vehicle_registration || 'VAN'}
                     </td>
-                    <td className="py-3 px-4 font-medium text-zinc-900">{j.driver_name || 'Driver'}</td>
-                    <td className="py-3 px-4 text-zinc-600">{j.origin_name}</td>
-                    <td className="py-3 px-4 font-medium text-zinc-900">{j.destination_name}</td>
-                    <td className="py-3 px-4 text-zinc-500 font-mono">
+                    <td className="py-3 px-4 font-bold text-zinc-900">{j.driver_name || 'Driver'}</td>
+                    <td className="py-3 px-4 text-zinc-800 font-semibold">{j.origin_name}</td>
+                    <td className="py-3 px-4 font-bold text-zinc-900">{j.destination_name}</td>
+                    <td className="py-3 px-4 text-zinc-700 font-mono font-medium">
                       {new Date(j.started_at).toLocaleTimeString()}
                     </td>
                     <td className="py-3 px-4">

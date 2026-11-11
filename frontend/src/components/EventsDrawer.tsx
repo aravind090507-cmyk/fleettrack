@@ -2,15 +2,11 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   Bell,
   X,
-  AlertTriangle,
-  Shield,
   Activity,
-  ArrowRight,
   Volume2,
   VolumeX,
 } from 'lucide-react';
 import { useTelematicsStore } from '../store/telematicsStore';
-import { TelematicsEvent } from '../types';
 
 function playAlertSound() {
   try {
@@ -68,12 +64,12 @@ export const EventsDrawer: React.FC = () => {
       <button
         type="button"
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 z-40 p-3.5 rounded-full bg-bespoke-surface hover:bg-bespoke-card text-bespoke-gold shadow-2xl border border-bespoke-border hover:border-bespoke-gold/50 transition-all flex items-center justify-center cursor-pointer group"
+        className="fixed bottom-6 right-6 z-40 p-3.5 rounded-full bg-white hover:bg-zinc-50 text-zinc-900 shadow-xl border border-black/10 transition-all flex items-center justify-center cursor-pointer group"
         title="Live Fleet Events"
       >
-        <Bell className="w-5 h-5 group-hover:scale-110 transition-transform" />
+        <Bell className="w-5 h-5 text-[#0071E3] group-hover:scale-110 transition-transform" />
         {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 px-1.5 py-0.2 rounded-full bg-bespoke-error text-[10px] font-mono border border-bespoke-black text-white">
+          <span className="absolute -top-1 -right-1 px-1.5 py-0.2 rounded-full bg-[#FF3B30] text-[10px] font-mono font-bold text-white shadow-sm">
             {unreadCount > 99 ? '99+' : unreadCount}
           </span>
         )}
@@ -84,18 +80,18 @@ export const EventsDrawer: React.FC = () => {
         <div className="fixed inset-0 z-50 flex justify-end">
           {/* Backdrop */}
           <div
-            className="fixed inset-0 bg-bespoke-black/70 backdrop-blur-xs transition-opacity"
+            className="fixed inset-0 bg-black/30 backdrop-blur-sm transition-opacity"
             onClick={() => setIsOpen(false)}
           />
 
           {/* Drawer Panel */}
-          <aside className="relative w-full max-w-md bg-bespoke-surface border-l border-bespoke-border h-full flex flex-col shadow-2xl z-10 text-bespoke-champagne select-none font-sans">
+          <aside className="relative w-full max-w-md bg-white/95 backdrop-blur-2xl border-l border-black/10 h-full flex flex-col shadow-2xl z-10 text-zinc-900 select-none font-sans">
             {/* Header */}
-            <div className="p-4 border-b border-bespoke-border flex items-center justify-between bg-bespoke-dark/90">
+            <div className="p-4 border-b border-black/[0.06] flex items-center justify-between bg-white/80">
               <div className="flex items-center gap-2">
-                <Activity className="w-4 h-4 text-bespoke-gold" />
-                <h3 className="font-light text-sm text-bespoke-offwhite uppercase tracking-[0.1em]">Live Telematics Events</h3>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-bespoke-card text-bespoke-champagne/70 border border-bespoke-border">
+                <Activity className="w-4 h-4 text-[#0071E3]" />
+                <h3 className="font-bold text-sm text-zinc-900 tracking-tight">Live Telematics Events</h3>
+                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-800 border border-zinc-200">
                   {events.length}
                 </span>
               </div>
@@ -103,15 +99,15 @@ export const EventsDrawer: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setSoundEnabled(!soundEnabled)}
-                  className="p-1.5 rounded bg-bespoke-card hover:bg-bespoke-surface text-bespoke-champagne border border-bespoke-border transition"
+                  className="p-1.5 rounded-full bg-zinc-100 hover:bg-zinc-200 text-zinc-700 transition"
                   title={soundEnabled ? 'Mute Alarm Sounds' : 'Unmute Alarm Sounds'}
                 >
-                  {soundEnabled ? <Volume2 className="w-4 h-4 text-bespoke-gold" /> : <VolumeX className="w-4 h-4 text-bespoke-dim" />}
+                  {soundEnabled ? <Volume2 className="w-4 h-4 text-[#0071E3]" /> : <VolumeX className="w-4 h-4 text-zinc-400" />}
                 </button>
                 <button
                   type="button"
                   onClick={() => setIsOpen(false)}
-                  className="p-1.5 rounded bg-bespoke-card hover:bg-bespoke-surface text-bespoke-champagne border border-bespoke-border transition"
+                  className="p-1.5 rounded-full bg-zinc-100 hover:bg-zinc-200 text-zinc-700 transition"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -121,10 +117,10 @@ export const EventsDrawer: React.FC = () => {
             {/* Events List */}
             <div className="flex-1 overflow-y-auto p-4 space-y-2.5">
               {events.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center text-bespoke-dim text-xs text-center p-6 font-mono uppercase tracking-wider">
-                  <Activity className="w-8 h-8 mb-2 opacity-30 text-bespoke-gold" />
+                <div className="h-full flex flex-col items-center justify-center text-zinc-500 text-xs text-center p-6 font-semibold">
+                  <Activity className="w-8 h-8 mb-2 opacity-30 text-[#0071E3]" />
                   <p>No real-time events received yet.</p>
-                  <p className="text-[10px] text-bespoke-dim/70 mt-1 font-sans">
+                  <p className="text-[11px] text-zinc-500 mt-1 font-normal">
                     Movement, geofences, overspeed, and SOS notifications will appear here.
                   </p>
                 </div>
@@ -134,40 +130,39 @@ export const EventsDrawer: React.FC = () => {
                   const isBreakdown = ev.type === 'BREAKDOWN';
                   const isOverspeed = ev.type === 'deviceOverspeed';
                   const isGeofence = ev.type.startsWith('geofence');
-                  const isMotion = ev.type === 'deviceMoving' || ev.type === 'deviceStopped';
 
-                  let badgeColor = 'bg-bespoke-card text-bespoke-champagne border-bespoke-border';
-                  if (isSOS) badgeColor = 'bg-bespoke-error/20 text-bespoke-linen border-bespoke-error animate-pulse';
-                  else if (isBreakdown) badgeColor = 'bg-amber-950 text-amber-300 border-amber-800';
-                  else if (isOverspeed) badgeColor = 'bg-orange-950 text-orange-300 border-orange-800';
-                  else if (isGeofence) badgeColor = 'bg-bespoke-gold/15 text-bespoke-goldLight border-bespoke-gold/30';
-                  else if (ev.type === 'deviceMoving') badgeColor = 'bg-bespoke-green/15 text-bespoke-green border-bespoke-green/30';
+                  let badgeColor = 'bg-zinc-100 text-zinc-800 border-zinc-200';
+                  if (isSOS) badgeColor = 'bg-rose-50 text-rose-700 border-rose-200 animate-pulse';
+                  else if (isBreakdown) badgeColor = 'bg-amber-50 text-amber-800 border-amber-200';
+                  else if (isOverspeed) badgeColor = 'bg-orange-50 text-orange-800 border-orange-200';
+                  else if (isGeofence) badgeColor = 'bg-blue-50 text-blue-700 border-blue-200';
+                  else if (ev.type === 'deviceMoving') badgeColor = 'bg-emerald-50 text-emerald-800 border-emerald-200';
 
                   return (
                     <div
                       key={ev.id}
-                      className="p-3 rounded bg-bespoke-dark/80 border border-bespoke-border space-y-1 hover:border-bespoke-gold/40 transition"
+                      className="p-3.5 rounded-2xl bg-white border border-black/[0.08] space-y-1.5 shadow-sm hover:border-[#0071E3]/50 transition"
                     >
                       <div className="flex items-center justify-between">
-                        <span className={`text-[10px] font-mono px-2 py-0.5 rounded border uppercase tracking-wider ${badgeColor}`}>
+                        <span className={`text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full border uppercase tracking-wider ${badgeColor}`}>
                           {ev.type}
                         </span>
-                        <span className="text-[10px] text-bespoke-dim font-mono">
+                        <span className="text-[11px] text-zinc-600 font-mono font-medium">
                           {new Date(ev.event_time).toLocaleTimeString()}
                         </span>
                       </div>
 
-                      <div className="text-xs text-bespoke-champagne pt-1 flex items-center justify-between">
-                        <span className="font-mono text-bespoke-offwhite">Device: {ev.device_id}</span>
+                      <div className="text-xs text-zinc-900 pt-1 flex items-center justify-between">
+                        <span className="font-mono font-bold text-zinc-900">Device: {ev.device_id}</span>
                         {ev.attributes && ev.attributes.speed && (
-                          <span className="font-mono text-bespoke-gold font-medium">
+                          <span className="font-mono text-[#0071E3] font-bold">
                             {Math.round(ev.attributes.speed)} km/h
                           </span>
                         )}
                       </div>
 
                       {ev.attributes && Object.keys(ev.attributes).length > 0 && (
-                        <div className="text-[10px] font-mono text-bespoke-dim truncate pt-0.5">
+                        <div className="text-[10px] font-mono text-zinc-600 truncate pt-0.5">
                           {JSON.stringify(ev.attributes)}
                         </div>
                       )}

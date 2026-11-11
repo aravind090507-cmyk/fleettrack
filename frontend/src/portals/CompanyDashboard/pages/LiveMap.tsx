@@ -516,7 +516,7 @@ export const LiveMap: React.FC = () => {
         {/* 1. Real-time Clickable Active Trips Bar across top of map */}
         <div className="absolute top-4 left-4 right-96 z-20 flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none pointer-events-auto">
           {activeJourneys.length === 0 ? (
-            <div className="px-4 py-2 bg-white/90 border border-white/80 rounded-full text-xs font-semibold text-zinc-500 backdrop-blur-xl shadow-lg flex items-center gap-2">
+            <div className="px-4 py-2 bg-white/90 border border-white/80 rounded-full text-xs font-semibold text-zinc-700 backdrop-blur-xl shadow-lg flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-zinc-400" />
               <span>No active dispatches — All units standby</span>
             </div>
@@ -647,7 +647,7 @@ export const LiveMap: React.FC = () => {
                     <h4 className="text-xs font-bold text-zinc-900 font-mono tracking-tight">
                       {selectedTransit.vehicle_registration || 'TRANSIT'}
                     </h4>
-                    <p className="text-[11px] text-zinc-500 font-medium">Driver: {selectedTransit.driver_name || 'Assigned'}</p>
+                    <p className="text-[11px] text-zinc-700 font-semibold">Driver: {selectedTransit.driver_name || 'Assigned'}</p>
                   </div>
                 </div>
 
@@ -665,7 +665,7 @@ export const LiveMap: React.FC = () => {
                       ☕ ON BREAK
                     </span>
                   ) : selectedTransit.status === 'COMPLETED' ? (
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-600 border border-zinc-200">
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-700 border border-zinc-200">
                       COMPLETED
                     </span>
                   ) : (
@@ -676,7 +676,7 @@ export const LiveMap: React.FC = () => {
                   )}
                   <button
                     onClick={handleClearTransit}
-                    className="p-1 rounded-full text-zinc-400 hover:text-zinc-800 hover:bg-zinc-100 transition cursor-pointer"
+                    className="p-1 rounded-full text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 transition cursor-pointer"
                     title="Close Transit View"
                   >
                     <X className="w-4 h-4" />
@@ -998,22 +998,22 @@ export const LiveMap: React.FC = () => {
                   }`}
                 >
                   <div className="flex items-center justify-between mb-1">
-                    <span className="font-mono text-sm text-bespoke-offwhite font-medium tracking-wider">{v.registration_number}</span>
+                    <span className="font-mono text-sm text-zinc-900 font-bold tracking-tight">{v.registration_number}</span>
                     <StatusBadge status={v.status} size="sm" />
                   </div>
-                  <p className="text-xs text-bespoke-muted mb-1">{v.model}</p>
+                  <p className="text-xs text-zinc-600 font-medium mb-1">{v.model}</p>
                   {v.origin_name && v.destination_name && (
-                    <div className="text-[11px] text-bespoke-champagne flex items-center gap-1 my-1.5 truncate bg-bespoke-black/80 p-1.5 rounded border border-bespoke-border">
-                      <span className="w-1.5 h-1.5 rounded-full bg-bespoke-gold shrink-0" />
-                      <span className="truncate text-bespoke-goldLight font-medium">{v.origin_name}</span>
-                      <span className="text-bespoke-dim">&rarr;</span>
-                      <span className="w-1.5 h-1.5 rounded-full bg-bespoke-champagne shrink-0" />
-                      <span className="truncate text-bespoke-offwhite font-medium">{v.destination_name}</span>
+                    <div className="text-[11px] text-zinc-800 flex items-center gap-1.5 my-1.5 truncate bg-black/[0.03] p-2 rounded-xl border border-black/[0.05]">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
+                      <span className="truncate text-zinc-900 font-bold">{v.origin_name}</span>
+                      <span className="text-zinc-500 font-bold mx-0.5">&rarr;</span>
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                      <span className="truncate text-zinc-900 font-bold">{v.destination_name}</span>
                     </div>
                   )}
-                  <div className="flex items-center justify-between text-[11px] text-bespoke-champagne/70">
-                    <span>Driver: {v.assigned_driver_name || 'None'}</span>
-                    <span className="font-mono text-bespoke-gold font-medium">{v.latest_speed || 0} km/h</span>
+                  <div className="flex items-center justify-between text-[11px] text-zinc-700 font-medium">
+                    <span>Driver: <strong className="text-zinc-900">{v.assigned_driver_name || 'None'}</strong></span>
+                    <span className="font-mono text-blue-600 font-bold">{v.latest_speed || 0} km/h</span>
                   </div>
                 </div>
               );

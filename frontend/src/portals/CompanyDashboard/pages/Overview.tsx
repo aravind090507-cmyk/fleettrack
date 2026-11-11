@@ -77,7 +77,7 @@ export const Overview: React.FC = () => {
 
         <div className="overflow-x-auto rounded-2xl border border-black/[0.04]">
           <table className="w-full text-left text-xs">
-            <thead className="bg-zinc-50/80 text-zinc-500 uppercase text-[10px] font-bold tracking-wider border-b border-black/[0.04]">
+            <thead className="bg-zinc-50/80 text-zinc-700 uppercase text-[10px] font-bold tracking-wider border-b border-black/[0.04]">
               <tr>
                 <th className="py-3 px-4 font-bold">Registration</th>
                 <th className="py-3 px-4 font-bold">Model</th>
@@ -89,10 +89,10 @@ export const Overview: React.FC = () => {
                 <th className="py-3 px-4 font-bold">Coordinates</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-black/[0.03] text-zinc-700 bg-white/40">
+            <tbody className="divide-y divide-black/[0.03] text-zinc-800 bg-white/40">
               {activeVehicles.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-zinc-400 text-xs font-mono uppercase tracking-wider">
+                  <td colSpan={8} className="py-12 text-center text-zinc-600 text-xs font-semibold uppercase tracking-wider">
                     No active dispatches
                   </td>
                 </tr>
@@ -100,9 +100,9 @@ export const Overview: React.FC = () => {
                 activeVehicles.map((v) => (
                   <tr key={v.vehicle_id} className="hover:bg-zinc-50/60 transition-colors">
                     <td className="py-3 px-4 font-bold text-zinc-900 font-mono tracking-tight">{v.registration_number}</td>
-                    <td className="py-3 px-4 font-medium text-zinc-800">{v.model}</td>
-                    <td className="py-3 px-4 text-zinc-500">{v.vehicle_type}</td>
-                    <td className="py-3 px-4 font-medium text-zinc-900">{v.assigned_driver_name || 'Unassigned'}</td>
+                    <td className="py-3 px-4 font-semibold text-zinc-800">{v.model}</td>
+                    <td className="py-3 px-4 text-zinc-700 font-medium">{v.vehicle_type}</td>
+                    <td className="py-3 px-4 font-bold text-zinc-900">{v.assigned_driver_name || 'Unassigned'}</td>
                     <td className="py-3 px-4">
                       <StatusBadge status={v.status} size="sm" />
                     </td>
@@ -110,23 +110,23 @@ export const Overview: React.FC = () => {
                       {v.origin_name && v.destination_name ? (
                         <div className="flex items-center gap-1.5 text-xs">
                           <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
-                          <span className="text-zinc-800 font-semibold truncate max-w-[120px]" title={v.origin_name}>
+                          <span className="text-zinc-900 font-bold truncate max-w-[120px]" title={v.origin_name}>
                             {v.origin_name}
                           </span>
-                          <span className="text-zinc-400">&rarr;</span>
+                          <span className="text-zinc-500 font-bold mx-0.5">&rarr;</span>
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-                          <span className="text-zinc-800 font-semibold truncate max-w-[120px]" title={v.destination_name}>
+                          <span className="text-zinc-900 font-bold truncate max-w-[120px]" title={v.destination_name}>
                             {v.destination_name}
                           </span>
                         </div>
                       ) : (
-                        <span className="text-zinc-400 italic text-[11px]">No active dispatch</span>
+                        <span className="text-zinc-600 font-medium italic text-[11px]">No active dispatch</span>
                       )}
                     </td>
                     <td className="py-3 px-4 font-mono font-bold text-zinc-900">
                       {v.latest_speed != null ? `${v.latest_speed} km/h` : '0 km/h'}
                     </td>
-                    <td className="py-3 px-4 font-mono text-[11px] text-zinc-500">
+                    <td className="py-3 px-4 font-mono text-[11px] text-zinc-700 font-medium">
                       {v.latest_latitude && v.latest_longitude
                         ? `${v.latest_latitude.toFixed(4)}, ${v.latest_longitude.toFixed(4)}`
                         : '--'}
