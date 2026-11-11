@@ -16,7 +16,7 @@ async def setup_test_db():
 
 @pytest.mark.asyncio
 async def test_role_escalation_prevention():
-    """Verify client-supplied role is ignored; public registration defaults strictly to DRIVER."""
+    """Verify client cannot escalate to ADMIN; unauthorized roles default strictly to DRIVER."""
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         unique_email = f"attacker-{uuid.uuid4().hex[:8]}@evil.corp"
@@ -24,12 +24,31 @@ async def test_role_escalation_prevention():
             "name": "Attacker User",
             "email": unique_email,
             "password": "Password123!",
-            "role": "FLEET_MANAGER"  # Even if sent in payload
+            "role": "ADMIN"  # Unauthorized escalation role
         }
         res = await client.post("/api/auth/register", json=payload)
         assert res.status_code == 201
         data = res.json()
         assert data["user"]["role"] == "DRIVER"  # Must remain DRIVER
+
+
+@pytest.mark.asyncio
+async def test_fleet_manager_registration():
+    """Verify user can register as FLEET_MANAGER to access company management console."""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        unique_email = f"manager-{uuid.uuid4().hex[:8]}@fleetcorp.com"
+        payload = {
+            "name": "New Manager",
+            "email": unique_email,
+            "password": "Password123!",
+            "role": "FLEET_MANAGER"
+        }
+        res = await client.post("/api/auth/register", json=payload)
+        assert res.status_code == 201
+        data = res.json()
+        assert data["user"]["role"] == "FLEET_MANAGER"
+        assert data["user"]["company_name"] == "FleetCorp Logistics"
 
 
 @pytest.mark.asyncio

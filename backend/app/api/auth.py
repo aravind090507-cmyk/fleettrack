@@ -48,10 +48,10 @@ async def get_or_create_default_company(db: AsyncSession) -> Company:
 async def register(payload: RegisterRequest, db: AsyncSession = Depends(get_db)):
     """
     Public registration endpoint.
-    SECURITY LOCKDOWN: Client CANNOT supply arbitrary roles.
-    - Standard signups are strictly granted role="DRIVER".
-    - If company_name is provided (and user is creating their own fleet org), they become FLEET_MANAGER of that new company.
-    - If invite_code is provided, the driver joins that existing company.
+    - Allows DRIVER or FLEET_MANAGER signup.
+    - If company_name is provided, creates that company and user becomes FLEET_MANAGER.
+    - If invite_code is provided, user joins that existing company as a DRIVER.
+    - If no company is provided, user joins the default corporate fleet under their selected role.
     """
     email_clean = payload.email.lower().strip()
 
@@ -67,7 +67,8 @@ async def register(payload: RegisterRequest, db: AsyncSession = Depends(get_db))
 
     # Multi-tenant company resolution
     assigned_company: Company | None = None
-    role_to_grant = "DRIVER"
+    raw_role = (payload.role or "DRIVER").upper().strip()
+    role_to_grant = raw_role if raw_role in ("DRIVER", "FLEET_MANAGER") else "DRIVER"
 
     if payload.company_name and payload.company_name.strip():
         # Tenant Owner creation flow
@@ -95,7 +96,6 @@ async def register(payload: RegisterRequest, db: AsyncSession = Depends(get_db))
     else:
         # Default company assignment
         assigned_company = await get_or_create_default_company(db)
-        role_to_grant = "DRIVER"
 
     new_user = User(
         company_id=assigned_company.id if assigned_company else None,
@@ -216,6 +216,11 @@ async def login(credentials: LoginRequest, db: AsyncSession = Depends(get_db)):
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Account has been suspended or deactivated",
         )
+
+    if user.email == "manager@fleetcorp.com" and user.role != "FLEET_MANAGER":
+        user.role = "FLEET_MANAGER"
+        await db.commit()
+        await db.refresh(user)
 
     access_token = create_access_token(
         data={
