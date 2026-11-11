@@ -2,6 +2,7 @@ import React, { useEffect, useMemo } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { LocationPing } from '../../types';
+import { getMapTileConfig } from '../../services/mapConfig';
 
 function createDriverVehicleIcon(heading: number = 0) {
   const html = `
@@ -138,10 +139,11 @@ export const DriverMap: React.FC<DriverMapProps> = ({ position, origin, destinat
         className="w-full h-full"
       >
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          maxZoom={19}
-          className="map-tiles-apple"
+          attribution={getMapTileConfig('apple').attribution}
+          url={getMapTileConfig('apple').url}
+          maxZoom={getMapTileConfig('apple').maxZoom}
+          tileSize={getMapTileConfig('apple').tileSize}
+          className={getMapTileConfig('apple').className}
         />
 
         <DriverMapController position={position} origin={origin} destination={destination} />

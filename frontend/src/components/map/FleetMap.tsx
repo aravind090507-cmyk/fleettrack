@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, Circle, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { ActiveVehicleTelemetry } from '../../types';
+import { getMapTileConfig } from '../../services/mapConfig';
 
 export interface SelectedTransitInfo {
   journey_id?: string;
@@ -338,10 +339,11 @@ export const FleetMap: React.FC<FleetMapProps> = ({
       >
         <TileLayer
           key={mapStyle}
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          maxZoom={19}
-          className={mapStyle === 'dark' ? 'map-tiles-dark' : 'map-tiles-apple'}
+          attribution={getMapTileConfig(mapStyle).attribution}
+          url={getMapTileConfig(mapStyle).url}
+          maxZoom={getMapTileConfig(mapStyle).maxZoom}
+          tileSize={getMapTileConfig(mapStyle).tileSize}
+          className={getMapTileConfig(mapStyle).className}
         />
 
         <MapController

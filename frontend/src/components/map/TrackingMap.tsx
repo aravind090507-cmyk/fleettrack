@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { LatestLocation, LocationPing } from '../../types';
+import { getMapTileConfig } from '../../services/mapConfig';
 
 function createPulseVehicleIcon(heading: number = 0) {
   const html = `
@@ -97,10 +98,11 @@ export const TrackingMap: React.FC<TrackingMapProps> = ({
         className="w-full h-full"
       >
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          maxZoom={19}
-          className="map-tiles-apple"
+          attribution={getMapTileConfig('apple').attribution}
+          url={getMapTileConfig('apple').url}
+          maxZoom={getMapTileConfig('apple').maxZoom}
+          tileSize={getMapTileConfig('apple').tileSize}
+          className={getMapTileConfig('apple').className}
         />
 
         <MapPanFollower center={currentPos} />
