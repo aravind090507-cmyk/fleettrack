@@ -205,7 +205,7 @@ export const JourneySetup: React.FC = () => {
         setStartLatInput(lat.toString());
         setStartLngInput(lng.toString());
         setMapTarget([lat, lng]);
-        setOriginName('Current Device Location');
+        setOriginName('Current GPS Location');
         setPinningMode('destination'); // Switch to let user tap destination next
       },
       (err) => {
@@ -448,7 +448,7 @@ export const JourneySetup: React.FC = () => {
 
       {/* Vehicle Asset Picker & Direct Input */}
       <Card
-        title="Vehicle / Device Unit"
+        title="Vehicle Unit"
         action={
           <div className="flex items-center gap-1 bg-bespoke-black p-1 rounded border border-bespoke-border text-[11px] font-mono">
             <button
@@ -966,7 +966,7 @@ export const JourneySetup: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-[11px] font-semibold text-slate-400 mb-1">Device / Vehicle Model</label>
+                <label className="block text-[11px] font-semibold text-slate-400 mb-1">Vehicle Model</label>
                 <input
                   type="text"
                   required

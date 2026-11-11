@@ -50,7 +50,6 @@ export const ActiveJourney: React.FC = () => {
   const [showEndModal, setShowEndModal] = useState<boolean>(false);
   const [showQrModal, setShowQrModal] = useState<boolean>(false);
   const [isLinkRevoked, setIsLinkRevoked] = useState<boolean>(false);
-  const [backgroundWarning, setBackgroundWarning] = useState<boolean>(false);
   const [sosProgress, setSosProgress] = useState<number>(0);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [pingCount, setPingCount] = useState<number>(0);
@@ -93,8 +92,6 @@ export const ActiveJourney: React.FC = () => {
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') {
         acquireLock();
-      } else if (document.visibilityState === 'hidden') {
-        setBackgroundWarning(true);
       }
     };
 
@@ -420,26 +417,6 @@ export const ActiveJourney: React.FC = () => {
               </span>
             ))}
           </div>
-        </div>
-      )}
-
-      {/* Background GPS Throttling Warning Banner */}
-      {backgroundWarning && (
-        <div className="p-3 bg-amber-950/70 border border-amber-800 rounded-2xl flex items-start gap-2.5 shadow-lg">
-          <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
-          <div className="flex-1 text-xs">
-            <p className="font-bold text-amber-300">Screen Lock / Background Warning</p>
-            <p className="text-amber-200/80 text-[11px] mt-0.5 leading-relaxed">
-              Mobile browsers pause GPS updates when screen locks. Screen Wake Lock is active — please keep this screen
-              unlocked during your trip.
-            </p>
-          </div>
-          <button
-            onClick={() => setBackgroundWarning(false)}
-            className="text-amber-400 hover:text-amber-200 text-xs font-bold"
-          >
-            ✕
-          </button>
         </div>
       )}
 
