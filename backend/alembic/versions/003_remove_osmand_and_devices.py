@@ -25,6 +25,16 @@ def upgrade() -> None:
     except Exception:
         pass
 
+    if is_postgres:
+        try:
+            op.execute("ALTER TABLE locations ALTER COLUMN protocol DROP NOT NULL;")
+        except Exception:
+            pass
+        try:
+            op.execute("ALTER TABLE locations ALTER COLUMN protocol SET DEFAULT 'web';")
+        except Exception:
+            pass
+
     # 2. Alter locations table: remove device_id, device_time, protocol, uq_device_recorded_at
     with op.batch_alter_table("locations") as batch_op:
         try:

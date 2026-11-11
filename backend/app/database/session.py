@@ -85,8 +85,27 @@ async def init_db():
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-        if settings.DATABASE_URL.startswith("sqlite"):
-            from sqlalchemy import text
+        from sqlalchemy import text
+        if not settings.DATABASE_URL.startswith("sqlite"):
+            # PostgreSQL schema reconciliation for live production databases
+            pg_migration_sqls = [
+                "ALTER TABLE locations ALTER COLUMN protocol DROP NOT NULL",
+                "ALTER TABLE locations ALTER COLUMN protocol SET DEFAULT 'web'",
+                "ALTER TABLE locations ALTER COLUMN device_id DROP NOT NULL",
+                "ALTER TABLE locations DROP COLUMN IF EXISTS protocol",
+                "ALTER TABLE locations DROP COLUMN IF EXISTS device_time",
+                "ALTER TABLE locations DROP COLUMN IF EXISTS device_id",
+                "ALTER TABLE journeys DROP COLUMN IF EXISTS device_id",
+                "ALTER TABLE trip_events ADD COLUMN IF NOT EXISTS is_dismissed BOOLEAN DEFAULT FALSE",
+                "DROP TABLE IF EXISTS device_geofences CASCADE",
+                "DROP TABLE IF EXISTS devices CASCADE",
+            ]
+            for sql in pg_migration_sqls:
+                try:
+                    await conn.execute(text(sql))
+                except Exception as e:
+                    logger.debug("PostgreSQL schema notice (%s): %s", sql, e)
+        else:
             for table in ["users", "vehicles", "journeys"]:
                 try:
                     await conn.execute(text(f"ALTER TABLE {table} ADD COLUMN company_id VARCHAR(36)"))
@@ -103,6 +122,7 @@ async def init_db():
                 "ALTER TABLE locations ADD COLUMN geofence_ids JSON",
                 "ALTER TABLE locations ADD COLUMN attributes JSON",
                 "ALTER TABLE locations ADD COLUMN geom TEXT",
+                "ALTER TABLE trip_events ADD COLUMN is_dismissed BOOLEAN DEFAULT 0",
             ]:
                 try:
                     await conn.execute(text(col_sql))
