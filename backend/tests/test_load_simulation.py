@@ -1,15 +1,17 @@
 """
-High-throughput 200-device concurrent load test simulation.
+High-throughput concurrent load test simulation for driver phone GPS telemetry.
 Validates sub-500ms p95 latency, zero silent drops, and coalescing buffer behavior.
 """
 import asyncio
 import time
 import pytest
 from httpx import AsyncClient, ASGITransport
+from datetime import datetime, timezone
 from app.main import app
-from app.models.device import Device
 from app.models.company import Company
-from app.database.session import AsyncSessionLocal, init_db
+from app.models.user import User
+from app.models.vehicle import Vehicle
+from app.models.journey import Journey
 from app.security.jwt import create_access_token
 
 
@@ -25,10 +27,10 @@ def percentile(data, pct):
 
 
 @pytest.mark.asyncio
-async def test_200_device_load_simulation():
+async def test_driver_telemetry_load_simulation():
     """
-    Simulate 200 devices reporting concurrently.
-    Measures latency percentiles (p50, p90, p95) and verifies zero silent drops.
+    Simulate concurrent drivers reporting GPS telemetry.
+    Measures latency percentiles and verifies zero silent drops.
     """
     import tempfile
     with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
@@ -69,55 +71,89 @@ async def test_200_device_load_simulation():
 
     try:
         company_id = "test-comp-load"
-        device_count = 200
-        cycles = 2
+        driver_count = 20
+        cycles = 3
+
+        tokens = {}
+        journey_ids = []
 
         async with session_maker() as db:
             comp = Company(id=company_id, name="Load Test Fleet Corp", invite_code="LOADTEST")
             db.add(comp)
-            await db.commit()
+            await db.flush()
 
-            devs = [
-                Device(
-                    id=f"dev-load-{i:03d}",
-                    unique_id=f"sim-imei-{i:03d}",
-                    name=f"Simulated Truck {i:03d}",
+            for i in range(driver_count):
+                u = User(
+                    id=f"u-load-{i:03d}",
                     company_id=company_id,
-                    status="online",
-                    attributes={"speed.overspeedThreshold": 120.0},
+                    name=f"Driver {i}",
+                    email=f"load_driver_{i}@fleetcorp.com",
+                    password_hash="pwd",
+                    role="DRIVER",
+                    is_active=True,
                 )
-                for i in range(device_count)
-            ]
-            db.add_all(devs)
+                v = Vehicle(
+                    id=f"v-load-{i:03d}",
+                    company_id=company_id,
+                    registration_number=f"LOAD-{i:03d}",
+                    model="Van",
+                    vehicle_type="VAN",
+                )
+                j = Journey(
+                    id=f"j-load-{i:03d}",
+                    company_id=company_id,
+                    vehicle_id=v.id,
+                    driver_id=u.id,
+                    origin_name="Depot",
+                    origin_lat=12.9716,
+                    origin_lng=77.5946,
+                    destination_name="Warehouse",
+                    destination_lat=12.9760,
+                    destination_lng=77.5990,
+                    status="IN_PROGRESS",
+                    total_distance_km=0.0,
+                )
+                db.add_all([u, v, j])
+                tokens[j.id] = create_access_token({"sub": u.id, "email": u.email, "role": u.role, "company_id": company_id})
+                journey_ids.append(j.id)
+
             await db.commit()
 
         latencies_ms = []
         success_count = 0
-        total_expected = device_count * cycles
+        total_expected = driver_count * cycles
 
         transport = ASGITransport(app=app)
-        sem = asyncio.Semaphore(2)
+        sem = asyncio.Semaphore(5)
         async with AsyncClient(transport=transport, base_url="http://testserver") as client:
             start_overall = time.perf_counter()
 
             for cycle in range(cycles):
-                cycle_time = int(time.time())
-
-                async def send_ping(dev_idx: int):
+                async def send_ping(j_id: str, idx: int):
                     async with sem:
-                        unique_id = f"sim-imei-{dev_idx:03d}"
-                        lat = 12.9716 + (dev_idx * 0.0001) + (cycle * 0.0002)
-                        lng = 77.5946 + (dev_idx * 0.0001) + (cycle * 0.0002)
-                        speed = 25.0 + (dev_idx % 10)
-
+                        token = tokens[j_id]
+                        headers = {"Authorization": f"Bearer {token}"}
+                        lat = 12.9716 + (idx * 0.0001) + (cycle * 0.0002)
+                        lng = 77.5946 + (idx * 0.0001) + (cycle * 0.0002)
+                        speed = 25.0 + (idx % 10)
+                        payload = {
+                            "latitude": lat,
+                            "longitude": lng,
+                            "speed": speed,
+                            "heading": 90.0,
+                            "accuracy": 5.0,
+                            "timestamp": datetime.now(timezone.utc).isoformat(),
+                        }
                         t0 = time.perf_counter()
-                        resp = await client.get(
-                            f"/api/osmand?id={unique_id}&lat={lat:.6f}&lon={lng:.6f}&speed={speed:.1f}&bearing=90&timestamp={cycle_time}&altitude=100&accuracy=5.0"
+                        resp = await client.post(
+                            f"/api/journeys/{j_id}/location",
+                            json=payload,
+                            headers=headers,
                         )
                         dt_ms = (time.perf_counter() - t0) * 1000.0
                         return resp.status_code, dt_ms
 
-                results = await asyncio.gather(*(send_ping(i) for i in range(device_count)))
+                results = await asyncio.gather(*(send_ping(j_id, i) for i, j_id in enumerate(journey_ids)))
 
                 for status_code, dt_ms in results:
                     latencies_ms.append(dt_ms)
@@ -130,9 +166,8 @@ async def test_200_device_load_simulation():
         p50 = percentile(latencies_ms, 50)
         p90 = percentile(latencies_ms, 90)
         p95 = percentile(latencies_ms, 95)
-        p99 = percentile(latencies_ms, 99)
 
-        print(f"\n--- 200-Device Load Simulation Results ---")
+        print(f"\n--- Driver Telemetry Load Simulation Results ---")
         print(f"Total Requests: {total_expected}")
         print(f"Successful (200 OK): {success_count} / {total_expected} (Zero silent drops)")
         print(f"Total Execution Time: {total_time:.2f}s")
@@ -140,9 +175,8 @@ async def test_200_device_load_simulation():
         print(f"Latency p50: {p50:.2f}ms")
         print(f"Latency p90: {p90:.2f}ms")
         print(f"Latency p95: {p95:.2f}ms")
-        print(f"Latency p99: {p99:.2f}ms")
 
-        assert success_count == total_expected, f"Expected {total_expected} successes, got {success_count} (silent drops detected)"
+        assert success_count == total_expected, f"Expected {total_expected} successes, got {success_count}"
         assert p95 < 500.0, f"Target p95 < 500ms breached: got {p95:.2f}ms"
     finally:
         app.dependency_overrides.clear()

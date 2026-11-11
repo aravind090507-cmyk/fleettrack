@@ -11,20 +11,17 @@ from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api.auth import router as auth_router, seed_demo_users
+from app.api.auth import router as auth_router
 from app.api.dashboard import router as dashboard_router
 from app.api.journeys import router as journeys_router
 from app.api.location import router as location_router, search_router
 from app.api.tracking import router as tracking_router
-from app.api.vehicles import router as vehicles_router, seed_demo_vehicles
+from app.api.vehicles import router as vehicles_router
 from app.api.websocket_routes import router as ws_router
-from app.api.osmand import router as osmand_router, root_osmand_router
-from app.api.devices import router as devices_router
 from app.api.positions import router as positions_router
 from app.api.events import router as events_router
 from app.api.geofences import router as geofences_router
 from app.api.reports import router as reports_router
-from app.pipeline.status_sweeper import DeviceStatusSweeper
 from app.config.settings import get_settings
 from app.database.session import AsyncSessionLocal, init_db
 from app.services.redis_service import get_redis_service
@@ -51,71 +48,11 @@ async def lifespan(app: FastAPI):
         if settings.APP_ENVIRONMENT == "production":
             raise RuntimeError(f"Database connectivity failed during production startup: {e}")
 
-    # 2. Seed initial demo credentials and vehicles if enabled
-    if settings.SEED_DEMO_DATA:
-        try:
-            async with AsyncSessionLocal() as db:
-                await seed_demo_users(db)
-                await seed_demo_vehicles(db)
-        except Exception as e:
-            logger.error("Demo seeding error: %s", e)
-
-    # 3. Clean up any leftover mock/test dispatches so only real dispatches populate
-    try:
-        from app.models.journey import Journey
-        from sqlalchemy import update, select
-        async with AsyncSessionLocal() as db:
-            stmt = (
-                update(Journey)
-                .where(Journey.status == "IN_PROGRESS")
-                .where(
-                    (Journey.origin_name.ilike("%Warehouse Alpha%"))
-                    | (Journey.destination_name.ilike("%Distribution Beta%"))
-                    | (Journey.description.ilike("%Walking test trip%"))
-                    | (Journey.origin_name.ilike("%Current Device Location%"))
-                )
-                .values(status="COMPLETED")
-            )
-            await db.execute(stmt)
-
-            # Reconcile distance metrics for historical completed journeys whose distance was distorted by device odometer
-            from app.models.location import Location
-            from app.services.journey_service import haversine_distance
-            recalc_stmt = select(Journey).where(Journey.status == "COMPLETED")
-            recalc_res = await db.execute(recalc_stmt)
-            completed_journeys = recalc_res.scalars().all()
-            for cj in completed_journeys:
-                locs_res = await db.execute(
-                    select(Location)
-                    .where(Location.journey_id == cj.id)
-                    .order_by(Location.recorded_at.asc())
-                )
-                j_locs = locs_res.scalars().all()
-                if j_locs:
-                    tot_m = sum(l.distance_m for l in j_locs if l.distance_m is not None and l.distance_m > 0)
-                    if tot_m > 0:
-                        cj.total_distance_km = round(tot_m / 1000.0, 3)
-                    elif len(j_locs) > 1:
-                        calc_km = 0.0
-                        for i in range(1, len(j_locs)):
-                            calc_km += haversine_distance(
-                                j_locs[i - 1].latitude, j_locs[i - 1].longitude,
-                                j_locs[i].latitude, j_locs[i].longitude
-                            )
-                        cj.total_distance_km = round(calc_km, 3)
-                    else:
-                        cj.total_distance_km = 0.0
-            await db.commit()
-    except Exception as e:
-        logger.warning("Mock journey cleanup notice: %s", e)
-
-    # 4. Connect to Redis (or fallback to in-memory)
+    # 2. Connect to Redis (or fallback to in-memory)
     redis_svc = get_redis_service()
     await redis_svc.initialize()
 
-    # 4. Start background device status sweeper and WebSocket pub/sub subscriber
-    sweeper = DeviceStatusSweeper(timeout_seconds=120, check_interval_seconds=30)
-    sweeper.start()
+    # 3. Start WebSocket pub/sub subscriber
     from app.websocket.manager import get_ws_manager
     ws_mgr = get_ws_manager()
     await ws_mgr.start_subscriber(redis_svc)
@@ -126,7 +63,6 @@ async def lifespan(app: FastAPI):
     # Clean shutdown
     logger.info("Shutting down Fleet Tracking Engine...")
     ws_mgr.stop_subscriber()
-    sweeper.stop()
     await redis_svc.close()
     from app.database.session import engine
     await engine.dispose()
@@ -172,9 +108,6 @@ app.include_router(search_router)
 app.include_router(tracking_router)
 app.include_router(dashboard_router)
 app.include_router(ws_router)
-app.include_router(osmand_router)
-app.include_router(root_osmand_router)
-app.include_router(devices_router)
 app.include_router(positions_router)
 app.include_router(events_router)
 app.include_router(geofences_router)

@@ -11,8 +11,8 @@ import {
   MapPin,
   AlertTriangle,
 } from 'lucide-react';
-import { reportsApi, devicesApi, eventsApi } from '../../../services/api';
-import { Device, Position, StopReportItem, SummaryReportItem, TelematicsEvent, TripReportItem } from '../../../types';
+import { reportsApi, vehiclesApi, eventsApi } from '../../../services/api';
+import { Vehicle, Position, StopReportItem, SummaryReportItem, TelematicsEvent, TripReportItem } from '../../../types';
 import { Card } from '../../../components/ui/Card';
 import { Button } from '../../../components/ui/Button';
 import { LoadingSpinner } from '../../../components/ui/LoadingSpinner';
@@ -21,8 +21,8 @@ type ReportTab = 'trips' | 'stops' | 'summary' | 'route' | 'events';
 
 export const ReportsPage: React.FC = () => {
   const [tab, setTab] = useState<ReportTab>('trips');
-  const [devices, setDevices] = useState<Device[]>([]);
-  const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [selectedVehicleId, setSelectedVehicleId] = useState<string>('');
 
   // Default to today
   const [fromDate, setFromDate] = useState<string>(() => {
@@ -46,10 +46,11 @@ export const ReportsPage: React.FC = () => {
   const [eventsData, setEventsData] = useState<TelematicsEvent[]>([]);
 
   useEffect(() => {
-    devicesApi.list().then((list) => {
-      setDevices(list);
-      if (list.length > 0 && !selectedDeviceId) {
-        setSelectedDeviceId(list[0].id);
+    vehiclesApi.list().then((res) => {
+      const list = res.items || [];
+      setVehicles(list);
+      if (list.length > 0 && !selectedVehicleId) {
+        setSelectedVehicleId(list[0].id);
       }
     });
   }, []);
@@ -59,22 +60,22 @@ export const ReportsPage: React.FC = () => {
       setLoading(true);
       const fromIso = new Date(fromDate).toISOString();
       const toIso = new Date(toDate).toISOString();
-      const devId = selectedDeviceId || undefined;
+      const vId = selectedVehicleId || undefined;
 
       if (tab === 'trips') {
-        const data = await reportsApi.getTrips({ device_id: devId, from: fromIso, to: toIso });
+        const data = await reportsApi.getTrips({ vehicle_id: vId, from: fromIso, to: toIso });
         setTripsData(Array.isArray(data) ? data : []);
       } else if (tab === 'stops') {
-        const data = await reportsApi.getStops({ device_id: devId, from: fromIso, to: toIso });
+        const data = await reportsApi.getStops({ vehicle_id: vId, from: fromIso, to: toIso });
         setStopsData(Array.isArray(data) ? data : []);
       } else if (tab === 'summary') {
-        const data = await reportsApi.getSummary({ device_id: devId, from: fromIso, to: toIso });
+        const data = await reportsApi.getSummary({ vehicle_id: vId, from: fromIso, to: toIso });
         setSummaryData(Array.isArray(data) ? data : []);
       } else if (tab === 'route') {
-        const data = await reportsApi.getRoute({ device_id: devId, from: fromIso, to: toIso });
+        const data = await reportsApi.getRoute({ vehicle_id: vId, from: fromIso, to: toIso });
         setRouteData(Array.isArray(data) ? data : []);
       } else if (tab === 'events') {
-        const data = await eventsApi.list({ device_id: devId, from: fromIso, to: toIso, limit: 100 });
+        const data = await eventsApi.list({ vehicle_id: vId, from: fromIso, to: toIso, limit: 100 });
         setEventsData(Array.isArray(data) ? data : []);
       }
     } catch (err: any) {
@@ -87,18 +88,18 @@ export const ReportsPage: React.FC = () => {
   const handleExportCsv = async () => {
     const fromIso = new Date(fromDate).toISOString();
     const toIso = new Date(toDate).toISOString();
-    const devId = selectedDeviceId || undefined;
+    const vId = selectedVehicleId || undefined;
 
     try {
       let blob: any = null;
       let filename = `fleettrack_${tab}_report.csv`;
 
       if (tab === 'trips') {
-        blob = await reportsApi.getTrips({ device_id: devId, from: fromIso, to: toIso, format: 'csv' });
+        blob = await reportsApi.getTrips({ vehicle_id: vId, from: fromIso, to: toIso, format: 'csv' });
       } else if (tab === 'stops') {
-        blob = await reportsApi.getStops({ device_id: devId, from: fromIso, to: toIso, format: 'csv' });
+        blob = await reportsApi.getStops({ vehicle_id: vId, from: fromIso, to: toIso, format: 'csv' });
       } else if (tab === 'route') {
-        blob = await reportsApi.getRoute({ device_id: devId, from: fromIso, to: toIso, format: 'csv' });
+        blob = await reportsApi.getRoute({ vehicle_id: vId, from: fromIso, to: toIso, format: 'csv' });
       } else {
         alert('CSV export available for Trips, Stops, and Route reports.');
         return;
@@ -125,10 +126,10 @@ export const ReportsPage: React.FC = () => {
     }
     const fromIso = new Date(fromDate).toISOString();
     const toIso = new Date(toDate).toISOString();
-    const devId = selectedDeviceId || undefined;
+    const vId = selectedVehicleId || undefined;
 
     try {
-      const blob = await reportsApi.getRoute({ device_id: devId, from: fromIso, to: toIso, format: 'gpx' });
+      const blob = await reportsApi.getRoute({ vehicle_id: vId, from: fromIso, to: toIso, format: 'gpx' });
       const url = window.URL.createObjectURL(new Blob([blob], { type: 'application/gpx+xml' }));
       const link = document.createElement('a');
       link.href = url;
@@ -175,16 +176,16 @@ export const ReportsPage: React.FC = () => {
       <Card>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
           <div>
-            <label className="block text-slate-400 font-semibold mb-1">Target Device / Vehicle</label>
+            <label className="block text-slate-400 font-semibold mb-1">Target Vehicle</label>
             <select
-              value={selectedDeviceId}
-              onChange={(e) => setSelectedDeviceId(e.target.value)}
+              value={selectedVehicleId}
+              onChange={(e) => setSelectedVehicleId(e.target.value)}
               className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-emerald-500"
             >
-              <option value="">All Fleet Devices</option>
-              {devices.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name} ({d.unique_id})
+              <option value="">All Fleet Vehicles</option>
+              {vehicles.map((v) => (
+                <option key={v.id} value={v.id}>
+                  {v.registration_number} ({v.model})
                 </option>
               ))}
             </select>

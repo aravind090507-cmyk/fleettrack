@@ -11,7 +11,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database.session import get_db
 from app.models.journey import Journey
 from app.models.location import Location
-from app.models.device import Device
 from app.models.geofence import Geofence
 from app.models.user import User
 from app.schemas.location import LocationBatch, LocationIngestResult, LocationPing, LocationResponse
@@ -23,40 +22,6 @@ from app.websocket.manager import get_ws_manager
 
 logger = logging.getLogger("fleettrack.location")
 router = APIRouter(prefix="/api/journeys", tags=["GPS Telemetry"])
-
-
-async def _get_or_create_device_for_journey(db: AsyncSession, journey: Journey) -> Device:
-    if journey.device_id:
-        stmt = select(Device).where(Device.id == journey.device_id)
-        dev = (await db.execute(stmt)).scalars().first()
-        if dev:
-            return dev
-
-    import uuid
-    stmt = select(Device).where(Device.vehicle_id == journey.vehicle_id)
-    dev = (await db.execute(stmt)).scalars().first()
-    if not dev:
-        comp_id = journey.company_id
-        if not comp_id and journey.vehicle:
-            comp_id = journey.vehicle.company_id
-        if not comp_id:
-            from app.models.company import Company
-            comp = (await db.execute(select(Company))).scalars().first()
-            comp_id = comp.id if comp else None
-
-        dev = Device(
-            id=str(uuid.uuid4()),
-            company_id=comp_id,
-            unique_id=f"web-{journey.vehicle_id}"[:100],
-            name=f"Web Tracker - {journey.vehicle_id}"[:255],
-            vehicle_id=journey.vehicle_id,
-            status="online",
-        )
-        db.add(dev)
-        await db.flush()
-
-    journey.device_id = dev.id
-    return dev
 
 
 async def _get_active_geofences(db: AsyncSession, company_id: Optional[str]) -> List[Dict[str, Any]]:
@@ -99,13 +64,11 @@ async def post_single_location_ping(
             detail="Cannot upload GPS telemetry for a completed or inactive journey",
         )
 
-    device = await _get_or_create_device_for_journey(db, journey)
     geofences = await _get_active_geofences(db, journey.company_id)
 
     runner = PipelineRunner(db)
     res = await runner.process_position(
         raw_ping=ping.model_dump(),
-        device=device,
         journey=journey,
         geofences=geofences,
         protocol="web",
@@ -122,7 +85,6 @@ async def post_single_location_ping(
             "type": "LOCATION_UPDATE",
             "journey_id": journey.id,
             "vehicle_id": journey.vehicle_id,
-            "device_id": device.id,
             "latitude": res.position["latitude"],
             "longitude": res.position["longitude"],
             "speed": res.position["speed"],
@@ -213,7 +175,6 @@ async def post_batch_location_pings(
                 detail={"error": "journey_ended", "status": journey.status, "ended_at": ended_at.isoformat()},
             )
 
-    device = await _get_or_create_device_for_journey(db, journey)
     geofences = await _get_active_geofences(db, journey.company_id)
 
     sorted_pings = sorted(batch.pings, key=lambda p: p.timestamp)
@@ -228,7 +189,6 @@ async def post_batch_location_pings(
     for idx, p in enumerate(sorted_pings):
         res = await runner.process_position(
             raw_ping=p.model_dump(),
-            device=device,
             journey=journey,
             geofences=geofences,
             protocol="web",
@@ -259,7 +219,6 @@ async def post_batch_location_pings(
             "type": "LOCATION_UPDATE",
             "journey_id": journey.id,
             "vehicle_id": journey.vehicle_id,
-            "device_id": device.id,
             "latitude": last_recorded_pos["latitude"],
             "longitude": last_recorded_pos["longitude"],
             "speed": last_recorded_pos["speed"],

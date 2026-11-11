@@ -15,38 +15,6 @@ export const LoginPage: React.FC = () => {
   const { login, register, isLoading } = useAuthStore();
   const navigate = useNavigate();
 
-  const handleQuickLogin = async (demoEmail: string, demoRole: 'DRIVER' | 'FLEET_MANAGER') => {
-    setError(null);
-    setEmail(demoEmail);
-    setPassword('Password123!');
-    try {
-      const user = await login(demoEmail, 'Password123!');
-      if (user.role === 'DRIVER') {
-        navigate('/driver');
-      } else {
-        navigate('/company');
-      }
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Demo login failed. Creating account...');
-      // Fallback: try registering if not exists
-      try {
-        const user = await register(
-          demoRole === 'DRIVER' ? 'Ramesh Kumar (Driver)' : 'Operations Fleet Manager',
-          demoEmail,
-          'Password123!',
-          demoRole
-        );
-        if (user.role === 'DRIVER') {
-          navigate('/driver');
-        } else {
-          navigate('/company');
-        }
-      } catch (regErr: any) {
-        setError(regErr.response?.data?.detail || 'Authentication error.');
-      }
-    }
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -132,43 +100,6 @@ export const LoginPage: React.FC = () => {
 
       <div className="mt-4 sm:mx-auto sm:w-full sm:max-w-md relative z-10 px-4">
         <div className="bg-[#151619] border border-[#26272b] rounded-3xl p-6 sm:p-8 shadow-2xl backdrop-blur-xl space-y-4">
-          {/* 1-Click Fast Demo Sign-In Buttons */}
-          <div className="p-3 bg-[#0d0d0d]/90 rounded-2xl border border-[#26272b] space-y-2.5">
-            <span className="text-[10px] font-semibold text-[#dac9be] uppercase tracking-[0.12em] flex items-center gap-1.5">
-              <Zap className="w-3 h-3 text-[#cb886c] fill-[#cb886c]" />
-              <span>Instant Access Portals</span>
-            </span>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => handleQuickLogin('driver1@fleetcorp.com', 'DRIVER')}
-                className="p-2.5 rounded-xl bg-[#151619] hover:bg-[#1f2025] border border-[#26272b] hover:border-[#cb886c]/50 text-left transition flex items-center gap-2 group cursor-pointer"
-              >
-                <div className="w-7 h-7 rounded-lg bg-[#cb886c]/15 border border-[#cb886c]/30 flex items-center justify-center text-[#ebcfbc] group-hover:scale-105 transition-transform shrink-0">
-                  <Truck className="w-3.5 h-3.5" />
-                </div>
-                <div className="truncate">
-                  <span className="text-xs font-semibold text-[#f4f5f2] block truncate">Driver Portal</span>
-                  <span className="text-[10px] text-[#9c9c9c] font-mono block">driver1</span>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleQuickLogin('manager@fleetcorp.com', 'FLEET_MANAGER')}
-                className="p-2.5 rounded-xl bg-[#151619] hover:bg-[#1f2025] border border-[#26272b] hover:border-[#cb886c]/50 text-left transition flex items-center gap-2 group cursor-pointer"
-              >
-                <div className="w-7 h-7 rounded-lg bg-[#dac9be]/15 border border-[#dac9be]/30 flex items-center justify-center text-[#dac9be] group-hover:scale-105 transition-transform shrink-0">
-                  <UserCheck className="w-3.5 h-3.5" />
-                </div>
-                <div className="truncate">
-                  <span className="text-xs font-semibold text-[#f4f5f2] block truncate">Fleet Operations</span>
-                  <span className="text-[10px] text-[#9c9c9c] font-mono block">manager</span>
-                </div>
-              </button>
-            </div>
-          </div>
-
           <form className="space-y-4" onSubmit={handleSubmit}>
             {error && (
               <div className="p-3 rounded-xl bg-[#1c0d11] border border-[#b63b51]/40 text-[#fda4af] text-xs font-medium leading-relaxed">

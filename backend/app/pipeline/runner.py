@@ -10,7 +10,6 @@ import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
 
-from app.models.device import Device
 from app.models.location import Location
 from app.models.event import Event
 from app.models.journey import Journey
@@ -71,14 +70,15 @@ class PipelineRunner:
     async def process_position(
         self,
         raw_ping: Dict[str, Any],
-        device: Device,
+        device: Optional[Any] = None,
         journey: Optional[Journey] = None,
         geofences: Optional[List[Dict[str, Any]]] = None,
         protocol: str = "web",
     ) -> PipelineResult:
-        """Processes a single position for a device under per-device lock."""
+        """Processes a single position under per-entity lock."""
         start_time = datetime.now(timezone.utc)
-        dev_state = await self.state_mgr.get_state(device.id)
+        lock_id = (journey.id if journey else None) or (device.id if device and hasattr(device, "id") else "default")
+        dev_state = await self.state_mgr.get_state(lock_id)
 
         async with dev_state.lock:
             # Prepare position dict
@@ -106,12 +106,12 @@ class PipelineRunner:
                 "attributes": raw_ping.get("attributes") or {},
             }
 
-            device_attrs = device.attributes or {}
+            device_attrs = (device.attributes if device and hasattr(device, "attributes") and device.attributes else {})
             reasons: List[str] = []
             adjusted_all: Dict[str, Any] = {}
 
             # 1. Device check
-            if device.disabled:
+            if device and getattr(device, "disabled", False):
                 dev_state.record_rejection(ReasonCode.REJECTED_DEVICE_DISABLED.value, pos)
                 return PipelineResult(PipelineStatus.REJECTED, [ReasonCode.REJECTED_DEVICE_DISABLED.value])
 
@@ -132,12 +132,15 @@ class PipelineRunner:
             last_pos = dev_state.last_position
             if last_pos is None:
                 # Query last position from DB
-                stmt = (
-                    select(Location)
-                    .where(Location.device_id == device.id)
-                    .order_by(Location.recorded_at.desc())
-                    .limit(1)
-                )
+                if journey:
+                    stmt = (
+                        select(Location)
+                        .where(Location.journey_id == journey.id)
+                        .order_by(Location.recorded_at.desc())
+                        .limit(1)
+                    )
+                else:
+                    stmt = select(Location).order_by(Location.recorded_at.desc()).limit(1)
                 db_loc = (await self.session.execute(stmt)).scalars().first()
                 if db_loc:
                     last_pos = {
@@ -205,12 +208,14 @@ class PipelineRunner:
             pos["geofence_ids"] = matched_gfs
 
             # 8. Event detector
+            comp_id = (journey.company_id if journey and journey.company_id else None) or (device.company_id if device and hasattr(device, "company_id") else "default")
+            dev_id = (device.id if device and hasattr(device, "id") else None) or (journey.vehicle_id if journey else "phone")
             events = self.event_detector.detect(
                 pos,
                 last_pos,
                 device_attributes=device_attrs,
-                company_id=device.company_id,
-                device_id=device.id,
+                company_id=comp_id,
+                device_id=dev_id,
                 journey_id=journey.id if journey else None,
             )
 
@@ -229,23 +234,16 @@ class PipelineRunner:
             if hasattr(rec_at, "tzinfo") and rec_at.tzinfo is not None:
                 rec_at = rec_at.replace(tzinfo=None)
 
-            dev_time = pos.get("device_time")
-            if hasattr(dev_time, "tzinfo") and dev_time.tzinfo is not None:
-                dev_time = dev_time.replace(tzinfo=None)
-
             location_record = Location(
                 journey_id=journey.id if journey else None,
-                device_id=device.id,
                 latitude=pos["latitude"],
                 longitude=pos["longitude"],
                 speed=pos["speed"],
                 heading=pos.get("heading", 0.0),
                 accuracy=pos.get("accuracy", 0.0),
                 recorded_at=rec_at,
-                device_time=dev_time,
                 valid=pos.get("valid", True),
                 outdated=pos.get("outdated", False),
-                protocol=protocol,
                 distance_m=pos["distance_m"],
                 total_distance_m=pos["total_distance_m"],
                 motion=pos["motion"],
@@ -261,8 +259,8 @@ class PipelineRunner:
                     e_time = e_time.replace(tzinfo=None)
                 evt_record = Event(
                     id=evt_data["id"],
-                    company_id=evt_data["company_id"],
-                    device_id=evt_data["device_id"],
+                    company_id=evt_data.get("company_id") or comp_id,
+                    device_id=dev_id,
                     journey_id=evt_data.get("journey_id"),
                     geofence_id=evt_data.get("geofence_id"),
                     type=evt_data["type"],
@@ -271,10 +269,14 @@ class PipelineRunner:
                 )
                 self.session.add(evt_record)
 
-            # 10. Update Device State & Tracking in DB and Cache
-            device.status = "online"
-            device.last_update = rec_at
-            device.motion_state = pos["motion"]
+            # 10. Update State & Tracking in DB and Cache
+            if device:
+                if hasattr(device, "status"):
+                    device.status = "online"
+                if hasattr(device, "last_update"):
+                    device.last_update = rec_at
+                if hasattr(device, "motion_state"):
+                    device.motion_state = pos["motion"]
 
             # Update Journey summary if active journey exists (accumulate real journey distance, not device odometer)
             if journey and journey.status == "IN_PROGRESS" and not pos.get("outdated", False):

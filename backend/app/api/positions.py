@@ -9,7 +9,7 @@ from pydantic import BaseModel
 
 from app.database.session import get_db
 from app.models.location import Location
-from app.models.device import Device
+from app.models.journey import Journey
 from app.models.user import User
 from app.security.dependencies import get_current_user
 
@@ -18,7 +18,6 @@ router = APIRouter(prefix="/api/positions", tags=["Positions & Tracks"])
 
 class PositionItem(BaseModel):
     id: int
-    device_id: Optional[str] = None
     journey_id: Optional[str] = None
     latitude: float
     longitude: float
@@ -28,7 +27,6 @@ class PositionItem(BaseModel):
     altitude: Optional[float] = None
     valid: bool
     outdated: bool
-    protocol: str
     distance_m: float
     total_distance_m: float
     motion: bool
@@ -42,7 +40,6 @@ class PositionItem(BaseModel):
 
 @router.get("", response_model=List[PositionItem])
 async def get_positions(
-    device_id: Optional[str] = Query(None),
     journey_id: Optional[str] = Query(None),
     from_time: Optional[datetime] = Query(None, alias="from"),
     to_time: Optional[datetime] = Query(None, alias="to"),
@@ -56,13 +53,10 @@ async def get_positions(
 
     # Multi-tenant company security check
     if current_user.company_id:
-        # Join Device to enforce company boundary
-        stmt = stmt.join(Device, Location.device_id == Device.id).where(
-            Device.company_id == current_user.company_id
+        stmt = stmt.join(Journey, Location.journey_id == Journey.id).where(
+            Journey.company_id == current_user.company_id
         )
 
-    if device_id:
-        stmt = stmt.where(Location.device_id == device_id)
     if journey_id:
         stmt = stmt.where(Location.journey_id == journey_id)
     if from_time:

@@ -10,7 +10,6 @@ interface DriverState {
   isOnline: boolean;
   offlineQueueCount: number;
   journeyDuration: number;
-  simulatedMode: boolean;
 
   setJourney: (journey: Journey | null, trackingUrl?: string, trackingToken?: string) => void;
   setGPSStatus: (status: 'idle' | 'acquiring' | 'active' | 'error' | 'paused') => void;
@@ -18,7 +17,6 @@ interface DriverState {
   setOnlineStatus: (isOnline: boolean) => void;
   setOfflineQueueCount: (count: number) => void;
   setJourneyDuration: (seconds: number) => void;
-  toggleSimulatedMode: () => void;
   clearJourney: () => void;
 }
 
@@ -31,7 +29,6 @@ export const useDriverStore = create<DriverState>((set) => ({
   isOnline: navigator.onLine,
   offlineQueueCount: 0,
   journeyDuration: 0,
-  simulatedMode: false,
 
   setJourney: (journey, trackingUrl, trackingToken) => {
     const resolvedToken = trackingToken || (journey as any)?.tracking_token || localStorage.getItem('fleet_active_token') || null;
@@ -55,7 +52,6 @@ export const useDriverStore = create<DriverState>((set) => ({
   setOnlineStatus: (isOnline) => set({ isOnline }),
   setOfflineQueueCount: (offlineQueueCount) => set({ offlineQueueCount }),
   setJourneyDuration: (journeyDuration) => set({ journeyDuration }),
-  toggleSimulatedMode: () => set((state) => ({ simulatedMode: !state.simulatedMode })),
 
   clearJourney: () => {
     localStorage.removeItem('fleet_active_token');

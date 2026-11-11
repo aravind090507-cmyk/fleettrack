@@ -104,9 +104,6 @@ it('ActiveJourney pattern: literal coord objects + onLocationUpdate => stable su
     }, []);
 
     const { startWatching, stopWatching } = useGeolocation({
-      simulated: false,
-      initialCoords: { lat: 12.9716, lng: 77.5946 }, // fresh literals every render
-      destinationCoords: { lat: 12.975, lng: 77.598 },
       onLocationUpdate: cb,
     });
 

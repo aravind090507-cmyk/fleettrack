@@ -4,7 +4,7 @@ Supports JSON, CSV, and GPX output formats.
 
 import io
 import csv
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Tuple
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy import select
@@ -12,13 +12,40 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.session import get_db
 from app.models.location import Location
-from app.models.device import Device
+from app.models.journey import Journey
+from app.models.vehicle import Vehicle
 from app.models.event import Event
 from app.models.user import User
 from app.security.dependencies import get_current_user
 from app.pipeline import geo, units
 
 router = APIRouter(prefix="/api/reports", tags=["Reports & Telematics Analytics"])
+
+
+async def _resolve_report_target(
+    db: AsyncSession,
+    identifier: str,
+    company_id: Optional[str],
+) -> Tuple[str, List[str], str]:
+    # 1. Try Journey
+    j_stmt = select(Journey).where(Journey.id == identifier)
+    j = (await db.execute(j_stmt)).scalars().first()
+    if j:
+        if company_id and j.company_id != company_id:
+            raise HTTPException(status_code=403, detail="Access denied")
+        return "journey", [j.id], f"Journey_{j.id[:8]}"
+
+    # 2. Try Vehicle
+    v_stmt = select(Vehicle).where((Vehicle.id == identifier) | (Vehicle.registration_number == identifier))
+    v = (await db.execute(v_stmt)).scalars().first()
+    if v:
+        if company_id and v.company_id != company_id:
+            raise HTTPException(status_code=403, detail="Access denied")
+        j_ids_stmt = select(Journey.id).where(Journey.vehicle_id == v.id)
+        j_ids = list((await db.execute(j_ids_stmt)).scalars().all())
+        return "vehicle", j_ids, v.registration_number
+
+    raise HTTPException(status_code=404, detail="Vehicle or journey not found")
 
 
 def _format_csv(rows: List[Dict[str, Any]], fieldnames: List[str]) -> str:
@@ -33,69 +60,68 @@ def _format_csv(rows: List[Dict[str, Any]], fieldnames: List[str]) -> str:
 def _format_gpx(locations: List[Location], track_name: str = "Track") -> str:
     xml = [
         '<?xml version="1.0" encoding="UTF-8"?>',
-        '<gpx version="1.1" creator="FleetTrack AI"',
-        ' xmlns="http://www.topografix.com/GPX/1/1">',
+        '<gpx version="1.1" creator="FleetTrack">',
         f'  <trk><name>{track_name}</name><trkseg>',
     ]
     for loc in locations:
         t_iso = loc.recorded_at.isoformat() if loc.recorded_at else ""
-        xml.append(f'    <trkpt lat="{loc.latitude}" lon="{loc.longitude}">')
-        if loc.altitude is not None:
-            xml.append(f'      <ele>{loc.altitude}</ele>')
-        xml.append(f'      <time>{t_iso}</time>')
-        xml.append(f'      <speed>{units.mps_from_kmh(loc.speed):.2f}</speed>')
-        xml.append('    </trkpt>')
-    xml.append('  </trkseg></trk>')
-    xml.append('</gpx>')
-    return '\n'.join(xml)
+        xml.append(
+            f'    <trkpt lat="{loc.latitude}" lon="{loc.longitude}">'
+            f'<time>{t_iso}</time><speed>{loc.speed}</speed></trkpt>'
+        )
+    xml.extend(['  </trkseg></trk>', '</gpx>'])
+    return "\n".join(xml)
 
 
-def parse_query_datetime(val: Any) -> datetime:
-    if isinstance(val, datetime):
-        return val
-    s = str(val).strip().replace(" ", "+").replace("Z", "+00:00")
+def parse_query_datetime(val: str) -> datetime:
     try:
-        return datetime.fromisoformat(s)
+        clean_val = val.replace(" ", "+").replace("Z", "+00:00")
+        dt = datetime.fromisoformat(clean_val)
+        if dt.tzinfo is not None:
+            dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+        return dt
     except Exception:
         raise HTTPException(status_code=400, detail=f"Invalid datetime format: {val}")
 
 
 @router.get("/route")
 async def get_route_report(
-    device_id: str = Query(...),
+    device_id: Optional[str] = Query(None),
+    vehicle_id: Optional[str] = Query(None),
+    journey_id: Optional[str] = Query(None),
     from_time: str = Query(..., alias="from"),
     to_time: str = Query(..., alias="to"),
     output_format: str = Query("json", alias="format"),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    target_ident = journey_id or vehicle_id or device_id
+    if not target_ident:
+        raise HTTPException(status_code=400, detail="vehicle_id or journey_id required")
+
     dt_from = parse_query_datetime(from_time)
     dt_to = parse_query_datetime(to_time)
 
-    # Verify device belongs to company
-    d_stmt = select(Device).where(Device.id == device_id)
-    device = (await db.execute(d_stmt)).scalars().first()
-    if not device:
-        raise HTTPException(status_code=404, detail="Device not found")
-    if current_user.company_id and device.company_id != current_user.company_id:
-        raise HTTPException(status_code=403, detail="Access denied")
-
-    stmt = (
-        select(Location)
-        .where(
-            Location.device_id == device_id,
-            Location.recorded_at >= dt_from,
-            Location.recorded_at <= dt_to,
+    _, j_ids, target_name = await _resolve_report_target(db, target_ident, current_user.company_id)
+    if not j_ids:
+        locs = []
+    else:
+        stmt = (
+            select(Location)
+            .where(
+                Location.journey_id.in_(j_ids),
+                Location.recorded_at >= dt_from,
+                Location.recorded_at <= dt_to,
+            )
+            .order_by(Location.recorded_at.asc())
+            .limit(5000)
         )
-        .order_by(Location.recorded_at.asc())
-        .limit(5000)
-    )
-    locs = (await db.execute(stmt)).scalars().all()
+        locs = (await db.execute(stmt)).scalars().all()
 
     if output_format.lower() == "gpx":
-        gpx_data = _format_gpx(locs, track_name=f"Route_{device.name}")
+        gpx_data = _format_gpx(locs, track_name=f"Route_{target_name}")
         return Response(content=gpx_data, media_type="application/gpx+xml", headers={
-            "Content-Disposition": f'attachment; filename="route_{device_id}.gpx"'
+            "Content-Disposition": f'attachment; filename="route_{target_ident}.gpx"'
         })
 
     rows = [
@@ -118,7 +144,7 @@ async def get_route_report(
     if output_format.lower() == "csv":
         csv_data = _format_csv(rows, ["id", "timestamp", "latitude", "longitude", "speed", "heading", "accuracy", "distance_m", "total_distance_m", "motion", "valid"])
         return Response(content=csv_data, media_type="text/csv", headers={
-            "Content-Disposition": f'attachment; filename="route_{device_id}.csv"'
+            "Content-Disposition": f'attachment; filename="route_{target_ident}.csv"'
         })
 
     return rows
@@ -126,33 +152,36 @@ async def get_route_report(
 
 @router.get("/trips")
 async def get_trips_report(
-    device_id: str = Query(...),
+    device_id: Optional[str] = Query(None),
+    vehicle_id: Optional[str] = Query(None),
+    journey_id: Optional[str] = Query(None),
     from_time: str = Query(..., alias="from"),
     to_time: str = Query(..., alias="to"),
     output_format: str = Query("json", alias="format"),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    target_ident = journey_id or vehicle_id or device_id
+    if not target_ident:
+        raise HTTPException(status_code=400, detail="vehicle_id or journey_id required")
+
     dt_from = parse_query_datetime(from_time)
     dt_to = parse_query_datetime(to_time)
 
-    d_stmt = select(Device).where(Device.id == device_id)
-    device = (await db.execute(d_stmt)).scalars().first()
-    if not device:
-        raise HTTPException(status_code=404, detail="Device not found")
-    if current_user.company_id and device.company_id != current_user.company_id:
-        raise HTTPException(status_code=403, detail="Access denied")
-
-    stmt = (
-        select(Location)
-        .where(
-            Location.device_id == device_id,
-            Location.recorded_at >= dt_from,
-            Location.recorded_at <= dt_to,
+    _, j_ids, target_name = await _resolve_report_target(db, target_ident, current_user.company_id)
+    if not j_ids:
+        locs = []
+    else:
+        stmt = (
+            select(Location)
+            .where(
+                Location.journey_id.in_(j_ids),
+                Location.recorded_at >= dt_from,
+                Location.recorded_at <= dt_to,
+            )
+            .order_by(Location.recorded_at.asc())
         )
-        .order_by(Location.recorded_at.asc())
-    )
-    locs = (await db.execute(stmt)).scalars().all()
+        locs = (await db.execute(stmt)).scalars().all()
 
     trips = []
     current_trip_pts: List[Location] = []
@@ -211,7 +240,7 @@ async def get_trips_report(
             ["start_time", "end_time", "start_latitude", "start_longitude", "end_latitude", "end_longitude", "distance_km", "duration_seconds", "max_speed_kmh", "average_speed_kmh"],
         )
         return Response(content=csv_data, media_type="text/csv", headers={
-            "Content-Disposition": f'attachment; filename="trips_{device_id}.csv"'
+            "Content-Disposition": f'attachment; filename="trips_{target_ident}.csv"'
         })
 
     return trips
@@ -219,33 +248,36 @@ async def get_trips_report(
 
 @router.get("/stops")
 async def get_stops_report(
-    device_id: str = Query(...),
+    device_id: Optional[str] = Query(None),
+    vehicle_id: Optional[str] = Query(None),
+    journey_id: Optional[str] = Query(None),
     from_time: str = Query(..., alias="from"),
     to_time: str = Query(..., alias="to"),
     output_format: str = Query("json", alias="format"),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    target_ident = journey_id or vehicle_id or device_id
+    if not target_ident:
+        raise HTTPException(status_code=400, detail="vehicle_id or journey_id required")
+
     dt_from = parse_query_datetime(from_time)
     dt_to = parse_query_datetime(to_time)
 
-    d_stmt = select(Device).where(Device.id == device_id)
-    device = (await db.execute(d_stmt)).scalars().first()
-    if not device:
-        raise HTTPException(status_code=404, detail="Device not found")
-    if current_user.company_id and device.company_id != current_user.company_id:
-        raise HTTPException(status_code=403, detail="Access denied")
-
-    stmt = (
-        select(Location)
-        .where(
-            Location.device_id == device_id,
-            Location.recorded_at >= dt_from,
-            Location.recorded_at <= dt_to,
+    _, j_ids, target_name = await _resolve_report_target(db, target_ident, current_user.company_id)
+    if not j_ids:
+        locs = []
+    else:
+        stmt = (
+            select(Location)
+            .where(
+                Location.journey_id.in_(j_ids),
+                Location.recorded_at >= dt_from,
+                Location.recorded_at <= dt_to,
+            )
+            .order_by(Location.recorded_at.asc())
         )
-        .order_by(Location.recorded_at.asc())
-    )
-    locs = (await db.execute(stmt)).scalars().all()
+        locs = (await db.execute(stmt)).scalars().all()
 
     stops = []
     stop_pts: List[Location] = []
@@ -284,7 +316,7 @@ async def get_stops_report(
     if output_format.lower() == "csv":
         csv_data = _format_csv(stops, ["start_time", "end_time", "duration_seconds", "latitude", "longitude"])
         return Response(content=csv_data, media_type="text/csv", headers={
-            "Content-Disposition": f'attachment; filename="stops_{device_id}.csv"'
+            "Content-Disposition": f'attachment; filename="stops_{target_ident}.csv"'
         })
 
     return stops
@@ -292,32 +324,35 @@ async def get_stops_report(
 
 @router.get("/summary")
 async def get_summary_report(
-    device_id: str = Query(...),
+    device_id: Optional[str] = Query(None),
+    vehicle_id: Optional[str] = Query(None),
+    journey_id: Optional[str] = Query(None),
     from_time: str = Query(..., alias="from"),
     to_time: str = Query(..., alias="to"),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    target_ident = journey_id or vehicle_id or device_id
+    if not target_ident:
+        raise HTTPException(status_code=400, detail="vehicle_id or journey_id required")
+
     dt_from = parse_query_datetime(from_time)
     dt_to = parse_query_datetime(to_time)
 
-    d_stmt = select(Device).where(Device.id == device_id)
-    device = (await db.execute(d_stmt)).scalars().first()
-    if not device:
-        raise HTTPException(status_code=404, detail="Device not found")
-    if current_user.company_id and device.company_id != current_user.company_id:
-        raise HTTPException(status_code=403, detail="Access denied")
-
-    stmt = (
-        select(Location)
-        .where(
-            Location.device_id == device_id,
-            Location.recorded_at >= dt_from,
-            Location.recorded_at <= dt_to,
+    _, j_ids, target_name = await _resolve_report_target(db, target_ident, current_user.company_id)
+    if not j_ids:
+        locs = []
+    else:
+        stmt = (
+            select(Location)
+            .where(
+                Location.journey_id.in_(j_ids),
+                Location.recorded_at >= dt_from,
+                Location.recorded_at <= dt_to,
+            )
+            .order_by(Location.recorded_at.asc())
         )
-        .order_by(Location.recorded_at.asc())
-    )
-    locs = (await db.execute(stmt)).scalars().all()
+        locs = (await db.execute(stmt)).scalars().all()
 
     total_dist_m = sum(l.distance_m for l in locs)
     speeds = [l.speed for l in locs if l.speed > 0]
@@ -332,8 +367,10 @@ async def get_summary_report(
                 moving_s += dt
 
     return {
-        "device_id": device.id,
-        "device_name": device.name,
+        "target_id": target_ident,
+        "target_name": target_name,
+        "device_id": target_ident,
+        "device_name": target_name,
         "total_distance_km": round(total_dist_m / 1000.0, 3),
         "max_speed_kmh": round(max_speed, 1),
         "average_speed_kmh": round(avg_speed, 1),

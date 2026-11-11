@@ -169,47 +169,4 @@ async def delete_vehicle(
     await db.commit()
 
 
-async def seed_demo_vehicles(db: AsyncSession):
-    """Seed multi-tenant company vehicle assets if not present."""
-    from app.models.company import Company
 
-    c1_stmt = select(Company).where(Company.name == "FleetCorp Logistics")
-    c1_res = await db.execute(c1_stmt)
-    c1 = c1_res.scalar_one_or_none()
-
-    c2_stmt = select(Company).where(Company.name == "Apex Freight Global")
-    c2_res = await db.execute(c2_stmt)
-    c2 = c2_res.scalar_one_or_none()
-
-    c1_id = c1.id if c1 else None
-    c2_id = c2.id if c2 else None
-
-    # Company 1 (FleetCorp) vehicles
-    demo_vehicles = [
-        ("KA-01-AB-1234", "Mercedes-Benz Sprinter 3500", "VAN", c1_id),
-        ("MH-02-CD-5678", "Tata Ace Gold Logistics", "TRUCK", c1_id),
-        ("TN-03-EF-9012", "Toyota Probox Delivery Wagon", "VAN", c1_id),
-        ("DL-04-GH-3456", "Mahindra Bolero Maxi Truck", "TRUCK", c1_id),
-        ("SAMPLE P1", "Royal Enfield Hunter 350", "MOTORCYCLE", c1_id),
-        # Company 2 (Apex Freight) vehicles for multi-tenant isolation
-        ("APEX-TRUCK-01", "Volvo FH16 Long Haul", "TRUCK", c2_id),
-        ("APEX-VAN-02", "Ford Transit Cargo Custom", "VAN", c2_id),
-    ]
-
-    for reg, model, v_type, comp_id in demo_vehicles:
-        stmt = select(Vehicle).where(Vehicle.registration_number == reg)
-        res = await db.execute(stmt)
-        existing = res.scalar_one_or_none()
-        if not existing:
-            v = Vehicle(
-                company_id=comp_id,
-                registration_number=reg,
-                model=model,
-                vehicle_type=v_type,
-                status="AVAILABLE",
-                battery_or_fuel_level=100.0,
-            )
-            db.add(v)
-        else:
-            existing.company_id = comp_id
-    await db.commit()

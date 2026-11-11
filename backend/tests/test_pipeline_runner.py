@@ -9,8 +9,8 @@ from sqlalchemy.orm import sessionmaker
 from app.database.base import Base
 import app.models  # load all models
 from app.models.company import Company
+from app.models.user import User
 from app.models.vehicle import Vehicle
-from app.models.device import Device
 from app.models.journey import Journey
 from app.models.location import Location
 from app.models.event import Event
@@ -27,18 +27,25 @@ async def test_pipeline_runner_end_to_end():
     async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
     async with async_session() as session:
-        # Seed company, vehicle, device
+        # Seed company, driver, vehicle, journey
         company = Company(id="c-test", name="Test Co", invite_code="TEST")
+        driver = User(id="u-test", company_id="c-test", name="Driver", email="d@test.com", password_hash="pwd", role="DRIVER")
         vehicle = Vehicle(id="v-test", company_id="c-test", registration_number="KA01TEST", model="Truck", vehicle_type="TRUCK")
-        device = Device(
-            id="d-test",
+        journey = Journey(
+            id="j-test",
             company_id="c-test",
             vehicle_id="v-test",
-            unique_id="web-v-test",
-            name="KA01TEST Tracker",
-            status="unknown",
+            driver_id="u-test",
+            origin_name="Depot A",
+            origin_lat=12.9716,
+            origin_lng=77.5946,
+            destination_name="Warehouse B",
+            destination_lat=12.9760,
+            destination_lng=77.5990,
+            status="IN_PROGRESS",
+            total_distance_km=0.0,
         )
-        session.add_all([company, vehicle, device])
+        session.add_all([company, driver, vehicle, journey])
         await session.commit()
 
         runner = PipelineRunner(session)
@@ -53,7 +60,7 @@ async def test_pipeline_runner_end_to_end():
             "accuracy": 8.0,
             "timestamp": t0.isoformat(),
         }
-        res1 = await runner.process_position(ping1, device)
+        res1 = await runner.process_position(ping1, journey=journey)
         await session.commit()
 
         assert res1.status == PipelineStatus.RECORDED
@@ -69,7 +76,7 @@ async def test_pipeline_runner_end_to_end():
             "accuracy": 12.0,
             "timestamp": (t0 + timedelta(seconds=5)).isoformat(),
         }
-        res2 = await runner.process_position(ping2, device)
+        res2 = await runner.process_position(ping2, journey=journey)
         await session.commit()
 
         assert res2.status == PipelineStatus.RECORDED
@@ -86,7 +93,7 @@ async def test_pipeline_runner_end_to_end():
             "accuracy": 5.0,
             "timestamp": (t0 + timedelta(seconds=10)).isoformat(),
         }
-        res3 = await runner.process_position(ping3, device)
+        res3 = await runner.process_position(ping3, journey=journey)
         await session.commit()
 
         assert res3.status == PipelineStatus.RECORDED
@@ -95,8 +102,7 @@ async def test_pipeline_runner_end_to_end():
         assert len(res3.events) > 0
         assert res3.events[0]["type"] == "deviceMoving"
 
-        # Verify device status updated in DB
-        assert device.status == "online"
-        assert device.motion_state is True
+        # Verify journey distance updated in DB
+        assert journey.total_distance_km > 0.0
 
     await engine.dispose()

@@ -38,7 +38,14 @@ export const LiveMap: React.FC = () => {
   const [vehicles, setVehicles] = useState<ActiveVehicleTelemetry[]>([]);
   const [activeJourneys, setActiveJourneys] = useState<ActiveJourneyTelemetry[]>([]);
   const [recentEvents, setRecentEvents] = useState<TripAlert[]>([]);
-  const [dismissedAlertId, setDismissedAlertId] = useState<string | null>(null);
+  const [dismissedAlertIds, setDismissedAlertIds] = useState<Set<string>>(() => {
+    try {
+      const stored = localStorage.getItem('fleet_dismissed_alerts');
+      return stored ? new Set(JSON.parse(stored)) : new Set<string>();
+    } catch {
+      return new Set<string>();
+    }
+  });
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
   const [selectedTransit, setSelectedTransit] = useState<SelectedTransitInfo | null>(null);
   const [journeyPath, setJourneyPath] = useState<[number, number][]>([]);
@@ -91,6 +98,24 @@ export const LiveMap: React.FC = () => {
     }
   }, []);
 
+  const dismissedAlertIdsRef = useRef(dismissedAlertIds);
+  dismissedAlertIdsRef.current = dismissedAlertIds;
+
+  const handleDismissAlert = useCallback((id: string) => {
+    setDismissedAlertIds((prev) => {
+      const updated = new Set(prev);
+      updated.add(id);
+      try {
+        localStorage.setItem('fleet_dismissed_alerts', JSON.stringify([...updated]));
+      } catch {}
+      return updated;
+    });
+    setRecentEvents((prev) => prev.filter((ev) => ev.id !== id));
+    dashboardApi.dismissEvent(id).catch((err) => {
+      console.warn('Failed to dismiss alert on server:', err);
+    });
+  }, []);
+
   // Load telemetry data from backend with multi-container self-healing sync
   const loadFleetData = useCallback(async () => {
     try {
@@ -101,10 +126,12 @@ export const LiveMap: React.FC = () => {
       ]);
 
       const resolvedJourneys = [...jData];
+      const dismissed = dismissedAlertIdsRef.current;
+      const filteredEvents = (eData || []).filter((ev) => !dismissed.has(ev.id));
 
       setVehicles(vData);
       setActiveJourneys(resolvedJourneys);
-      setRecentEvents(eData);
+      setRecentEvents(filteredEvents);
 
       // If no active journeys exist, clear any active selections
       const current = selectedTransitRef.current;
@@ -393,16 +420,38 @@ export const LiveMap: React.FC = () => {
         }
       } else if (msg.type === 'VEHICLE_MOVED' || msg.type === 'LOCATION_UPDATE') {
         processLocationUpdate(msg);
-      } else if (
-        msg.type === 'JOURNEY_STARTED' ||
-        msg.type === 'JOURNEY_FINISHED' ||
-        msg.type === 'JOURNEY_COMPLETED' ||
-        msg.type === 'TRIP_EVENT'
-      ) {
+      } else if (msg.type === 'JOURNEY_FINISHED' || msg.type === 'JOURNEY_COMPLETED') {
+        const finishedId = (msg as any).journey_id || (msg as any).id;
+        setActiveJourneys((prev) => prev.filter((j) => j.journey_id !== finishedId && (j as any).id !== finishedId));
+        setVehicles((prev) =>
+          prev.map((v) =>
+            v.current_journey_id === finishedId
+              ? { ...v, status: 'AVAILABLE', current_journey_id: null }
+              : v
+          )
+        );
+        if (
+          selectedTransitRef.current &&
+          (selectedTransitRef.current.journey_id === finishedId || selectedTransitRef.current.id === finishedId)
+        ) {
+          if (!queryJourneyId) {
+            setSelectedTransit(null);
+            setSelectedVehicleId(null);
+            setJourneyPath([]);
+          }
+        }
+        loadFleetData();
+      } else if (msg.type === 'TRIP_EVENT') {
+        const evId = (msg as any).id;
+        if (evId && dismissedAlertIdsRef.current.has(evId)) {
+          return;
+        }
+        loadFleetData();
+      } else if (msg.type === 'JOURNEY_STARTED') {
         loadFleetData();
       }
     },
-    [processLocationUpdate, loadFleetData]
+    [processLocationUpdate, loadFleetData, queryJourneyId]
   );
 
   // Connect to live fleet WebSocket
@@ -425,10 +474,10 @@ export const LiveMap: React.FC = () => {
   const criticalAlert = useMemo(() => {
     return recentEvents.find(
       (ev) =>
-        ev.id !== dismissedAlertId &&
+        !dismissedAlertIds.has(ev.id) &&
         (ev.event_type === 'SOS' || ev.event_type === 'BREAKDOWN' || ev.event_type === 'BREAK_START')
     );
-  }, [recentEvents, dismissedAlertId]);
+  }, [recentEvents, dismissedAlertIds]);
 
   const filteredVehicles = vehicles.filter(
     (v) =>
@@ -583,7 +632,7 @@ export const LiveMap: React.FC = () => {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setDismissedAlertId(criticalAlert.id)}
+                  onClick={() => handleDismissAlert(criticalAlert.id)}
                   className="p-1 text-slate-400 hover:text-white rounded-lg cursor-pointer"
                   title="Dismiss alert banner"
                 >

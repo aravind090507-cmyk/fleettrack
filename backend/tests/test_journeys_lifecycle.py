@@ -4,8 +4,7 @@ from datetime import datetime, timezone
 from httpx import AsyncClient, ASGITransport
 from app.main import app
 from app.database.session import AsyncSessionLocal, init_db
-from app.api.auth import seed_demo_users
-from app.api.vehicles import seed_demo_vehicles
+from tests.fixtures import seed_demo_users, seed_demo_vehicles
 
 
 @pytest_asyncio.fixture(autouse=True)

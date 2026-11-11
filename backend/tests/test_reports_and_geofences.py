@@ -11,7 +11,7 @@ from app.database.session import AsyncSessionLocal, init_db
 from app.models.company import Company
 from app.models.user import User
 from app.models.vehicle import Vehicle
-from app.models.device import Device
+from app.models.journey import Journey
 from app.models.location import Location
 from app.security.passwords import hash_password
 
@@ -43,17 +43,22 @@ async def test_geofences_crud_and_reports(auth_headers_factory):
         await db.refresh(mgr)
         await db.refresh(veh)
 
-        device = Device(
-            id=f"dev-rep-{uuid.uuid4().hex[:6]}",
+        journey = Journey(
             company_id=comp.id,
-            unique_id=f"rep-{uuid.uuid4().hex[:6]}",
-            name="Report Tracker",
             vehicle_id=veh.id,
-            status="online",
+            driver_id=mgr.id,
+            origin_name="Depot A",
+            origin_lat=12.9716,
+            origin_lng=77.5946,
+            destination_name="Warehouse B",
+            destination_lat=12.9760,
+            destination_lng=77.5990,
+            status="IN_PROGRESS",
+            total_distance_km=1.1,
         )
-        db.add(device)
+        db.add(journey)
         await db.commit()
-        await db.refresh(device)
+        await db.refresh(journey)
 
         # Seed telemetry locations:
         # Stop 1 (10:00 - 10:05, stationary)
@@ -62,14 +67,14 @@ async def test_geofences_crud_and_reports(auth_headers_factory):
         t0 = datetime(2026, 11, 10, 10, 0, 0, tzinfo=timezone.utc)
         pts = [
             # Stop 1
-            Location(device_id=device.id, latitude=12.9716, longitude=77.5946, speed=0.0, motion=False, distance_m=0.0, total_distance_m=0.0, recorded_at=t0),
-            Location(device_id=device.id, latitude=12.9716, longitude=77.5946, speed=0.0, motion=False, distance_m=0.0, total_distance_m=0.0, recorded_at=t0 + timedelta(minutes=5)),
+            Location(journey_id=journey.id, latitude=12.9716, longitude=77.5946, speed=0.0, motion=False, distance_m=0.0, total_distance_m=0.0, recorded_at=t0),
+            Location(journey_id=journey.id, latitude=12.9716, longitude=77.5946, speed=0.0, motion=False, distance_m=0.0, total_distance_m=0.0, recorded_at=t0 + timedelta(minutes=5)),
             # Trip 1
-            Location(device_id=device.id, latitude=12.9730, longitude=77.5960, speed=40.0, motion=True, distance_m=500.0, total_distance_m=500.0, recorded_at=t0 + timedelta(minutes=8)),
-            Location(device_id=device.id, latitude=12.9760, longitude=77.5990, speed=50.0, motion=True, distance_m=600.0, total_distance_m=1100.0, recorded_at=t0 + timedelta(minutes=15)),
+            Location(journey_id=journey.id, latitude=12.9730, longitude=77.5960, speed=40.0, motion=True, distance_m=500.0, total_distance_m=500.0, recorded_at=t0 + timedelta(minutes=8)),
+            Location(journey_id=journey.id, latitude=12.9760, longitude=77.5990, speed=50.0, motion=True, distance_m=600.0, total_distance_m=1100.0, recorded_at=t0 + timedelta(minutes=15)),
             # Stop 2
-            Location(device_id=device.id, latitude=12.9760, longitude=77.5990, speed=0.0, motion=False, distance_m=0.0, total_distance_m=1100.0, recorded_at=t0 + timedelta(minutes=16)),
-            Location(device_id=device.id, latitude=12.9760, longitude=77.5990, speed=0.0, motion=False, distance_m=0.0, total_distance_m=1100.0, recorded_at=t0 + timedelta(minutes=20)),
+            Location(journey_id=journey.id, latitude=12.9760, longitude=77.5990, speed=0.0, motion=False, distance_m=0.0, total_distance_m=1100.0, recorded_at=t0 + timedelta(minutes=16)),
+            Location(journey_id=journey.id, latitude=12.9760, longitude=77.5990, speed=0.0, motion=False, distance_m=0.0, total_distance_m=1100.0, recorded_at=t0 + timedelta(minutes=20)),
         ]
         db.add_all(pts)
         await db.commit()
@@ -89,17 +94,13 @@ async def test_geofences_crud_and_reports(auth_headers_factory):
         gf_data = res_gf.json()
         gf_id = gf_data["id"]
 
-        # Link device to geofence
-        res_link = await client.post(f"/api/geofences/{gf_id}/devices", json={"device_ids": [device.id]}, headers=mgr_headers)
-        assert res_link.status_code == 200
-
         # List geofences
         res_gfs = await client.get("/api/geofences", headers=mgr_headers)
         assert res_gfs.status_code == 200
         assert len(res_gfs.json()) >= 1
 
         # 2. Positions API
-        res_pos = await client.get(f"/api/positions?device_id={device.id}&limit=100", headers=mgr_headers)
+        res_pos = await client.get(f"/api/positions?journey_id={journey.id}&limit=100", headers=mgr_headers)
         assert res_pos.status_code == 200
         assert len(res_pos.json()) == 6
 
@@ -107,21 +108,21 @@ async def test_geofences_crud_and_reports(auth_headers_factory):
         from_str = t0.isoformat()
         to_str = (t0 + timedelta(hours=1)).isoformat()
 
-        res_route = await client.get(f"/api/reports/route?device_id={device.id}&from={from_str}&to={to_str}", headers=mgr_headers)
+        res_route = await client.get(f"/api/reports/route?vehicle_id={veh.id}&from={from_str}&to={to_str}", headers=mgr_headers)
         assert res_route.status_code == 200
         assert len(res_route.json()) == 6
 
-        res_route_csv = await client.get(f"/api/reports/route?device_id={device.id}&from={from_str}&to={to_str}&format=csv", headers=mgr_headers)
+        res_route_csv = await client.get(f"/api/reports/route?vehicle_id={veh.id}&from={from_str}&to={to_str}&format=csv", headers=mgr_headers)
         assert res_route_csv.status_code == 200
         assert "latitude,longitude" in res_route_csv.text
 
-        res_route_gpx = await client.get(f"/api/reports/route?device_id={device.id}&from={from_str}&to={to_str}&format=gpx", headers=mgr_headers)
+        res_route_gpx = await client.get(f"/api/reports/route?vehicle_id={veh.id}&from={from_str}&to={to_str}&format=gpx", headers=mgr_headers)
         assert res_route_gpx.status_code == 200
         assert "<gpx" in res_route_gpx.text
         assert "<trkpt" in res_route_gpx.text
 
         # 4. Trips Report
-        res_trips = await client.get(f"/api/reports/trips?device_id={device.id}&from={from_str}&to={to_str}", headers=mgr_headers)
+        res_trips = await client.get(f"/api/reports/trips?vehicle_id={veh.id}&from={from_str}&to={to_str}", headers=mgr_headers)
         assert res_trips.status_code == 200
         trips = res_trips.json()
         assert len(trips) == 1
@@ -129,13 +130,13 @@ async def test_geofences_crud_and_reports(auth_headers_factory):
         assert trips[0]["max_speed_kmh"] == 50.0
 
         # 5. Stops Report
-        res_stops = await client.get(f"/api/reports/stops?device_id={device.id}&from={from_str}&to={to_str}", headers=mgr_headers)
+        res_stops = await client.get(f"/api/reports/stops?vehicle_id={veh.id}&from={from_str}&to={to_str}", headers=mgr_headers)
         assert res_stops.status_code == 200
         stops = res_stops.json()
         assert len(stops) == 2  # 2 stationary intervals >= 30s
 
         # 6. Summary Report
-        res_sum = await client.get(f"/api/reports/summary?device_id={device.id}&from={from_str}&to={to_str}", headers=mgr_headers)
+        res_sum = await client.get(f"/api/reports/summary?vehicle_id={veh.id}&from={from_str}&to={to_str}", headers=mgr_headers)
         assert res_sum.status_code == 200
         summary = res_sum.json()
         assert summary["total_distance_km"] == 1.1

@@ -25,27 +25,31 @@ def test_alembic_upgrade_and_downgrade():
         engine = sa.create_engine(url)
         with engine.connect() as conn:
             tables = sa.inspect(engine).get_table_names()
-            assert "devices" in tables
+            assert "devices" not in tables
+            assert "device_geofences" not in tables
             assert "geofences" in tables
             assert "events" in tables
-            assert "device_geofences" in tables
             assert "locations" in tables
             assert "journeys" in tables
+            assert "trip_events" in tables
 
-            # Verify locations has new columns
-            cols = [c["name"] for c in sa.inspect(engine).get_columns("locations")]
-            assert "device_id" in cols
-            assert "valid" in cols
-            assert "outdated" in cols
-            assert "distance_m" in cols
-            assert "total_distance_m" in cols
-            assert "motion" in cols
+            # Verify locations columns
+            loc_cols = [c["name"] for c in sa.inspect(engine).get_columns("locations")]
+            assert "device_id" not in loc_cols
+            assert "valid" in loc_cols
+            assert "outdated" in loc_cols
+            assert "distance_m" in loc_cols
+            assert "total_distance_m" in loc_cols
+            assert "motion" in loc_cols
+
+            # Verify trip_events has is_dismissed
+            te_cols = [c["name"] for c in sa.inspect(engine).get_columns("trip_events")]
+            assert "is_dismissed" in te_cols
 
         # 2. Downgrade to base
         command.downgrade(alembic_cfg, "base")
         with engine.connect() as conn:
             tables = sa.inspect(engine).get_table_names()
-            assert "devices" not in tables
             assert "geofences" not in tables
             assert "events" not in tables
 
@@ -53,7 +57,8 @@ def test_alembic_upgrade_and_downgrade():
         command.upgrade(alembic_cfg, "head")
         with engine.connect() as conn:
             tables = sa.inspect(engine).get_table_names()
-            assert "devices" in tables
+            assert "devices" not in tables
+            assert "trip_events" in tables
 
     finally:
         if os.path.exists(db_path):

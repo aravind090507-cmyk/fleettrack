@@ -347,6 +347,7 @@ async def get_recent_fleet_events(
             selectinload(TripEvent.journey).selectinload(Journey.vehicle),
             selectinload(TripEvent.journey).selectinload(Journey.driver),
         )
+        .where(TripEvent.is_dismissed == False)
         .order_by(TripEvent.created_at.desc())
         .limit(limit)
     )
@@ -380,3 +381,28 @@ async def get_recent_fleet_events(
         )
 
     return output
+
+
+@router.post("/events/{event_id}/dismiss")
+async def dismiss_fleet_event(
+    event_id: str,
+    current_user: User = Depends(require_fleet_manager),
+    db: AsyncSession = Depends(get_db),
+):
+    """Mark a fleet alert/event as dismissed so it does not reappear."""
+    stmt = (
+        select(TripEvent)
+        .join(Journey, TripEvent.journey_id == Journey.id)
+        .where(TripEvent.id == event_id)
+    )
+    if current_user.company_id:
+        stmt = stmt.where(Journey.company_id == current_user.company_id)
+    
+    result = await db.execute(stmt)
+    ev = result.scalars().first()
+    if not ev:
+        raise HTTPException(status_code=404, detail="Alert event not found")
+
+    ev.is_dismissed = True
+    await db.commit()
+    return {"status": "dismissed", "id": event_id}

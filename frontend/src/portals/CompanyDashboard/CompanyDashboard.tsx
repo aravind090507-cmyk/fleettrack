@@ -9,7 +9,6 @@ import { LiveMap } from './pages/LiveMap';
 import { Vehicles } from './pages/Vehicles';
 import { ActiveJourneys } from './pages/ActiveJourneys';
 import { JourneyHistory } from './pages/JourneyHistory';
-import { DevicesPage } from './pages/DevicesPage';
 import { GeofencesPage } from './pages/GeofencesPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { ReplayPage } from './pages/ReplayPage';
@@ -29,7 +28,6 @@ export const CompanyDashboard: React.FC = () => {
             <Route path="vehicles" element={<Vehicles />} />
             <Route path="journeys" element={<ActiveJourneys />} />
             <Route path="history" element={<JourneyHistory />} />
-            <Route path="devices" element={<DevicesPage />} />
             <Route path="geofences" element={<GeofencesPage />} />
             <Route path="reports" element={<ReportsPage />} />
             <Route path="replay" element={<ReplayPage />} />

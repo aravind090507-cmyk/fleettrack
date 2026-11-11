@@ -38,8 +38,6 @@ export const ActiveJourney: React.FC = () => {
     currentJourney,
     trackingUrl,
     trackingToken,
-    simulatedMode,
-    toggleSimulatedMode,
     setGPSStatus,
     setLastPing,
     setOfflineQueueCount,
@@ -57,8 +55,6 @@ export const ActiveJourney: React.FC = () => {
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [pingCount, setPingCount] = useState<number>(0);
   const [uploaderState, setUploaderState] = useState<UploaderState>(positionUploader.getState());
-  const [copiedDeviceId, setCopiedDeviceId] = useState<boolean>(false);
-  const [copiedServerUrl, setCopiedServerUrl] = useState<boolean>(false);
   const [lastFixTime, setLastFixTime] = useState<number>(Date.now());
   const [fixAgeSec, setFixAgeSec] = useState<number>(0);
 
@@ -167,17 +163,14 @@ export const ActiveJourney: React.FC = () => {
   );
 
   // Active GPS watcher hook with clean error feedback
-  const { position, error: gpsError, isSimulating, startWatching, stopWatching } = useGeolocation({
-    simulated: simulatedMode,
-    initialCoords,
-    destinationCoords,
+  const { position, error: gpsError, startWatching, stopWatching } = useGeolocation({
     onLocationUpdate: handleLocationPing,
   });
 
   useEffect(() => {
     startWatching();
     return () => stopWatching();
-  }, [startWatching, stopWatching, simulatedMode]);
+  }, [startWatching, stopWatching]);
 
   // Copy tracking link to clipboard
   const handleCopyLink = () => {
@@ -389,29 +382,13 @@ export const ActiveJourney: React.FC = () => {
       )}
 
       {/* GPS Status Alert Banner */}
-      {gpsError && !simulatedMode && (
+      {gpsError && (
         <div className="p-3 bg-red-950/80 border border-red-700 rounded-2xl flex items-start gap-2.5 shadow-lg">
           <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5 animate-bounce" />
           <div className="flex-1 text-xs">
             <p className="font-bold text-red-300">GPS Signal Alert</p>
             <p className="text-red-200/90 text-[11px] mt-0.5 leading-relaxed">{gpsError}</p>
           </div>
-        </div>
-      )}
-
-      {/* Development Simulation Indicator */}
-      {simulatedMode && (
-        <div className="p-2.5 bg-blue-950/70 border border-blue-800 rounded-xl flex items-center justify-between text-xs text-blue-300">
-          <span className="font-semibold flex items-center gap-1.5">
-            🚗 <span className="underline">Route Simulation Active</span> (Demo/Test Mode)
-          </span>
-          <button
-            type="button"
-            onClick={toggleSimulatedMode}
-            className="text-[10px] bg-blue-900/80 hover:bg-blue-800 text-blue-200 px-2.5 py-1 rounded-lg border border-blue-700 transition"
-          >
-            Switch to Live GPS
-          </button>
         </div>
       )}
 
@@ -525,19 +502,6 @@ export const ActiveJourney: React.FC = () => {
             Live GPS Telemetry
           </span>
           <div className="flex items-center gap-1.5">
-            {import.meta.env.DEV && (
-              <button
-                type="button"
-                onClick={toggleSimulatedMode}
-                className={`px-2 py-0.5 rounded-full text-[10px] font-bold border transition cursor-pointer flex items-center gap-1 ${
-                  simulatedMode
-                    ? 'bg-emerald-600 text-white border-emerald-500 shadow-sm'
-                    : 'bg-slate-900 text-slate-400 border-slate-700 hover:text-white'
-                }`}
-              >
-                <span>{simulatedMode ? '🚗 Sim ON' : '📡 GPS'}</span>
-              </button>
-            )}
             <span className="font-mono text-emerald-400 font-bold bg-emerald-950/80 px-2 py-0.5 rounded-full border border-emerald-800">
               {pingCount} pings sent
             </span>
@@ -579,13 +543,6 @@ export const ActiveJourney: React.FC = () => {
         } else if (accuracy < 100) {
           qualityBadge = { label: 'Poor (<100m)', color: 'text-orange-400', bg: 'bg-orange-950/70', border: 'border-orange-800' };
         }
-
-        const deviceUniqueId =
-          (currentJourney as any)?.device_id ||
-          currentJourney?.vehicle_registration ||
-          currentJourney?.vehicle_id ||
-          'VEHICLE';
-        const osmandServerUrl = `${getApiBaseUrl() || window.location.origin}/osmand`;
 
         return (
           <>
@@ -633,64 +590,6 @@ export const ActiveJourney: React.FC = () => {
                 <span className="text-[10px] text-slate-500 ml-1">m</span>
               </div>
             </div>
-
-            {/* Background Tracking Card (Traccar Client Integration) */}
-            <Card title="Background Tracking (Traccar Client App)">
-              <div className="space-y-3 text-xs text-slate-400">
-                <p className="text-[11px] leading-relaxed">
-                  For locked-screen 24/7 background tracking on mobile, configure the official{' '}
-                  <strong className="text-slate-200">Traccar Client</strong> app with these credentials:
-                </p>
-
-                <div className="space-y-2.5">
-                  <div>
-                    <span className="text-[10px] font-bold text-slate-400 uppercase">Device Identifier</span>
-                    <div className="flex items-center gap-2 p-2 bg-slate-950 border border-slate-800 rounded-xl mt-0.5">
-                      <input
-                        type="text"
-                        readOnly
-                        value={deviceUniqueId}
-                        className="w-full bg-transparent text-xs text-emerald-400 font-mono truncate px-1 focus:outline-none"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          navigator.clipboard.writeText(deviceUniqueId);
-                          setCopiedDeviceId(true);
-                          setTimeout(() => setCopiedDeviceId(false), 2000);
-                        }}
-                        className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-medium flex items-center gap-1 transition flex-shrink-0"
-                      >
-                        {copiedDeviceId ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div>
-                    <span className="text-[10px] font-bold text-slate-400 uppercase">Server URL</span>
-                    <div className="flex items-center gap-2 p-2 bg-slate-950 border border-slate-800 rounded-xl mt-0.5">
-                      <input
-                        type="text"
-                        readOnly
-                        value={osmandServerUrl}
-                        className="w-full bg-transparent text-xs text-emerald-400 font-mono truncate px-1 focus:outline-none"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          navigator.clipboard.writeText(osmandServerUrl);
-                          setCopiedServerUrl(true);
-                          setTimeout(() => setCopiedServerUrl(false), 2000);
-                        }}
-                        className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-medium flex items-center gap-1 transition flex-shrink-0"
-                      >
-                        {copiedServerUrl ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </Card>
           </>
         );
       })()}

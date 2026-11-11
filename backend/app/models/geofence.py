@@ -37,17 +37,3 @@ class Geofence(Base):
 
     # Relationships
     company = relationship("Company")
-    device_links = relationship("DeviceGeofence", back_populates="geofence", cascade="all, delete-orphan")
-
-
-class DeviceGeofence(Base):
-    __tablename__ = "device_geofences"
-
-    id = Column(Integer().with_variant(BigInteger, "postgresql"), primary_key=True, autoincrement=True)
-    device_id = Column(String(36), ForeignKey("devices.id", ondelete="CASCADE"), nullable=True, index=True)
-    geofence_id = Column(String(36), ForeignKey("geofences.id", ondelete="CASCADE"), nullable=False, index=True)
-    all_devices = Column(Boolean, default=False, nullable=False)
-
-    # Relationships
-    geofence = relationship("Geofence", back_populates="device_links")
-    device = relationship("Device")

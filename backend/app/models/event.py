@@ -22,7 +22,7 @@ class Event(Base):
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     company_id = Column(String(36), ForeignKey("companies.id"), nullable=False, index=True)
-    device_id = Column(String(36), ForeignKey("devices.id", ondelete="CASCADE"), nullable=False, index=True)
+    device_id = Column(String(36), nullable=True, index=True)
     journey_id = Column(String(36), ForeignKey("journeys.id", ondelete="SET NULL"), nullable=True, index=True)
     position_id = Column(BigInteger, nullable=True)
     geofence_id = Column(String(36), ForeignKey("geofences.id", ondelete="SET NULL"), nullable=True)
@@ -36,6 +36,5 @@ class Event(Base):
 
     # Relationships
     company = relationship("Company")
-    device = relationship("Device", back_populates="events")
     journey = relationship("Journey")
     geofence = relationship("Geofence")

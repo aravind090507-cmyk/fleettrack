@@ -3,7 +3,7 @@ import { useWebSocket } from '../hooks/useWebSocket';
 import { useTelematicsStore } from '../store/telematicsStore';
 import { useFleetStore } from '../store/fleetStore';
 import { useAuthStore } from '../store/authStore';
-import { dashboardApi, devicesApi, positionsApi, getApiBaseUrl } from '../services/api';
+import { dashboardApi, positionsApi, getApiBaseUrl } from '../services/api';
 import { Position, TelematicsEnvelope, WebSocketMessage } from '../types';
 
 export const SocketController: React.FC = () => {
@@ -38,16 +38,12 @@ export const SocketController: React.FC = () => {
   // REST Resync function held in ref
   const resyncData = useCallback(async () => {
     try {
-      const [devs, activeVehicles, overview, positionsResp] = await Promise.all([
-        devicesApi.list().catch(() => []),
+      const [activeVehicles, overview, positionsResp] = await Promise.all([
         dashboardApi.getActiveVehicles().catch(() => []),
         dashboardApi.getOverview().catch(() => null),
         positionsApi.list({ limit: 100 }).catch(() => ({ items: [] })),
       ]);
 
-      if (devs && devs.length > 0) {
-        setDevices(devs);
-      }
       if (positionsResp && positionsResp.items && positionsResp.items.length > 0) {
         setPositions(positionsResp.items);
       }
@@ -60,7 +56,7 @@ export const SocketController: React.FC = () => {
     } catch (err) {
       console.warn('[SocketController] REST resync error:', err);
     }
-  }, [setDevices, setPositions, setActiveVehicles, setOverview]);
+  }, [setPositions, setActiveVehicles, setOverview]);
 
   const resyncRef = useRef(resyncData);
   useEffect(() => {

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import Column, DateTime, Float, ForeignKey, String, func
+from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, String, func
 from sqlalchemy.types import JSON
 
 from sqlalchemy.orm import relationship
@@ -20,6 +20,7 @@ class TripEvent(Base):
     latitude = Column(Float, nullable=False)
     longitude = Column(Float, nullable=False)
     metadata_json = Column(JSON, default=dict)
+    is_dismissed = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
 
     # Relationship

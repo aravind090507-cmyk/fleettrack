@@ -53,6 +53,11 @@ class FilterHandler:
             curr_time = position.get("recorded_at") or position.get("device_time")
             last_time = last_position.get("recorded_at") or last_position.get("device_time")
 
+            if curr_time and hasattr(curr_time, "tzinfo") and curr_time.tzinfo is not None:
+                curr_time = curr_time.replace(tzinfo=None)
+            if last_time and hasattr(last_time, "tzinfo") and last_time.tzinfo is not None:
+                last_time = last_time.replace(tzinfo=None)
+
             # 4. Duplicate filter (same timestamp and position)
             filter_dup = lookup_config("filter.duplicate", device_attributes, self.config, True)
             if filter_dup and curr_time and last_time and curr_time == last_time:

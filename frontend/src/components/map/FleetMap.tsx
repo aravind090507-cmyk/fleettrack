@@ -453,40 +453,6 @@ export const FleetMap: React.FC<FleetMapProps> = ({
           </Marker>
         )}
 
-        {/* If transit is completed and vehicle is not active, render vehicle marker at last recorded ping */}
-        {selectedTransit &&
-          !vehiclesWithCoords.some((v) => v.vehicle_id === selectedTransit.vehicle_id) &&
-          (journeyPath.length > 0 || (selectedTransit.origin_lat != null && selectedTransit.origin_lng != null)) && (() => {
-            const lastPos = journeyPath.length > 0
-              ? journeyPath[journeyPath.length - 1]
-              : [selectedTransit.origin_lat!, selectedTransit.origin_lng!] as [number, number];
-            const icon = createVehicleIcon(
-              selectedTransit.status || 'COMPLETED',
-              0,
-              0,
-              true,
-              selectedTransit.latest_event_type
-            );
-            return (
-              <Marker position={lastPos} icon={icon}>
-                <Popup className="custom-leaflet-popup">
-                  <div className="p-1 min-w-[180px] text-slate-900">
-                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 uppercase block mb-1">
-                      {selectedTransit.status || 'COMPLETED'}
-                    </span>
-                    <h5 className="font-bold text-sm">{selectedTransit.vehicle_registration || 'Vehicle'}</h5>
-                    <p className="text-xs text-slate-600">Driver: {selectedTransit.driver_name || 'Driver'}</p>
-                    <p className="text-xs text-emerald-700 font-bold mt-1">
-                      Distance:{' '}
-                      {(selectedTransit.total_distance_km || 0) < 1
-                        ? `${Math.round((selectedTransit.total_distance_km || 0) * 1000)} m`
-                        : `${(selectedTransit.total_distance_km || 0).toFixed(2)} km`}
-                    </p>
-                  </div>
-                </Popup>
-              </Marker>
-            );
-          })()}
 
         {/* Fleet Vehicle Markers */}
         {vehiclesWithCoords.map((v) => {

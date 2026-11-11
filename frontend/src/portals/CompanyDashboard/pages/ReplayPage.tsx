@@ -13,8 +13,8 @@ import {
 } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Polyline, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
-import { devicesApi, positionsApi } from '../../../services/api';
-import { Device, Position } from '../../../types';
+import { vehiclesApi, positionsApi } from '../../../services/api';
+import { Vehicle, Position } from '../../../types';
 import { Card } from '../../../components/ui/Card';
 import { Button } from '../../../components/ui/Button';
 import { LoadingSpinner } from '../../../components/ui/LoadingSpinner';
@@ -53,8 +53,8 @@ function createReplayMarker(course: number = 0, speed: number = 0) {
 }
 
 export const ReplayPage: React.FC = () => {
-  const [devices, setDevices] = useState<Device[]>([]);
-  const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [selectedVehicleId, setSelectedVehicleId] = useState<string>('');
 
   // Default to today
   const [fromDate, setFromDate] = useState<string>(() => {
@@ -77,16 +77,17 @@ export const ReplayPage: React.FC = () => {
   const timerRef = useRef<any>(null);
 
   useEffect(() => {
-    devicesApi.list().then((list) => {
-      setDevices(list);
-      if (list.length > 0 && !selectedDeviceId) {
-        setSelectedDeviceId(list[0].id);
+    vehiclesApi.list().then((res) => {
+      const list = res.items || [];
+      setVehicles(list);
+      if (list.length > 0 && !selectedVehicleId) {
+        setSelectedVehicleId(list[0].id);
       }
     });
   }, []);
 
   const handleFetchRoute = async () => {
-    if (!selectedDeviceId) return;
+    if (!selectedVehicleId) return;
     try {
       setLoading(true);
       setIsPlaying(false);
@@ -96,7 +97,7 @@ export const ReplayPage: React.FC = () => {
       const toIso = new Date(toDate).toISOString();
 
       const res = await positionsApi.list({
-        device_id: selectedDeviceId,
+        vehicle_id: selectedVehicleId,
         from: fromIso,
         to: toIso,
         limit: 2000,
@@ -172,16 +173,16 @@ export const ReplayPage: React.FC = () => {
       <Card>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
           <div>
-            <label className="block text-slate-400 font-semibold mb-1">Target Device / Vehicle</label>
+            <label className="block text-slate-400 font-semibold mb-1">Target Vehicle</label>
             <select
-              value={selectedDeviceId}
-              onChange={(e) => setSelectedDeviceId(e.target.value)}
+              value={selectedVehicleId}
+              onChange={(e) => setSelectedVehicleId(e.target.value)}
               className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-indigo-500"
             >
-              <option value="">Select a device</option>
-              {devices.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name} ({d.unique_id})
+              <option value="">Select a vehicle</option>
+              {vehicles.map((v) => (
+                <option key={v.id} value={v.id}>
+                  {v.registration_number} ({v.model})
                 </option>
               ))}
             </select>
@@ -213,7 +214,7 @@ export const ReplayPage: React.FC = () => {
               size="md"
               className="w-full bg-indigo-600 hover:bg-indigo-700"
               onClick={handleFetchRoute}
-              disabled={loading || !selectedDeviceId}
+              disabled={loading || !selectedVehicleId}
             >
               <Filter className="w-4 h-4" />
               <span>{loading ? 'Retrieving Trace...' : 'Load Route Trace'}</span>

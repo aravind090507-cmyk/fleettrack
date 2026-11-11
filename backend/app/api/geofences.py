@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
 
 from app.database.session import get_db
-from app.models.geofence import Geofence, DeviceGeofence
+from app.models.geofence import Geofence
 from app.models.user import User
 from app.security.dependencies import get_current_user
 
@@ -43,11 +43,6 @@ class GeofenceResponse(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
-
-
-class LinkDevicesPayload(BaseModel):
-    device_ids: List[str]
-    all_devices: bool = False
 
 
 @router.get("", response_model=List[GeofenceResponse])
@@ -148,32 +143,3 @@ async def delete_geofence(
     await db.delete(gf)
     await db.commit()
     return None
-
-
-@router.post("/{geofence_id}/devices")
-async def link_devices_to_geofence(
-    geofence_id: str,
-    payload: LinkDevicesPayload,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    stmt = select(Geofence).where(Geofence.id == geofence_id)
-    gf = (await db.execute(stmt)).scalars().first()
-    if not gf:
-        raise HTTPException(status_code=404, detail="Geofence not found")
-    if current_user.company_id and gf.company_id != current_user.company_id:
-        raise HTTPException(status_code=403, detail="Access denied")
-
-    # Clear existing links
-    await db.execute(delete(DeviceGeofence).where(DeviceGeofence.geofence_id == geofence_id))
-
-    if payload.all_devices:
-        link = DeviceGeofence(geofence_id=geofence_id, all_devices=True)
-        db.add(link)
-    else:
-        for did in payload.device_ids:
-            link = DeviceGeofence(geofence_id=geofence_id, device_id=did, all_devices=False)
-            db.add(link)
-
-    await db.commit()
-    return {"status": "linked", "geofence_id": geofence_id}

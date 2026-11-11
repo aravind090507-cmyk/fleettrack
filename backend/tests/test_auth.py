@@ -4,7 +4,7 @@ import pytest_asyncio
 from httpx import AsyncClient, ASGITransport
 from app.main import app
 from app.database.session import AsyncSessionLocal, init_db
-from app.api.auth import seed_demo_users
+from tests.fixtures import seed_demo_users
 
 
 @pytest_asyncio.fixture(autouse=True)
