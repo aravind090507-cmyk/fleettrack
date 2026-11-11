@@ -17,25 +17,25 @@ export const Button: React.FC<ButtonProps> = ({
   ...props
 }) => {
   const base =
-    'inline-flex items-center justify-center font-medium rounded-xl transition-all duration-200 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none select-none tracking-wide';
+    'inline-flex items-center justify-center font-semibold rounded-full transition-all duration-200 active:scale-[0.97] disabled:opacity-50 disabled:pointer-events-none select-none tracking-wide cursor-pointer';
 
   const variants = {
     primary:
-      'bg-[#cb886c] hover:bg-[#d9977c] text-[#0d0d0d] font-semibold shadow-lg shadow-[#cb886c]/20 border border-[#cb886c]/40',
+      'bg-[#0071E3] hover:bg-[#0077ED] text-white shadow-md shadow-blue-500/25 border border-blue-400/20',
     secondary:
-      'bg-[#1a1b1f] hover:bg-[#222429] text-[#f4f5f2] border border-[#2a2b30] hover:border-[#cb886c]/40 shadow-sm',
+      'bg-zinc-100 hover:bg-zinc-200 text-zinc-900 border border-zinc-200/80 shadow-sm',
     danger:
-      'bg-[#b63b51] hover:bg-[#c9455d] text-white shadow-lg shadow-[#b63b51]/30 border border-[#b63b51]/40',
+      'bg-[#FF3B30] hover:bg-rose-600 text-white shadow-md shadow-rose-500/25 border border-rose-400/20',
     warning:
-      'bg-[#d97706] hover:bg-[#b45309] text-white shadow-lg shadow-amber-950/40 border border-amber-600/30',
+      'bg-[#FF9500] hover:bg-amber-600 text-white shadow-md shadow-amber-500/25 border border-amber-400/20',
     ghost:
-      'hover:bg-[#1a1b1f] text-[#dac9be] hover:text-[#f4f5f2] border border-transparent hover:border-[#26272b]',
+      'hover:bg-black/[0.05] text-zinc-600 hover:text-zinc-900 border border-transparent',
   };
 
   const sizes = {
-    sm: 'text-xs px-3 py-1.5 gap-1.5 min-h-[36px]',
-    md: 'text-sm px-4 py-2.5 gap-2 min-h-[44px]',
-    lg: 'text-base px-6 py-3.5 gap-2.5 min-h-[52px]',
+    sm: 'text-xs px-3.5 py-1.5 gap-1.5 min-h-[34px]',
+    md: 'text-sm px-4.5 py-2.5 gap-2 min-h-[40px]',
+    lg: 'text-base px-6 py-3.5 gap-2.5 min-h-[48px]',
   };
 
   return (

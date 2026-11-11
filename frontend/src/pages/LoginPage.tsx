@@ -77,25 +77,26 @@ export const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#0d0d0d] flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative overflow-hidden select-none">
-      {/* Bespoke ambient subtle warm gold illumination */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[650px] h-[650px] bg-[#cb886c]/08 rounded-full blur-[180px] pointer-events-none" />
+    <div className="min-h-screen bg-[#F2F2F7] text-[#1C1C1E] flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative overflow-hidden select-none font-sans">
+      {/* Apple ambient soft atmospheric gradients */}
+      <div className="absolute -top-32 -left-32 w-96 h-96 bg-blue-400/15 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-emerald-400/15 rounded-full blur-3xl pointer-events-none" />
 
       <div className="sm:mx-auto sm:w-full sm:max-w-md relative z-10 px-4">
-        <div className="flex justify-center mb-4">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-[#cb886c] to-[#ebcfbc] flex items-center justify-center shadow-2xl shadow-black border border-[#cb886c]/30 p-3">
-            <Radio className="w-7 h-7 text-[#0d0d0d] font-bold animate-pulse" />
+        <div className="flex justify-center mb-3">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-[#0071E3] to-[#42A5F5] flex items-center justify-center shadow-xl shadow-blue-500/20 text-white p-3">
+            <Radio className="w-7 h-7 animate-pulse" />
           </div>
         </div>
-        <h2 className="text-center text-2xl font-bold tracking-[0.08em] text-[#f4f5f2] uppercase">
+        <h2 className="text-center text-2xl font-bold tracking-tight text-[#1D1D1F]">
           FleetTrack
         </h2>
-        <p className="mt-1.5 text-center text-[11px] tracking-[0.14em] text-[#dac9be] uppercase">
-          Private Asset Mobility & Telematics Advisory
+        <p className="mt-1 text-center text-xs font-medium text-zinc-500">
+          Geospatial Fleet Mobility & Telematics
         </p>
 
-        {/* Tab Switcher: Login vs Register */}
-        <div className="mt-7 flex bg-[#151619] p-1 rounded-2xl border border-[#26272b] backdrop-blur-md">
+        {/* Apple Segmented Control: Sign In vs Create Account */}
+        <div className="mt-6 flex bg-zinc-200/80 p-1 rounded-2xl border border-black/5 backdrop-blur-md">
           <button
             type="button"
             onClick={() => {
@@ -104,8 +105,8 @@ export const LoginPage: React.FC = () => {
             }}
             className={`flex-1 py-2 text-xs font-semibold tracking-wide rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
               !isRegistering
-                ? 'bg-[#cb886c] text-[#0d0d0d] shadow-lg shadow-[#cb886c]/20'
-                : 'text-[#9c9c9c] hover:text-[#f4f5f2]'
+                ? 'bg-white text-zinc-900 shadow-sm font-bold'
+                : 'text-zinc-600 hover:text-zinc-900'
             }`}
           >
             <LogIn className="w-3.5 h-3.5" />
@@ -120,8 +121,8 @@ export const LoginPage: React.FC = () => {
             }}
             className={`flex-1 py-2 text-xs font-semibold tracking-wide rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
               isRegistering
-                ? 'bg-[#cb886c] text-[#0d0d0d] shadow-lg shadow-[#cb886c]/20'
-                : 'text-[#9c9c9c] hover:text-[#f4f5f2]'
+                ? 'bg-white text-zinc-900 shadow-sm font-bold'
+                : 'text-zinc-600 hover:text-zinc-900'
             }`}
           >
             <UserPlus className="w-3.5 h-3.5" />
@@ -131,25 +132,26 @@ export const LoginPage: React.FC = () => {
       </div>
 
       <div className="mt-4 sm:mx-auto sm:w-full sm:max-w-md relative z-10 px-4">
-        <div className="bg-[#151619] border border-[#26272b] rounded-3xl p-6 sm:p-8 shadow-2xl backdrop-blur-xl space-y-4">
+        <div className="bg-white/85 border border-white/80 rounded-3xl p-6 sm:p-8 shadow-2xl backdrop-blur-2xl space-y-4">
+          
           {/* Quick 1-Click Access Buttons */}
-          <div className="space-y-2 border-b border-[#26272b] pb-4 mb-2">
-            <span className="text-[10px] font-mono uppercase tracking-[0.12em] text-[#dac9be] block text-center">
-              Instant Access Portals
+          <div className="space-y-2 border-b border-zinc-100 pb-4 mb-2">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400 block text-center">
+              Quick 1-Click Test Access
             </span>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-2.5">
               <button
                 type="button"
                 onClick={() => handleQuickLogin('driver1@fleetcorp.com', 'DRIVER')}
                 disabled={isLoading}
-                className="p-2.5 rounded-2xl bg-[#0d0d0d] hover:bg-[#1c1c1f] border border-[#26272b] hover:border-[#cb886c]/50 text-left transition-all cursor-pointer flex items-center gap-2.5 group"
+                className="p-3 rounded-2xl bg-zinc-50 hover:bg-zinc-100 border border-zinc-200/70 text-left transition-all cursor-pointer flex items-center gap-2.5 group shadow-sm"
               >
-                <div className="w-7 h-7 rounded-lg bg-[#cb886c]/15 border border-[#cb886c]/30 flex items-center justify-center text-[#cb886c] group-hover:scale-105 transition-transform shrink-0">
-                  <Truck className="w-3.5 h-3.5" />
+                <div className="w-8 h-8 rounded-xl bg-blue-500/10 text-[#0071E3] flex items-center justify-center group-hover:scale-105 transition-transform shrink-0">
+                  <Truck className="w-4 h-4" />
                 </div>
                 <div className="truncate">
-                  <span className="text-xs font-semibold text-[#f4f5f2] block truncate">Driver Mobile</span>
-                  <span className="text-[10px] text-[#9c9c9c] font-mono block">driver1</span>
+                  <span className="text-xs font-bold text-zinc-900 block truncate">Driver App</span>
+                  <span className="text-[10px] text-zinc-500 font-mono block">driver1</span>
                 </div>
               </button>
 
@@ -157,29 +159,29 @@ export const LoginPage: React.FC = () => {
                 type="button"
                 onClick={() => handleQuickLogin('manager@fleetcorp.com', 'FLEET_MANAGER')}
                 disabled={isLoading}
-                className="p-2.5 rounded-2xl bg-[#0d0d0d] hover:bg-[#1c1c1f] border border-[#26272b] hover:border-[#cb886c]/50 text-left transition-all cursor-pointer flex items-center gap-2.5 group"
+                className="p-3 rounded-2xl bg-zinc-50 hover:bg-zinc-100 border border-zinc-200/70 text-left transition-all cursor-pointer flex items-center gap-2.5 group shadow-sm"
               >
-                <div className="w-7 h-7 rounded-lg bg-[#dac9be]/15 border border-[#dac9be]/30 flex items-center justify-center text-[#dac9be] group-hover:scale-105 transition-transform shrink-0">
-                  <UserCheck className="w-3.5 h-3.5" />
+                <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center group-hover:scale-105 transition-transform shrink-0">
+                  <UserCheck className="w-4 h-4" />
                 </div>
                 <div className="truncate">
-                  <span className="text-xs font-semibold text-[#f4f5f2] block truncate">Fleet Operations</span>
-                  <span className="text-[10px] text-[#9c9c9c] font-mono block">manager</span>
+                  <span className="text-xs font-bold text-zinc-900 block truncate">Fleet Ops</span>
+                  <span className="text-[10px] text-zinc-500 font-mono block">manager</span>
                 </div>
               </button>
             </div>
           </div>
 
-          <form className="space-y-4" onSubmit={handleSubmit}>
+          <form className="space-y-3.5" onSubmit={handleSubmit}>
             {error && (
-              <div className="p-3 rounded-xl bg-[#1c0d11] border border-[#b63b51]/40 text-[#fda4af] text-xs font-medium leading-relaxed">
+              <div className="p-3 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium leading-relaxed">
                 {error}
               </div>
             )}
 
             {isRegistering && (
               <div>
-                <label className="block text-[11px] font-semibold text-[#dac9be] uppercase tracking-[0.1em] mb-1.5">
+                <label className="block text-[11px] font-bold text-zinc-600 uppercase tracking-wider mb-1">
                   Full Name
                 </label>
                 <input
@@ -188,13 +190,13 @@ export const LoginPage: React.FC = () => {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="e.g. Alexander Rivera"
-                  className="w-full px-4 py-2.5 bg-[#0d0d0d] border border-[#26272b] rounded-xl text-[#f4f5f2] placeholder-[#636363] focus:outline-none focus:border-[#cb886c] text-sm transition-all"
+                  className="w-full px-4 py-2.5 bg-black/[0.03] border border-black/[0.08] rounded-xl text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#0071E3] focus:bg-white text-sm transition-all"
                 />
               </div>
             )}
 
             <div>
-              <label className="block text-[11px] font-semibold text-[#dac9be] uppercase tracking-[0.1em] mb-1.5">
+              <label className="block text-[11px] font-bold text-zinc-600 uppercase tracking-wider mb-1">
                 Email Address
               </label>
               <input
@@ -203,12 +205,12 @@ export const LoginPage: React.FC = () => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="your.email@example.com"
-                className="w-full px-4 py-2.5 bg-[#0d0d0d] border border-[#26272b] rounded-xl text-[#f4f5f2] placeholder-[#636363] focus:outline-none focus:border-[#cb886c] text-sm transition-all"
+                className="w-full px-4 py-2.5 bg-black/[0.03] border border-black/[0.08] rounded-xl text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#0071E3] focus:bg-white text-sm transition-all"
               />
             </div>
 
             <div>
-              <label className="block text-[11px] font-semibold text-[#dac9be] uppercase tracking-[0.1em] mb-1.5">
+              <label className="block text-[11px] font-bold text-zinc-600 uppercase tracking-wider mb-1">
                 Password
               </label>
               <input
@@ -217,13 +219,13 @@ export const LoginPage: React.FC = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••••••"
-                className="w-full px-4 py-2.5 bg-[#0d0d0d] border border-[#26272b] rounded-xl text-[#f4f5f2] placeholder-[#636363] focus:outline-none focus:border-[#cb886c] text-sm transition-all"
+                className="w-full px-4 py-2.5 bg-black/[0.03] border border-black/[0.08] rounded-xl text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#0071E3] focus:bg-white text-sm transition-all"
               />
             </div>
 
             {isRegistering && (
               <div>
-                <label className="block text-[11px] font-semibold text-[#dac9be] uppercase tracking-[0.1em] mb-1.5">
+                <label className="block text-[11px] font-bold text-zinc-600 uppercase tracking-wider mb-1">
                   Assigned Operating Role
                 </label>
                 <div className="grid grid-cols-2 gap-2">
@@ -232,8 +234,8 @@ export const LoginPage: React.FC = () => {
                     onClick={() => setRole('DRIVER')}
                     className={`py-2 px-3 rounded-xl border text-xs font-semibold tracking-wide flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
                       role === 'DRIVER'
-                        ? 'bg-[#cb886c]/20 border-[#cb886c] text-[#ebcfbc] shadow-sm'
-                        : 'bg-[#0d0d0d] border-[#26272b] text-[#9c9c9c]'
+                        ? 'bg-blue-50 border-[#0071E3] text-[#0071E3] font-bold shadow-sm'
+                        : 'bg-zinc-50 border-zinc-200 text-zinc-600'
                     }`}
                   >
                     <Truck className="w-3.5 h-3.5" />
@@ -245,8 +247,8 @@ export const LoginPage: React.FC = () => {
                     onClick={() => setRole('FLEET_MANAGER')}
                     className={`py-2 px-3 rounded-xl border text-xs font-semibold tracking-wide flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
                       role === 'FLEET_MANAGER'
-                        ? 'bg-[#cb886c]/20 border-[#cb886c] text-[#ebcfbc] shadow-sm'
-                        : 'bg-[#0d0d0d] border-[#26272b] text-[#9c9c9c]'
+                        ? 'bg-blue-50 border-[#0071E3] text-[#0071E3] font-bold shadow-sm'
+                        : 'bg-zinc-50 border-zinc-200 text-zinc-600'
                     }`}
                   >
                     <UserCheck className="w-3.5 h-3.5" />
@@ -256,10 +258,14 @@ export const LoginPage: React.FC = () => {
               </div>
             )}
 
-            <Button type="submit" variant="primary" size="lg" className="w-full mt-2 font-semibold tracking-wider" isLoading={isLoading}>
-              <span>{isRegistering ? 'Create Account & Access' : 'Authorize & Sign In'}</span>
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full mt-3 py-3 rounded-full bg-[#0071E3] hover:bg-[#0077ED] text-white text-sm font-bold shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 transition-all active:scale-[0.98] cursor-pointer"
+            >
+              <span>{isLoading ? 'Authenticating...' : isRegistering ? 'Create Account & Access' : 'Sign In'}</span>
               <ArrowRight className="w-4 h-4 ml-1" />
-            </Button>
+            </button>
           </form>
         </div>
       </div>

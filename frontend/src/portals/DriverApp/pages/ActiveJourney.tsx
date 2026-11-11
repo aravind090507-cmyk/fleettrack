@@ -312,59 +312,64 @@ export const ActiveJourney: React.FC = () => {
   };
 
   return (
-    <div className="space-y-4 pb-8">
-      {/* Top Journey Status Banner */}
-      <div className="p-4 bg-bespoke-surface border border-bespoke-border rounded-xl flex items-center justify-between">
-        <div>
-          <span className="text-[10px] font-mono font-medium text-bespoke-dim uppercase tracking-[0.12em] block">Vehicle</span>
-          <p className="text-base font-medium font-mono text-bespoke-gold">{currentJourney?.vehicle_registration || 'VAN-01'}</p>
+    <div className="space-y-4 pb-8 font-sans">
+      {/* Top Apple Dynamic Island Journey Status Banner */}
+      <div className="p-4 bg-black/90 text-white rounded-3xl shadow-xl flex items-center justify-between border border-white/10 backdrop-blur-2xl">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-[#0071E3] to-[#42A5F5] flex items-center justify-center font-bold text-white shadow-md shadow-blue-500/25">
+            🚐
+          </div>
+          <div>
+            <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">Assigned Vehicle</span>
+            <p className="text-sm font-bold font-mono text-white">{currentJourney?.vehicle_registration || 'VAN-01'}</p>
+          </div>
         </div>
         <div className="text-right">
-          <span className="text-[10px] font-mono font-medium text-bespoke-dim uppercase tracking-[0.12em] block">Duration</span>
-          <p className="text-base font-light font-mono text-bespoke-offwhite">{formattedTime}</p>
+          <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">Elapsed Time</span>
+          <p className="text-sm font-bold font-mono text-emerald-400">{formattedTime}</p>
         </div>
       </div>
 
       {/* Starting Location & Destination Route Card */}
-      <div className="bg-bespoke-surface border border-bespoke-border rounded-xl p-4 shadow-xl space-y-3">
-        <div className="flex items-center justify-between border-b border-bespoke-border pb-2">
+      <div className="bg-white/85 border border-white/80 rounded-3xl p-4 shadow-sm backdrop-blur-xl space-y-3 text-zinc-900">
+        <div className="flex items-center justify-between border-b border-black/[0.04] pb-2">
           <div className="flex items-center gap-2">
-            <Route className="w-4 h-4 text-bespoke-gold" />
-            <span className="text-xs font-mono uppercase tracking-[0.1em] text-bespoke-offwhite">Active Journey Endpoints</span>
+            <Route className="w-4 h-4 text-[#0071E3]" />
+            <span className="text-xs font-bold uppercase tracking-wider text-zinc-800">Active Journey Waypoints</span>
           </div>
-          <span className="px-2.5 py-0.5 rounded text-[10px] font-mono uppercase bg-bespoke-gold/10 text-bespoke-gold border border-bespoke-gold/30">
+          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-blue-50 text-[#0071E3] border border-blue-200/80">
             {currentJourney?.status || 'IN_PROGRESS'}
           </span>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 text-xs">
           {/* Starting Location (Source) */}
-          <div className="bg-bespoke-black/80 p-3 rounded border border-bespoke-border space-y-1">
-            <span className="text-[10px] font-mono uppercase tracking-wider text-bespoke-gold flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-bespoke-gold" />
+          <div className="bg-zinc-50/80 p-3 rounded-2xl border border-black/[0.04] space-y-1">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
               Source Point
             </span>
-            <p className="text-sm font-medium text-bespoke-linen break-words">
+            <p className="text-xs font-bold text-zinc-900 break-words">
               {currentJourney?.origin_name || 'Starting Point'}
             </p>
             {currentJourney?.origin_lat != null && currentJourney?.origin_lng != null && (
-              <p className="text-[10px] text-bespoke-dim font-mono">
+              <p className="text-[10px] text-zinc-400 font-mono">
                 {currentJourney.origin_lat.toFixed(5)}, {currentJourney.origin_lng.toFixed(5)}
               </p>
             )}
           </div>
 
           {/* Destination (Target) */}
-          <div className="bg-bespoke-black/80 p-3 rounded border border-bespoke-border space-y-1">
-            <span className="text-[10px] font-mono uppercase tracking-wider text-bespoke-champagne flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-bespoke-champagne" />
+          <div className="bg-zinc-50/80 p-3 rounded-2xl border border-black/[0.04] space-y-1">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
               Destination Point
             </span>
-            <p className="text-sm font-medium text-bespoke-offwhite break-words">
+            <p className="text-xs font-bold text-zinc-900 break-words">
               {currentJourney?.destination_name || 'Destination Point'}
             </p>
             {currentJourney?.destination_lat != null && currentJourney?.destination_lng != null && (
-              <p className="text-[10px] text-bespoke-dim font-mono">
+              <p className="text-[10px] text-zinc-400 font-mono">
                 {currentJourney.destination_lat.toFixed(5)}, {currentJourney.destination_lng.toFixed(5)}
               </p>
             )}
@@ -373,29 +378,29 @@ export const ActiveJourney: React.FC = () => {
       </div>
 
       {statusMessage && (
-        <div className="p-3 bg-rose-950 border border-rose-800 text-rose-200 text-xs font-bold rounded-xl text-center animate-pulse">
+        <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold rounded-2xl text-center animate-pulse">
           {statusMessage}
         </div>
       )}
 
       {/* GPS Status Alert Banner */}
       {gpsError && (
-        <div className="p-3 bg-red-950/80 border border-red-700 rounded-2xl flex items-start gap-2.5 shadow-lg">
-          <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5 animate-bounce" />
+        <div className="p-3 bg-rose-50 border border-rose-200 rounded-2xl flex items-start gap-2.5 shadow-sm">
+          <AlertTriangle className="w-5 h-5 text-rose-500 flex-shrink-0 mt-0.5 animate-bounce" />
           <div className="flex-1 text-xs">
-            <p className="font-bold text-red-300">GPS Signal Alert</p>
-            <p className="text-red-200/90 text-[11px] mt-0.5 leading-relaxed">{gpsError}</p>
+            <p className="font-bold text-rose-800">GPS Signal Alert</p>
+            <p className="text-rose-700 text-[11px] mt-0.5 leading-relaxed">{gpsError}</p>
           </div>
         </div>
       )}
 
       {/* Clock Skew Warning Banner */}
       {Math.abs(uploaderState.serverTimeOffsetMs) > 10000 && (
-        <div className="p-3 bg-amber-950/80 border border-amber-800 rounded-2xl flex items-start gap-2.5 shadow-lg">
-          <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5 animate-bounce" />
+        <div className="p-3 bg-amber-50 border border-amber-200 rounded-2xl flex items-start gap-2.5 shadow-sm">
+          <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5 animate-bounce" />
           <div className="flex-1 text-xs">
-            <p className="font-bold text-amber-300">Clock Skew Warning</p>
-            <p className="text-amber-200/90 text-[11px] mt-0.5 leading-relaxed">
+            <p className="font-bold text-amber-800">Clock Skew Warning</p>
+            <p className="text-amber-700 text-[11px] mt-0.5 leading-relaxed">
               Device clock differs from server time by {Math.round(uploaderState.serverTimeOffsetMs / 1000)}s. GPS
               timestamps are automatically calibrated.
             </p>
@@ -405,13 +410,13 @@ export const ActiveJourney: React.FC = () => {
 
       {/* GPS Rejections / Filter reasons */}
       {uploaderState.lastRejectionReasons.length > 0 && (
-        <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl text-xs space-y-1">
-          <span className="text-[10px] uppercase font-bold text-slate-400">Recent GPS Filter Flags</span>
+        <div className="p-3 bg-zinc-50 border border-zinc-200 rounded-2xl text-xs space-y-1">
+          <span className="text-[10px] uppercase font-bold text-zinc-500">Recent GPS Filter Flags</span>
           <div className="flex flex-wrap gap-1.5 pt-1">
             {uploaderState.lastRejectionReasons.map((reason, idx) => (
               <span
                 key={idx}
-                className="text-[10px] font-mono px-2 py-0.5 rounded bg-rose-950/60 text-rose-300 border border-rose-800"
+                className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200"
               >
                 {reason}
               </span>
@@ -423,7 +428,7 @@ export const ActiveJourney: React.FC = () => {
       {/* Ephemeral Tracking Link Sharing Card */}
       <Card title="Temporary Public Tracking Link">
         <div className="space-y-3">
-          <p className="text-xs text-bespoke-champagne/70 leading-relaxed">
+          <p className="text-xs text-zinc-500 leading-relaxed font-medium">
             {isLinkRevoked
               ? 'Public link access has been manually revoked.'
               : 'Share this secure advisory link with clients or dispatchers. Valid only while in transit.'}
@@ -431,18 +436,18 @@ export const ActiveJourney: React.FC = () => {
 
           {!isLinkRevoked && (
             <>
-              <div className="flex items-center gap-2 p-2 bg-bespoke-black border border-bespoke-border rounded">
+              <div className="flex items-center gap-2 p-2 bg-zinc-50 border border-black/[0.06] rounded-2xl">
                 <input
                   type="text"
                   readOnly
                   value={effectiveTrackingUrl || ''}
-                  className="w-full bg-transparent text-xs text-bespoke-gold font-mono truncate px-2 focus:outline-none"
+                  className="w-full bg-transparent text-xs text-[#0071E3] font-mono font-bold truncate px-2 focus:outline-none"
                 />
                 <button
                   onClick={handleCopyLink}
-                  className="p-2 bg-bespoke-card hover:bg-bespoke-surface text-bespoke-champagne border border-bespoke-border rounded text-xs font-mono uppercase tracking-wider flex items-center gap-1 transition-all flex-shrink-0"
+                  className="px-3 py-1.5 bg-white hover:bg-zinc-100 text-zinc-800 border border-zinc-200/80 rounded-xl text-xs font-semibold uppercase tracking-wider flex items-center gap-1 transition-all flex-shrink-0 shadow-sm cursor-pointer"
                 >
-                  {copied ? <Check className="w-3.5 h-3.5 text-bespoke-green" /> : <Copy className="w-3.5 h-3.5" />}
+                  {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5 text-zinc-500" />}
                   <span>{copied ? 'Copied' : 'Copy'}</span>
                 </button>
               </div>

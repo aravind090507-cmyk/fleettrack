@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Truck, Plus, Filter, ShieldAlert, Check } from 'lucide-react';
+import { Truck, Plus, Filter } from 'lucide-react';
 import { vehiclesApi } from '../../../services/api';
 import { useTelematicsStore } from '../../../store/telematicsStore';
 import { Vehicle } from '../../../types';
@@ -58,27 +58,27 @@ export const Vehicles: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 font-sans">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-light text-bespoke-offwhite uppercase tracking-wide">Fleet Asset Inventory</h2>
-          <p className="text-xs text-bespoke-champagne/70">Manage corporate assets, telematics devices, and operational statuses.</p>
+          <h2 className="text-xl font-bold text-zinc-900 tracking-tight">Fleet Asset Inventory</h2>
+          <p className="text-xs text-zinc-500 font-medium">Manage corporate assets, telematics devices, and operational statuses.</p>
         </div>
 
         <Button variant="primary" onClick={() => setShowAddModal(true)}>
-          <Plus className="w-4 h-4" />
+          <Plus className="w-4 h-4 mr-1" />
           <span>Add Asset</span>
         </Button>
       </div>
 
       <Card>
-        <div className="flex items-center justify-between pb-4 border-b border-bespoke-border">
+        <div className="flex items-center justify-between pb-4 border-b border-black/[0.04]">
           <div className="flex items-center gap-2">
-            <Filter className="w-4 h-4 text-bespoke-dim" />
+            <Filter className="w-4 h-4 text-zinc-400" />
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="bg-bespoke-black border border-bespoke-border rounded px-3 py-1.5 text-xs text-bespoke-champagne focus:outline-none focus:border-bespoke-gold font-mono"
+              className="bg-white border border-zinc-200/80 rounded-full px-3.5 py-1.5 text-xs text-zinc-800 focus:outline-none focus:ring-2 focus:ring-[#0071E3] font-semibold shadow-sm"
             >
               <option value="">All Statuses</option>
               <option value="AVAILABLE">Available</option>
@@ -87,35 +87,35 @@ export const Vehicles: React.FC = () => {
               <option value="OFFLINE">Offline</option>
             </select>
           </div>
-          <span className="text-xs font-mono text-bespoke-champagne/70">{vehicles.length} assets registered</span>
+          <span className="text-xs font-semibold text-zinc-500">{vehicles.length} assets registered</span>
         </div>
 
         {loading ? (
           <LoadingSpinner />
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto rounded-2xl border border-black/[0.03] mt-3">
             <table className="w-full text-left text-xs">
-              <thead className="bg-bespoke-black/80 text-[10px] text-bespoke-champagne uppercase tracking-[0.12em] border-b border-bespoke-border">
+              <thead className="bg-zinc-50/80 text-[10px] text-zinc-500 uppercase font-bold tracking-wider border-b border-black/[0.04]">
                 <tr>
-                  <th className="py-3 px-4 font-normal">Plate Registration</th>
-                  <th className="py-3 px-4 font-normal">Vehicle Model</th>
-                  <th className="py-3 px-4 font-normal">Type</th>
-                  <th className="py-3 px-4 font-normal">Operational Status</th>
-                  <th className="py-3 px-4 font-normal">Fuel / Battery</th>
-                  <th className="py-3 px-4 font-normal">Assigned Driver</th>
+                  <th className="py-3 px-4 font-bold">Plate Registration</th>
+                  <th className="py-3 px-4 font-bold">Vehicle Model</th>
+                  <th className="py-3 px-4 font-bold">Type</th>
+                  <th className="py-3 px-4 font-bold">Operational Status</th>
+                  <th className="py-3 px-4 font-bold">Fuel / Battery</th>
+                  <th className="py-3 px-4 font-bold">Assigned Driver</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-bespoke-border/60 text-bespoke-champagne">
+              <tbody className="divide-y divide-black/[0.03] text-zinc-700 bg-white/40">
                 {vehicles.map((v) => (
-                  <tr key={v.id} className="hover:bg-bespoke-card/50 transition-colors">
-                    <td className="py-3 px-4 font-medium font-mono text-bespoke-offwhite tracking-wider">{v.registration_number}</td>
-                    <td className="py-3 px-4 text-bespoke-linen">{v.model}</td>
-                    <td className="py-3 px-4 text-bespoke-muted">{v.vehicle_type}</td>
+                  <tr key={v.id} className="hover:bg-zinc-50/60 transition-colors">
+                    <td className="py-3 px-4 font-bold font-mono text-zinc-900 tracking-tight">{v.registration_number}</td>
+                    <td className="py-3 px-4 font-medium text-zinc-800">{v.model}</td>
+                    <td className="py-3 px-4 text-zinc-500">{v.vehicle_type}</td>
                     <td className="py-3 px-4">
                       <StatusBadge status={v.status} size="sm" />
                     </td>
-                    <td className="py-3 px-4 font-mono text-bespoke-gold">{v.battery_or_fuel_level}%</td>
-                    <td className="py-3 px-4 text-bespoke-champagne">{v.assigned_driver_name || 'Unassigned'}</td>
+                    <td className="py-3 px-4 font-mono font-bold text-[#0071E3]">{v.battery_or_fuel_level}%</td>
+                    <td className="py-3 px-4 font-medium text-zinc-800">{v.assigned_driver_name || 'Unassigned'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -126,40 +126,40 @@ export const Vehicles: React.FC = () => {
 
       {/* Add Vehicle Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-bespoke-black/85 backdrop-blur-md">
-          <div className="bg-bespoke-surface border border-bespoke-border rounded-xl p-6 max-w-md w-full space-y-4 shadow-2xl">
-            <h3 className="text-base font-light text-bespoke-offwhite uppercase tracking-wide">Register New Fleet Asset</h3>
-            <form onSubmit={handleCreateVehicle} className="space-y-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-md">
+          <div className="bg-white/95 border border-white/80 rounded-3xl p-6 max-w-md w-full space-y-4 shadow-2xl">
+            <h3 className="text-base font-bold text-zinc-900 tracking-tight">Register New Fleet Asset</h3>
+            <form onSubmit={handleCreateVehicle} className="space-y-3.5">
               <div>
-                <label className="block text-xs font-mono uppercase tracking-wider text-bespoke-champagne/80 mb-1">Registration Plate</label>
+                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1">Registration Plate</label>
                 <input
                   type="text"
                   required
                   placeholder="e.g. KA-01-XX-9999"
                   value={regNum}
                   onChange={(e) => setRegNum(e.target.value)}
-                  className="w-full px-3 py-2 bg-bespoke-black border border-bespoke-border rounded text-xs text-bespoke-offwhite focus:outline-none focus:border-bespoke-gold"
+                  className="w-full px-3.5 py-2.5 bg-black/[0.03] border border-black/[0.08] rounded-xl text-xs text-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#0071E3] focus:bg-white font-mono font-bold"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-mono uppercase tracking-wider text-bespoke-champagne/80 mb-1">Vehicle Model</label>
+                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1">Vehicle Model</label>
                 <input
                   type="text"
                   required
                   placeholder="e.g. Ford Transit Cargo"
                   value={model}
                   onChange={(e) => setModel(e.target.value)}
-                  className="w-full px-3 py-2 bg-bespoke-black border border-bespoke-border rounded text-xs text-bespoke-offwhite focus:outline-none focus:border-bespoke-gold"
+                  className="w-full px-3.5 py-2.5 bg-black/[0.03] border border-black/[0.08] rounded-xl text-xs text-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#0071E3] focus:bg-white font-medium"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-mono uppercase tracking-wider text-bespoke-champagne/80 mb-1">Vehicle Type</label>
+                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1">Vehicle Type</label>
                 <select
                   value={type}
                   onChange={(e) => setType(e.target.value)}
-                  className="w-full px-3 py-2 bg-bespoke-black border border-bespoke-border rounded text-xs text-bespoke-offwhite focus:outline-none focus:border-bespoke-gold"
+                  className="w-full px-3.5 py-2.5 bg-black/[0.03] border border-black/[0.08] rounded-xl text-xs text-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#0071E3] focus:bg-white font-medium"
                 >
                   <option value="VAN">Van</option>
                   <option value="TRUCK">Truck</option>

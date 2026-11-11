@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Route, Clock, Navigation, MapPin, ArrowRight } from 'lucide-react';
+import { MapPin, ArrowRight } from 'lucide-react';
 import { useTelematicsStore } from '../../../store/telematicsStore';
-import { journeysApi, trackingApi } from '../../../services/api';
+import { journeysApi } from '../../../services/api';
 import { Journey } from '../../../types';
 import { Card } from '../../../components/ui/Card';
 import { StatusBadge } from '../../../components/ui/StatusBadge';
@@ -34,13 +34,13 @@ export const ActiveJourneys: React.FC = () => {
   }, [loadActive, socketConnected]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 font-sans">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-light text-bespoke-offwhite tracking-wide uppercase">Active Dispatches & Transits</h2>
-          <p className="text-xs text-bespoke-champagne/70">All vehicular movements currently underway. Click any row to view live path.</p>
+          <h2 className="text-xl font-bold text-zinc-900 tracking-tight">Active Dispatches & Transits</h2>
+          <p className="text-xs text-zinc-500 font-medium">All vehicular movements currently underway. Click any row to view live path.</p>
         </div>
-        <span className="text-[10px] font-mono tracking-[0.12em] text-bespoke-gold bg-bespoke-gold/10 px-3 py-1 rounded-full border border-bespoke-gold/30 uppercase">
+        <span className="text-xs font-bold px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/80 shadow-sm">
           {socketConnected ? 'Live Socket Stream' : 'Safety Poll 10s'}
         </span>
       </div>
@@ -49,37 +49,37 @@ export const ActiveJourneys: React.FC = () => {
         {loading && journeys.length === 0 ? (
           <LoadingSpinner />
         ) : journeys.length === 0 ? (
-          <div className="text-center py-12 text-bespoke-dim text-xs font-mono uppercase tracking-wider">
+          <div className="text-center py-12 text-zinc-400 text-xs font-mono uppercase tracking-wider">
             No active dispatches
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto rounded-2xl border border-black/[0.03]">
             <table className="w-full text-left text-xs">
-              <thead className="bg-bespoke-black/80 text-[10px] text-bespoke-champagne uppercase tracking-[0.12em] border-b border-bespoke-border">
+              <thead className="bg-zinc-50/80 text-[10px] text-zinc-500 uppercase font-bold tracking-wider border-b border-black/[0.04]">
                 <tr>
-                  <th className="py-3 px-4 font-normal">Vehicle</th>
-                  <th className="py-3 px-4 font-normal">Driver</th>
-                  <th className="py-3 px-4 font-normal">Origin Point</th>
-                  <th className="py-3 px-4 font-normal">Destination</th>
-                  <th className="py-3 px-4 font-normal">Departure Time</th>
-                  <th className="py-3 px-4 font-normal">Status</th>
-                  <th className="py-3 px-4 font-normal text-right">Action</th>
+                  <th className="py-3 px-4 font-bold">Vehicle</th>
+                  <th className="py-3 px-4 font-bold">Driver</th>
+                  <th className="py-3 px-4 font-bold">Origin Point</th>
+                  <th className="py-3 px-4 font-bold">Destination</th>
+                  <th className="py-3 px-4 font-bold">Departure Time</th>
+                  <th className="py-3 px-4 font-bold">Status</th>
+                  <th className="py-3 px-4 font-bold text-right">Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-bespoke-border/60 text-bespoke-champagne">
+              <tbody className="divide-y divide-black/[0.03] text-zinc-700 bg-white/40">
                 {journeys.map((j) => (
                   <tr
                     key={j.id}
                     onClick={() => navigate(`/company/live-map?journeyId=${j.id}`)}
-                    className="hover:bg-bespoke-card/60 cursor-pointer transition-colors"
+                    className="hover:bg-zinc-50/60 cursor-pointer transition-colors"
                   >
-                    <td className="py-3 px-4 font-medium font-mono text-bespoke-gold tracking-wider">
+                    <td className="py-3 px-4 font-bold font-mono text-[#0071E3] tracking-tight">
                       {j.vehicle_registration || 'VAN'}
                     </td>
-                    <td className="py-3 px-4 font-medium text-bespoke-offwhite">{j.driver_name || 'Driver'}</td>
-                    <td className="py-3 px-4 text-bespoke-champagne">{j.origin_name}</td>
-                    <td className="py-3 px-4 font-medium text-bespoke-linen">{j.destination_name}</td>
-                    <td className="py-3 px-4 text-bespoke-muted font-mono">
+                    <td className="py-3 px-4 font-medium text-zinc-900">{j.driver_name || 'Driver'}</td>
+                    <td className="py-3 px-4 text-zinc-600">{j.origin_name}</td>
+                    <td className="py-3 px-4 font-medium text-zinc-900">{j.destination_name}</td>
+                    <td className="py-3 px-4 text-zinc-500 font-mono">
                       {new Date(j.started_at).toLocaleTimeString()}
                     </td>
                     <td className="py-3 px-4">
@@ -91,7 +91,7 @@ export const ActiveJourneys: React.FC = () => {
                           e.stopPropagation();
                           navigate(`/company/live-map?journeyId=${j.id}`);
                         }}
-                        className="inline-flex items-center gap-1.5 px-3 py-1 bg-bespoke-gold hover:bg-bespoke-goldHover text-bespoke-black rounded text-[11px] font-semibold uppercase tracking-[0.08em] transition shadow-sm"
+                        className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#0071E3] hover:bg-[#0077ED] text-white rounded-full text-xs font-bold transition shadow-sm cursor-pointer"
                       >
                         <MapPin className="w-3 h-3" />
                         <span>Track Route</span>

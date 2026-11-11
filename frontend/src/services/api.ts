@@ -31,7 +31,14 @@ export const getApiBaseUrl = (): string => {
     import.meta.env.VITE_API_BASE_URL ||
     ''
   ).replace(/\/$/, '');
-  return envUrl;
+  if (envUrl) return envUrl;
+
+  // Direct connection to Railway production backend when hosted on Vercel
+  if (typeof window !== 'undefined' && window.location.hostname.includes('vercel.app')) {
+    return 'https://fleettrack-production-d254.up.railway.app';
+  }
+
+  return '';
 };
 
 const api = axios.create({
