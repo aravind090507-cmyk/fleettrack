@@ -95,6 +95,13 @@ async def start_new_journey(
             detail=f"Driver already has an active journey in progress (ID: {existing_active.id}). Please complete or end it before starting a new journey.",
         )
 
+    # Update driver name if provided in setup
+    if payload.driver_name and payload.driver_name.strip():
+        current_user.name = payload.driver_name.strip()
+        db.add(current_user)
+        await db.commit()
+        await db.refresh(current_user)
+
     redis_svc = get_redis_service()
     journey, raw_token, tracking_url = await create_journey(
         db=db,

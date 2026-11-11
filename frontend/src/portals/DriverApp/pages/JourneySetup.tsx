@@ -20,6 +20,7 @@ import L from 'leaflet';
 import { Vehicle } from '../../../types';
 import { vehiclesApi, journeysApi, locationApi } from '../../../services/api';
 import { useDriverStore } from '../../../store/driverStore';
+import { useAuthStore } from '../../../store/authStore';
 import { Button } from '../../../components/ui/Button';
 import { Card } from '../../../components/ui/Card';
 
@@ -138,6 +139,15 @@ export const JourneySetup: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   const { setJourney } = useDriverStore();
+  const { user } = useAuthStore();
+  const [driverName, setDriverName] = useState<string>(user?.name || '');
+  const [driverPhone, setDriverPhone] = useState<string>('');
+
+  useEffect(() => {
+    if (user?.name && !driverName) {
+      setDriverName(user.name);
+    }
+  }, [user]);
 
   const loadVehicles = () => {
     vehiclesApi
@@ -360,6 +370,8 @@ export const JourneySetup: React.FC = () => {
       }
 
       const payload: any = {
+        driver_name: driverName.trim() || user?.name || 'Assigned Driver',
+        driver_phone: driverPhone.trim(),
         origin_name: originName,
         origin_lat: finalOriginLat,
         origin_lng: finalOriginLng,
@@ -445,6 +457,37 @@ export const JourneySetup: React.FC = () => {
           <span>{error}</span>
         </div>
       )}
+
+      {/* Driver Identity & Details Input (Requested by User) */}
+      <Card title="Driver Profile & Identification">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+              Driver Full Name *
+            </label>
+            <input
+              type="text"
+              required
+              placeholder="e.g. Alex Rivera"
+              value={driverName}
+              onChange={(e) => setDriverName(e.target.value)}
+              className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white font-medium focus:outline-none focus:ring-1 focus:ring-emerald-500"
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+              Driver Phone / Radio (Optional)
+            </label>
+            <input
+              type="tel"
+              placeholder="e.g. +91 98765 43210"
+              value={driverPhone}
+              onChange={(e) => setDriverPhone(e.target.value)}
+              className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white font-medium focus:outline-none focus:ring-1 focus:ring-emerald-500"
+            />
+          </div>
+        </div>
+      </Card>
 
       {/* Vehicle Asset Picker & Direct Input */}
       <Card

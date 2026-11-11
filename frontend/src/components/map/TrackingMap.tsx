@@ -5,10 +5,10 @@ import { LatestLocation, LocationPing } from '../../types';
 
 function createPulseVehicleIcon(heading: number = 0) {
   const html = `
-    <div style="position: relative; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;">
-      <div class="animate-ping-slow" style="position: absolute; width: 40px; height: 40px; border-radius: 50%; background-color: rgba(16, 185, 129, 0.4);"></div>
-      <div style="position: relative; z-index: 2; transform: rotate(${heading}deg); transition: transform 0.3s ease;">
-        <svg width="34" height="34" viewBox="0 0 24 24" fill="#10b981" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="filter: drop-shadow(0 4px 8px rgba(0,0,0,0.6));">
+    <div style="position: relative; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;">
+      <div class="apple-radar-wave" style="position: absolute; width: 44px; height: 44px; border-radius: 50%; background-color: rgba(0, 113, 227, 0.35);"></div>
+      <div style="position: relative; z-index: 2; transform: rotate(${heading}deg); transition: transform 0.3s ease; width: 34px; height: 34px; border-radius: 50%; background: #0071e3; border: 3px solid #ffffff; box-shadow: 0 8px 20px rgba(0, 113, 227, 0.45); display: flex; align-items: center; justify-content: center;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="#ffffff" stroke="none">
           <polygon points="12 2 19 21 12 17 5 21 12 2"/>
         </svg>
       </div>
@@ -16,32 +16,32 @@ function createPulseVehicleIcon(heading: number = 0) {
   `;
   return L.divIcon({
     html,
-    className: 'public-pulse-icon',
-    iconSize: [44, 44],
-    iconAnchor: [22, 22],
+    className: 'apple-vehicle-pulse-icon',
+    iconSize: [48, 48],
+    iconAnchor: [24, 24],
   });
 }
 
 const originIcon = L.divIcon({
   html: `
-    <div style="width: 28px; height: 28px; background: #3b82f6; border: 3px solid white; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 6px rgba(0,0,0,0.5);">
-      <div style="width: 8px; height: 8px; background: white; border-radius: 50%;"></div>
+    <div style="width: 32px; height: 32px; background: #1c1c1e; border: 2.5px solid white; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.35);">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="white"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
     </div>
   `,
-  className: 'origin-marker',
-  iconSize: [28, 28],
-  iconAnchor: [14, 14],
+  className: 'apple-origin-marker',
+  iconSize: [32, 32],
+  iconAnchor: [16, 16],
 });
 
 const destinationIcon = L.divIcon({
   html: `
-    <div style="width: 28px; height: 28px; background: #ef4444; border: 3px solid white; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 6px rgba(0,0,0,0.5);">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="white" stroke="none"><polygon points="3 2 19 9 3 16 3 2"/></svg>
+    <div style="width: 32px; height: 32px; background: #ff3b30; border: 2.5px solid white; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(255,59,48,0.4);">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="white"><path d="M14.4 6L14 4H5v17h2v-7h5.6l.4 2h7V6z"/></svg>
     </div>
   `,
-  className: 'destination-marker',
-  iconSize: [28, 28],
-  iconAnchor: [14, 14],
+  className: 'apple-dest-marker',
+  iconSize: [32, 32],
+  iconAnchor: [16, 16],
 });
 
 function MapPanFollower({
@@ -97,9 +97,8 @@ export const TrackingMap: React.FC<TrackingMapProps> = ({
         className="w-full h-full"
       >
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          className="dark-tiles"
+          attribution='&copy; <a href="https://carto.com/">CARTO</a>'
+          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
         />
 
         <MapPanFollower center={currentPos} />
@@ -122,13 +121,14 @@ export const TrackingMap: React.FC<TrackingMapProps> = ({
           </Popup>
         </Marker>
 
-        {/* Dynamic Trajectory Polyline */}
+        {/* Apple Maps Style Route Polyline */}
         <Polyline
           positions={polylineCoords}
           pathOptions={{
-            color: '#10b981',
-            weight: 5,
-            opacity: 0.85,
+            color: '#0071e3',
+            weight: 6,
+            opacity: 0.9,
+            lineCap: 'round',
             lineJoin: 'round',
           }}
         />

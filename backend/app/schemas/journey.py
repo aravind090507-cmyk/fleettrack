@@ -11,6 +11,8 @@ class JourneyStartRequest(BaseModel):
     vehicle_registration: Optional[str] = None
     vehicle_model: Optional[str] = "Fleet Vehicle"
     vehicle_type: Optional[str] = "VAN"
+    driver_name: Optional[str] = None
+    driver_phone: Optional[str] = None
     origin_name: str = Field(..., min_length=1)
     origin_lat: float = Field(..., ge=-90.0, le=90.0)
     origin_lng: float = Field(..., ge=-180.0, le=180.0)

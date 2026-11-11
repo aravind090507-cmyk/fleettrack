@@ -304,21 +304,29 @@ export const FleetMap: React.FC<FleetMapProps> = ({
   }, [selectedTransit, journeyPath]);
 
   const [followSelected, setFollowSelected] = useState<boolean>(true);
+  const [mapStyle, setMapStyle] = useState<'apple' | 'dark'>('apple');
 
   return (
-    <div className="relative w-full h-full min-h-[450px] rounded-xl overflow-hidden border border-bespoke-border shadow-2xl">
-      {/* Top Map Controls Overlay */}
+    <div className="relative w-full h-full min-h-[450px] rounded-2xl overflow-hidden border border-bespoke-border shadow-2xl">
+      {/* Top Map Controls Overlay (Apple Pill Controls) */}
       <div className="absolute top-3 right-3 z-[1000] flex items-center gap-2">
         <button
           type="button"
+          onClick={() => setMapStyle((s) => (s === 'apple' ? 'dark' : 'apple'))}
+          className="px-3 py-1.5 rounded-full text-xs font-semibold shadow-lg transition backdrop-blur-xl border border-white/20 bg-white/90 text-zinc-800 hover:bg-white cursor-pointer flex items-center gap-1.5"
+        >
+          <span>{mapStyle === 'apple' ? '🗺️ Apple Light' : '🌙 Night Glass'}</span>
+        </button>
+        <button
+          type="button"
           onClick={() => setFollowSelected((f) => !f)}
-          className={`px-3 py-1.5 rounded text-xs font-mono uppercase tracking-[0.08em] shadow-lg transition backdrop-blur-md border ${
+          className={`px-3.5 py-1.5 rounded-full text-xs font-semibold shadow-lg transition backdrop-blur-xl border cursor-pointer ${
             followSelected
-              ? 'bg-bespoke-gold text-bespoke-black border-bespoke-gold font-semibold shadow-bespoke-gold/20'
-              : 'bg-bespoke-surface/90 text-bespoke-champagne border-bespoke-border hover:text-white'
+              ? 'bg-[#0071e3] text-white border-blue-400 font-bold shadow-blue-500/25'
+              : 'bg-white/90 text-zinc-700 border-white/20 hover:bg-white'
           }`}
         >
-          {followSelected ? '🎯 Following Vehicle' : '📍 Free Pan'}
+          {followSelected ? '🎯 Following' : '📍 Free Pan'}
         </button>
       </div>
 
@@ -329,9 +337,13 @@ export const FleetMap: React.FC<FleetMapProps> = ({
         className="w-full h-full"
       >
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          className="dark-tiles"
+          key={mapStyle}
+          attribution='&copy; <a href="https://carto.com/">CARTO</a>'
+          url={
+            mapStyle === 'apple'
+              ? 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
+              : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+          }
         />
 
         <MapController

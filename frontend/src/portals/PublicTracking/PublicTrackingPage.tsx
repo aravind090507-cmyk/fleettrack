@@ -188,43 +188,72 @@ export const PublicTrackingPage: React.FC = () => {
   }
 
   const isSignalLost = secondsSinceLastPing > 15;
+  const [copiedToast, setCopiedToast] = useState(false);
+
+  const handleShare = () => {
+    navigator.clipboard?.writeText(window.location.href);
+    setCopiedToast(true);
+    setTimeout(() => setCopiedToast(false), 2400);
+  };
+
+  const etaDisplay = trackingInfo.eta_minutes != null
+    ? trackingInfo.eta_minutes < 1 && (trackingInfo.distance_remaining_km ?? 999) < 0.1
+      ? 'Arrived'
+      : trackingInfo.eta_minutes < 60
+      ? `${Math.round(trackingInfo.eta_minutes)} min`
+      : `${Math.floor(trackingInfo.eta_minutes / 60)}h ${Math.round(trackingInfo.eta_minutes % 60)}m`
+    : 'Calculating...';
+
+  // Calculate approximate completion progress
+  const totalApprox = (trackingInfo.distance_remaining_km != null && routeHistory.length > 0)
+    ? Math.min(Math.max(Math.round((routeHistory.length / (routeHistory.length + (trackingInfo.distance_remaining_km * 3))) * 100), 15), 98)
+    : 45;
 
   return (
-    <div className="flex flex-col h-screen bg-bespoke-dark text-bespoke-offwhite overflow-hidden relative font-sans">
-      {/* Top Floating Header */}
-      <header className="absolute top-4 left-4 right-4 z-30 flex items-center justify-between pointer-events-none">
-        <div className="bg-bespoke-surface/90 border border-bespoke-border backdrop-blur-md px-4 py-2.5 rounded-xl shadow-xl pointer-events-auto flex items-center gap-3">
-          <div className="w-8 h-8 rounded bg-bespoke-card border border-bespoke-gold/40 flex items-center justify-center shadow-md">
-            <Radio className="w-4 h-4 text-bespoke-gold animate-pulse" />
+    <div className="flex flex-col h-screen bg-[#F2F2F7] text-[#1C1C1E] overflow-hidden relative font-sans select-none">
+      
+      {/* FLOATING APPLE DYNAMIC ISLAND (TOP CENTER) */}
+      <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 pointer-events-auto">
+        <div className="bg-black/90 text-white backdrop-blur-2xl rounded-full px-5 py-2.5 shadow-2xl flex items-center space-x-3.5 border border-white/15 transition-all">
+          <div className="relative flex items-center justify-center">
+            <div className={`w-2.5 h-2.5 rounded-full ${isSignalLost ? 'bg-amber-400' : 'bg-emerald-500'}`} />
+            <div className={`absolute w-5 h-5 rounded-full ${isSignalLost ? 'bg-amber-400/40 animate-ping' : 'bg-emerald-400/40 animate-ping'}`} />
           </div>
-          <div>
-            <h2 className="text-xs font-mono font-medium text-bespoke-offwhite uppercase tracking-wider">
-              {trackingInfo.vehicle_registration} ({trackingInfo.vehicle_type})
-            </h2>
-            <p className="text-[11px] text-bespoke-champagne/70">Driver: {trackingInfo.driver_name}</p>
+          <div className="flex items-center space-x-2 text-xs">
+            <span className="font-semibold text-zinc-300 font-mono tracking-wider">{trackingInfo.vehicle_registration}</span>
+            <span className="text-zinc-600">•</span>
+            <span className="font-bold text-emerald-400">{etaDisplay}</span>
+            {trackingInfo.distance_remaining_km != null && (
+              <>
+                <span className="text-zinc-600">•</span>
+                <span className="text-zinc-300">{trackingInfo.distance_remaining_km.toFixed(1)} km</span>
+              </>
+            )}
+          </div>
+          <div className="pl-2 border-l border-zinc-700/80 flex items-center space-x-1.5 text-zinc-400 text-xs">
+            <span className="text-[10px] uppercase font-semibold text-blue-400">
+              {isSignalLost ? 'SYNC PAUSED' : isConnected ? 'LIVE 5G' : 'GPS'}
+            </span>
           </div>
         </div>
+      </div>
 
-        <div className="flex items-center gap-2 pointer-events-auto">
-          {isSignalLost ? (
-            <div className="bg-bespoke-error/20 border border-bespoke-error/60 backdrop-blur-md px-3 py-1.5 rounded-full shadow-xl flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-bespoke-error animate-ping" />
-              <span className="text-[10px] font-mono font-medium tracking-wide uppercase text-bespoke-linen">
-                SIGNAL PAUSED ({secondsSinceLastPing}s)
-              </span>
+      {/* TOP LEFT ROUTE HUD */}
+      <div className="absolute top-4 left-4 z-20 hidden sm:block pointer-events-auto">
+        <div className="apple-glass rounded-2xl px-4 py-3 shadow-lg border border-white/80 max-w-xs">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-500 text-white flex items-center justify-center text-lg shadow-md shadow-emerald-500/25">
+              <Navigation className="w-5 h-5" />
             </div>
-          ) : (
-            <div className="bg-bespoke-surface/90 border border-bespoke-border backdrop-blur-md px-3 py-1.5 rounded-full shadow-xl flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-bespoke-gold animate-ping" />
-              <span className="text-[10px] font-mono font-medium tracking-wide uppercase text-bespoke-gold">
-                {isConnected ? 'LIVE TELEMETRY STREAM' : 'REAL-TIME SYNC (2s)'}
-              </span>
+            <div className="truncate">
+              <div className="text-[10px] font-bold tracking-wider uppercase text-emerald-600">Heading to</div>
+              <div className="text-xs font-bold text-zinc-900 truncate">{trackingInfo.destination_name}</div>
             </div>
-          )}
+          </div>
         </div>
-      </header>
+      </div>
 
-      {/* Interactive Map */}
+      {/* INTERACTIVE APPLE MAP */}
       <div className="flex-1 w-full h-full">
         <TrackingMap
           currentLocation={currentLocation}
@@ -242,95 +271,104 @@ export const PublicTrackingPage: React.FC = () => {
         />
       </div>
 
-      {/* Bottom Floating Telemetry Card */}
-      <div className="absolute bottom-6 left-4 right-4 max-w-lg mx-auto z-30">
-        <div className="bg-bespoke-surface/95 border border-bespoke-border backdrop-blur-xl p-4 rounded-xl shadow-2xl space-y-3">
-          <div className="grid grid-cols-2 gap-4 border-b border-bespoke-border pb-3">
-            <div>
-              <span className="text-[10px] text-bespoke-gold font-mono uppercase tracking-wider block flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-bespoke-gold" />
-                Origin Point
-              </span>
-              <p className="text-xs font-medium text-bespoke-linen truncate">{trackingInfo.origin_name}</p>
-            </div>
-            <div>
-              <span className="text-[10px] text-bespoke-champagne font-mono uppercase tracking-wider block flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-bespoke-champagne" />
-                Destination Point
-              </span>
-              <p className="text-xs font-medium text-bespoke-offwhite truncate">{trackingInfo.destination_name}</p>
-            </div>
-          </div>
+      {/* FLOATING APPLE BOTTOM SHEET */}
+      <div className="absolute bottom-5 left-1/2 -translate-x-1/2 w-[92vw] max-w-lg z-30 pointer-events-auto">
+        <div className="apple-glass rounded-[28px] p-5 shadow-2xl border border-white/90">
+          
+          {/* Grabber Handle */}
+          <div className="w-10 h-1 bg-zinc-300 rounded-full mx-auto mb-3.5" />
 
-          <div className="flex items-center justify-between text-xs pt-1">
-            <div className="flex items-center gap-1.5 text-bespoke-champagne">
-              <Gauge className="w-4 h-4 text-bespoke-gold" />
-              <span>
-                Current Speed: <strong className="font-mono text-bespoke-offwhite">{currentLocation?.speed || 0} km/h</strong>
-              </span>
-            </div>
-
-            <div className="flex items-center gap-1 text-[11px] text-bespoke-dim font-mono">
-              <ShieldCheck className="w-3.5 h-3.5 text-bespoke-gold" />
-              <span>Encrypted Stream</span>
-            </div>
-          </div>
-
-          {/* Event Status Banner */}
-          {trackingInfo.latest_event_type && trackingInfo.latest_event_type !== 'RESUME' && (() => {
-            const evt = trackingInfo.latest_event_type;
-            const isSos = evt === 'SOS';
-            const isBreakdown = evt === 'BREAKDOWN';
-            const isBreak = evt === 'BREAK';
-            const bannerClass = isSos || isBreakdown
-              ? 'bg-bespoke-error/20 border-bespoke-error text-bespoke-linen'
-              : isBreak
-              ? 'bg-amber-950/90 border-amber-800 text-amber-200'
-              : 'bg-bespoke-card border-bespoke-border text-bespoke-champagne';
-            const label = isSos
-              ? '🆘 SOS Emergency'
-              : isBreakdown
-              ? '⚠️ Vehicle Breakdown Reported'
-              : isBreak
-              ? '🛑 Driver on Break'
-              : `ℹ️ ${evt}`;
-            return (
-              <div className={`mt-1 px-3 py-2 rounded border text-xs font-mono uppercase ${bannerClass} ${isSos ? 'animate-pulse' : ''}`}>
-                {label}
-                {trackingInfo.latest_event_note && (
-                  <span className="ml-2 font-normal opacity-80">— {trackingInfo.latest_event_note}</span>
-                )}
+          {/* Vehicle & Driver Identity */}
+          <div className="flex items-center justify-between mb-3.5">
+            <div className="flex items-center space-x-3">
+              <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-500 text-white flex items-center justify-center text-lg shadow-md shadow-blue-500/25">
+                <Navigation className="w-5 h-5" />
               </div>
-            );
-          })()}
-
-          {/* RESUME banner */}
-          {trackingInfo.latest_event_type === 'RESUME' && (
-            <div className="mt-1 px-3 py-2 rounded border bg-bespoke-gold/10 border-bespoke-gold/30 text-bespoke-gold text-xs font-mono uppercase text-center">
-              ✅ Journey Resumed
+              <div>
+                <div className="flex items-center space-x-2">
+                  <h2 className="text-sm font-bold text-zinc-900 font-mono tracking-tight">
+                    {trackingInfo.vehicle_registration}
+                  </h2>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700">
+                    {trackingInfo.vehicle_type}
+                  </span>
+                </div>
+                <p className="text-xs text-zinc-500 font-medium mt-0.5">
+                  Driver: <strong className="text-zinc-800">{trackingInfo.driver_name || 'Assigned Driver'}</strong>
+                </p>
+              </div>
             </div>
-          )}
 
-          {/* ETA Card */}
-          {trackingInfo.eta_minutes != null && (
-            <div className="mt-1 flex items-center justify-between px-3 py-2 bg-bespoke-black/80 border border-bespoke-border rounded text-xs">
-              <span className="text-bespoke-dim font-mono uppercase tracking-wider text-[10px]">ETA</span>
-              <span className="font-medium font-mono text-bespoke-gold">
-                {trackingInfo.eta_minutes < 1 && (trackingInfo.distance_remaining_km ?? 999) < 0.1
-                  ? '✅ Arrived'
-                  : trackingInfo.eta_minutes < 60
-                  ? `${Math.round(trackingInfo.eta_minutes)} min`
-                  : `${Math.floor(trackingInfo.eta_minutes / 60)}h ${Math.round(trackingInfo.eta_minutes % 60)}m`}
-              </span>
-              {trackingInfo.distance_remaining_km != null && trackingInfo.distance_remaining_km >= 0.1 && (
-                <span className="text-bespoke-dim font-mono text-[10px]">
-                  {trackingInfo.distance_remaining_km.toFixed(1)} km remaining
-                </span>
+            <button
+              onClick={handleShare}
+              className="apple-pill-btn px-3.5 py-1.5 rounded-full bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-md shadow-blue-500/25 flex items-center space-x-1.5 cursor-pointer"
+            >
+              <span>{copiedToast ? '✓ Copied' : 'Share ETA'}</span>
+            </button>
+          </div>
+
+          {/* Metric Grid */}
+          <div className="grid grid-cols-4 gap-2 my-3">
+            <div className="bg-white/75 rounded-2xl p-2.5 text-center border border-white/70 shadow-sm">
+              <div className="text-[10px] font-semibold text-zinc-400 uppercase">Speed</div>
+              <div className="text-sm font-bold text-zinc-900 mt-0.5">
+                {currentLocation?.speed || 0} <span className="text-[10px] font-normal text-zinc-500">km/h</span>
+              </div>
+            </div>
+            <div className="bg-white/75 rounded-2xl p-2.5 text-center border border-white/70 shadow-sm">
+              <div className="text-[10px] font-semibold text-zinc-400 uppercase">ETA</div>
+              <div className="text-sm font-bold text-emerald-600 mt-0.5">{etaDisplay}</div>
+            </div>
+            <div className="bg-white/75 rounded-2xl p-2.5 text-center border border-white/70 shadow-sm">
+              <div className="text-[10px] font-semibold text-zinc-400 uppercase">Remaining</div>
+              <div className="text-sm font-bold text-zinc-900 mt-0.5">
+                {trackingInfo.distance_remaining_km != null ? trackingInfo.distance_remaining_km.toFixed(1) : '--'}
+                <span className="text-[10px] font-normal text-zinc-500"> km</span>
+              </div>
+            </div>
+            <div className="bg-white/75 rounded-2xl p-2.5 text-center border border-white/70 shadow-sm">
+              <div className="text-[10px] font-semibold text-zinc-400 uppercase">Status</div>
+              <div className="text-xs font-bold text-blue-600 mt-1">
+                {isConnected ? 'Live' : 'Syncing'}
+              </div>
+            </div>
+          </div>
+
+          {/* Progress bar */}
+          <div className="my-2.5">
+            <div className="flex items-center justify-between text-[11px] font-semibold text-zinc-600 mb-1">
+              <span className="truncate max-w-[140px]">{trackingInfo.origin_name}</span>
+              <span className="text-blue-600 font-mono">{totalApprox}%</span>
+              <span className="truncate max-w-[140px] text-right">{trackingInfo.destination_name}</span>
+            </div>
+            <div className="w-full bg-zinc-200/80 rounded-full h-1.5 overflow-hidden">
+              <div
+                className="bg-gradient-to-r from-blue-500 to-emerald-500 h-1.5 rounded-full transition-all duration-500"
+                style={{ width: `${totalApprox}%` }}
+              />
+            </div>
+          </div>
+
+          {/* Emergency / Alert Banner if present */}
+          {trackingInfo.latest_event_type && trackingInfo.latest_event_type !== 'RESUME' && (
+            <div className="mt-2.5 px-3 py-2 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-900 text-xs font-semibold flex items-center justify-between">
+              <span>⚠️ Event: {trackingInfo.latest_event_type}</span>
+              {trackingInfo.latest_event_note && (
+                <span className="text-zinc-600 text-[11px] font-normal">{trackingInfo.latest_event_note}</span>
               )}
             </div>
           )}
+
         </div>
       </div>
+
+      {/* TOAST FEEDBACK */}
+      {copiedToast && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-black/90 text-white text-xs font-medium px-4 py-2 rounded-full shadow-2xl border border-white/20 animate-fade-in">
+          Tracking link copied to clipboard!
+        </div>
+      )}
+
     </div>
   );
 };

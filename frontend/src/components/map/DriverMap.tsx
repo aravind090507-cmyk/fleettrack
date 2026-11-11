@@ -5,18 +5,21 @@ import { LocationPing } from '../../types';
 
 function createDriverVehicleIcon(heading: number = 0) {
   const html = `
-    <div style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; transform: rotate(${heading}deg); transition: transform 0.3s ease;">
-      <svg width="36" height="36" viewBox="0 0 24 24" fill="#10b981" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="filter: drop-shadow(0 4px 6px rgba(0,0,0,0.6));">
-        <polygon points="12 2 19 21 12 17 5 21 12 2"/>
-      </svg>
+    <div style="position: relative; width: 46px; height: 46px; display: flex; align-items: center; justify-content: center;">
+      <div class="apple-radar-wave" style="position: absolute; width: 42px; height: 42px; border-radius: 50%; background-color: rgba(0, 113, 227, 0.35);"></div>
+      <div style="position: relative; z-index: 2; transform: rotate(${heading}deg); transition: transform 0.3s ease; width: 34px; height: 34px; border-radius: 50%; background: #0071e3; border: 3px solid #ffffff; box-shadow: 0 4px 14px rgba(0, 113, 227, 0.45); display: flex; align-items: center; justify-content: center;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="#ffffff" stroke="none">
+          <polygon points="12 2 19 21 12 17 5 21 12 2"/>
+        </svg>
+      </div>
     </div>
   `;
   return L.divIcon({
     html,
-    className: 'driver-gps-icon',
-    iconSize: [44, 44],
-    iconAnchor: [22, 22],
-    popupAnchor: [0, -22],
+    className: 'apple-driver-gps-icon',
+    iconSize: [46, 46],
+    iconAnchor: [23, 23],
+    popupAnchor: [0, -23],
   });
 }
 
@@ -135,9 +138,8 @@ export const DriverMap: React.FC<DriverMapProps> = ({ position, origin, destinat
         className="w-full h-full"
       >
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          className="dark-tiles"
+          attribution='&copy; <a href="https://carto.com/">CARTO</a>'
+          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
         />
 
         <DriverMapController position={position} origin={origin} destination={destination} />
