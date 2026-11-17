@@ -139,14 +139,16 @@ export const JourneySetup: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { setJourney } = useDriverStore();
+  const { setJourney, setDriverName: setStoreDriverName } = useDriverStore();
   const { user } = useAuthStore();
-  const [driverName, setDriverName] = useState<string>(user?.name || '');
+  const initialDriverName = (typeof window !== 'undefined' ? localStorage.getItem('fleet_driver_name') : null) || user?.name || '';
+  const [driverName, setDriverName] = useState<string>(initialDriverName);
   const [driverPhone, setDriverPhone] = useState<string>('');
 
   useEffect(() => {
     if (user?.name && !driverName) {
       setDriverName(user.name);
+      setStoreDriverName(user.name);
     }
   }, [user]);
 
@@ -417,8 +419,10 @@ export const JourneySetup: React.FC = () => {
         driver_name: res.driver_name,
       };
 
+      const finalDriverName = driverName.trim() || res.driver_name || user?.name || 'Driver';
+      setStoreDriverName(finalDriverName);
       const trackingUrl = `${window.location.origin}/track/${res.tracking_token}`;
-      setJourney(newJourney, trackingUrl, res.tracking_token);
+      setJourney(newJourney, trackingUrl, res.tracking_token, finalDriverName);
     } catch (err: any) {
       if (err.response?.status === 409) {
         // Automatically restore active journey if one was already running
@@ -428,7 +432,9 @@ export const JourneySetup: React.FC = () => {
             const active = activeList[0];
             const token = (active as any).tracking_token || active.id;
             const trackingUrl = `${window.location.origin}/track/${token}`;
-            setJourney(active, trackingUrl, token);
+            const activeDriver = (active as any).driver_name || driverName.trim() || user?.name || 'Driver';
+            setStoreDriverName(activeDriver);
+            setJourney(active, trackingUrl, token, activeDriver);
             return;
           }
         } catch {}
@@ -473,7 +479,10 @@ export const JourneySetup: React.FC = () => {
               required
               placeholder="e.g. Alex Rivera"
               value={driverName}
-              onChange={(e) => setDriverName(e.target.value)}
+              onChange={(e) => {
+                setDriverName(e.target.value);
+                setStoreDriverName(e.target.value);
+              }}
               className="w-full px-3.5 py-2.5 bg-black/[0.03] border border-black/10 rounded-2xl text-xs text-zinc-900 font-semibold focus:outline-none focus:ring-2 focus:ring-[#0071E3] focus:bg-white"
             />
           </div>

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { normalizeUtcTimestamp } from '../utils/time';
 
 export function useJourneyTimer(startedAt: string | null | undefined, isRunning: boolean = true) {
   const [elapsedSeconds, setElapsedSeconds] = useState<number>(0);
@@ -6,10 +7,16 @@ export function useJourneyTimer(startedAt: string | null | undefined, isRunning:
   useEffect(() => {
     if (!startedAt || !isRunning) return;
 
-    const startTime = new Date(startedAt).getTime();
+    const normalizedTime = normalizeUtcTimestamp(startedAt);
+    if (!normalizedTime) return;
+
+    const startMs = new Date(normalizedTime).getTime();
+    if (isNaN(startMs)) return;
+
     const update = () => {
       const now = Date.now();
-      const diff = Math.max(0, Math.floor((now - startTime) / 1000));
+      // Clamp so elapsed seconds never go negative due to clock drift
+      const diff = Math.max(0, Math.floor((now - startMs) / 1000));
       setElapsedSeconds(diff);
     };
 

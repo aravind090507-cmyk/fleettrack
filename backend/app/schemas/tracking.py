@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Optional, List
-from pydantic import BaseModel
+from pydantic import BaseModel, field_serializer
 
 
 class LatestLocation(BaseModel):
@@ -13,6 +13,13 @@ class LatestLocation(BaseModel):
     heading: float
     accuracy: float
     recorded_at: datetime
+
+    @field_serializer("recorded_at", when_used="json")
+    def serialize_recorded_at(self, v: Optional[datetime]) -> Optional[str]:
+        if not v:
+            return None
+        s = v.isoformat()
+        return s if s.endswith("Z") or ("+" in s[10:] or "-" in s[10:]) else f"{s}Z"
 
 
 class TrackingInfoResponse(BaseModel):
@@ -37,6 +44,13 @@ class TrackingInfoResponse(BaseModel):
     latest_event_type: Optional[str] = None
     latest_event_at: Optional[datetime] = None
     latest_event_note: Optional[str] = None
+
+    @field_serializer("started_at", "latest_event_at", check_fields=False, when_used="json")
+    def serialize_utc_dt(self, v: Optional[datetime]) -> Optional[str]:
+        if not v:
+            return None
+        s = v.isoformat()
+        return s if s.endswith("Z") or ("+" in s[10:] or "-" in s[10:]) else f"{s}Z"
 
 
 class TrackingLocationResponse(BaseModel):

@@ -42,6 +42,7 @@ export const getApiBaseUrl = (): string => {
 };
 
 const api = axios.create({
+  timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
     'Bypass-Tunnel-Reminder': 'true', // Bypasses localtunnel splash screen if used

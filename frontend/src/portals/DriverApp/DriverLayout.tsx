@@ -11,13 +11,18 @@ interface DriverLayoutProps {
 
 export const DriverLayout: React.FC<DriverLayoutProps> = ({ children }) => {
   const { user, logout } = useAuthStore();
-  const { isOnline, offlineQueueCount } = useDriverStore();
+  const { isOnline, offlineQueueCount, currentJourney, driverName } = useDriverStore();
   const navigate = useNavigate();
 
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
+
+  const storedDriverName = typeof window !== 'undefined' ? localStorage.getItem('fleet_driver_name') : null;
+  const rawName = currentJourney?.driver_name || driverName || storedDriverName || user?.name || 'Driver';
+  const cleanName = rawName.replace(/\s*\(Driver\)$/i, '').trim() || 'Driver';
+  const driverHeaderSubtitle = `${cleanName} (Driver)`;
 
   return (
     <div className="min-h-screen bg-[#F2F2F7] text-[#1D1D1F] flex flex-col max-w-md mx-auto border-x border-black/[0.06] shadow-2xl font-sans select-none">
@@ -29,7 +34,7 @@ export const DriverLayout: React.FC<DriverLayoutProps> = ({ children }) => {
           </div>
           <div>
             <h1 className="text-xs font-bold uppercase tracking-wider text-zinc-900 leading-tight">Driver Console</h1>
-            <p className="text-[11px] text-zinc-500 font-medium truncate max-w-[120px]">{user?.name || 'Driver'}</p>
+            <p className="text-[11px] text-zinc-500 font-medium truncate max-w-[160px]">{driverHeaderSubtitle}</p>
           </div>
         </div>
 

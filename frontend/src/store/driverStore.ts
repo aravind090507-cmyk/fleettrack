@@ -5,13 +5,15 @@ interface DriverState {
   currentJourney: Journey | null;
   trackingUrl: string | null;
   trackingToken: string | null;
+  driverName: string | null;
   gpsStatus: 'idle' | 'acquiring' | 'active' | 'error' | 'paused';
   lastPing: LocationPing | null;
   isOnline: boolean;
   offlineQueueCount: number;
   journeyDuration: number;
 
-  setJourney: (journey: Journey | null, trackingUrl?: string, trackingToken?: string) => void;
+  setDriverName: (name: string) => void;
+  setJourney: (journey: Journey | null, trackingUrl?: string, trackingToken?: string, customDriverName?: string) => void;
   setGPSStatus: (status: 'idle' | 'acquiring' | 'active' | 'error' | 'paused') => void;
   setLastPing: (ping: LocationPing | null) => void;
   setOnlineStatus: (isOnline: boolean) => void;
@@ -24,25 +26,45 @@ export const useDriverStore = create<DriverState>((set) => ({
   currentJourney: null,
   trackingUrl: null,
   trackingToken: null,
+  driverName: typeof window !== 'undefined' ? localStorage.getItem('fleet_driver_name') : null,
   gpsStatus: 'idle',
   lastPing: null,
   isOnline: navigator.onLine,
   offlineQueueCount: 0,
   journeyDuration: 0,
 
-  setJourney: (journey, trackingUrl, trackingToken) => {
-    const resolvedToken = trackingToken || (journey as any)?.tracking_token || localStorage.getItem('fleet_active_token') || null;
+  setDriverName: (name: string) => {
+    const clean = name ? name.trim() : '';
+    if (typeof window !== 'undefined') {
+      if (clean) {
+        localStorage.setItem('fleet_driver_name', clean);
+      } else {
+        localStorage.removeItem('fleet_driver_name');
+      }
+    }
+    set({ driverName: clean || null });
+  },
+
+  setJourney: (journey, trackingUrl, trackingToken, customDriverName) => {
+    const resolvedToken = trackingToken || (journey as any)?.tracking_token || (typeof window !== 'undefined' ? localStorage.getItem('fleet_active_token') : null) || null;
     let resolvedUrl = trackingUrl;
     if (resolvedToken && (!resolvedUrl || resolvedUrl.includes('localhost') || resolvedUrl.startsWith('/'))) {
       resolvedUrl = `${window.location.origin}/track/${resolvedToken}`;
     }
-    if (resolvedToken) {
+    if (resolvedToken && typeof window !== 'undefined') {
       localStorage.setItem('fleet_active_token', resolvedToken);
     }
+
+    const resolvedDriver = customDriverName || (journey as any)?.driver_name || (typeof window !== 'undefined' ? localStorage.getItem('fleet_driver_name') : null) || null;
+    if (resolvedDriver && typeof window !== 'undefined') {
+      localStorage.setItem('fleet_driver_name', resolvedDriver);
+    }
+
     set({
       currentJourney: journey,
       trackingUrl: resolvedUrl || null,
       trackingToken: resolvedToken || null,
+      driverName: resolvedDriver || null,
       gpsStatus: journey ? 'acquiring' : 'idle',
     });
   },
@@ -54,7 +76,9 @@ export const useDriverStore = create<DriverState>((set) => ({
   setJourneyDuration: (journeyDuration) => set({ journeyDuration }),
 
   clearJourney: () => {
-    localStorage.removeItem('fleet_active_token');
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('fleet_active_token');
+    }
     set({
       currentJourney: null,
       trackingUrl: null,

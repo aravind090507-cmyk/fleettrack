@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Optional, List, Any
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, model_validator, field_serializer
 
 
 class JourneyStartRequest(BaseModel):
@@ -89,6 +89,13 @@ class JourneyStartResponse(BaseModel):
         self.end_location = self.destination_name
         return self
 
+    @field_serializer("started_at", check_fields=False, when_used="json")
+    def serialize_started_at(self, v: Optional[datetime]) -> Optional[str]:
+        if not v:
+            return None
+        s = v.isoformat()
+        return s if s.endswith("Z") or ("+" in s[10:] or "-" in s[10:]) else f"{s}Z"
+
 
 class JourneyResponse(BaseModel):
     id: str
@@ -122,6 +129,13 @@ class JourneyResponse(BaseModel):
         self.end_location = self.destination_name
         return self
 
+    @field_serializer("started_at", "created_at", "ended_at", check_fields=False, when_used="json")
+    def serialize_journey_dts(self, v: Optional[datetime]) -> Optional[str]:
+        if not v:
+            return None
+        s = v.isoformat()
+        return s if s.endswith("Z") or ("+" in s[10:] or "-" in s[10:]) else f"{s}Z"
+
     model_config = {"from_attributes": True}
 
 
@@ -132,6 +146,13 @@ class JourneyEndResponse(BaseModel):
     duration_seconds: int
     total_distance_km: float
     message: str = "Journey ended successfully and tracking link revoked."
+
+    @field_serializer("ended_at", check_fields=False, when_used="json")
+    def serialize_ended_at(self, v: Optional[datetime]) -> Optional[str]:
+        if not v:
+            return None
+        s = v.isoformat()
+        return s if s.endswith("Z") or ("+" in s[10:] or "-" in s[10:]) else f"{s}Z"
 
 
 class TripEventCreate(BaseModel):

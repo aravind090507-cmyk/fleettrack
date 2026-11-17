@@ -4,11 +4,27 @@ import L from 'leaflet';
 import { LatestLocation, LocationPing } from '../../types';
 import { getMapTileConfig } from '../../services/mapConfig';
 
+function isFiniteCoord(v: any): boolean {
+  return typeof v === 'number' && !isNaN(v) && isFinite(v);
+}
+
+function isValidLatLng(lat: any, lng: any): boolean {
+  return (
+    isFiniteCoord(lat) &&
+    isFiniteCoord(lng) &&
+    lat >= -90 &&
+    lat <= 90 &&
+    lng >= -180 &&
+    lng <= 180
+  );
+}
+
 function createPulseVehicleIcon(heading: number = 0) {
+  const safeHeading = isFiniteCoord(heading) ? heading : 0;
   const html = `
     <div style="position: relative; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;">
       <div class="apple-radar-wave" style="position: absolute; width: 44px; height: 44px; border-radius: 50%; background-color: rgba(0, 113, 227, 0.35);"></div>
-      <div style="position: relative; z-index: 2; transform: rotate(${heading}deg); transition: transform 0.3s ease; width: 34px; height: 34px; border-radius: 50%; background: #0071e3; border: 3px solid #ffffff; box-shadow: 0 8px 20px rgba(0, 113, 227, 0.45); display: flex; align-items: center; justify-content: center;">
+      <div style="position: relative; z-index: 2; transform: rotate(${safeHeading}deg); transition: transform 0.3s ease; width: 34px; height: 34px; border-radius: 50%; background: #0071e3; border: 3px solid #ffffff; box-shadow: 0 8px 20px rgba(0, 113, 227, 0.45); display: flex; align-items: center; justify-content: center;">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="#ffffff" stroke="none">
           <polygon points="12 2 19 21 12 17 5 21 12 2"/>
         </svg>
@@ -45,14 +61,16 @@ const destinationIcon = L.divIcon({
   iconAnchor: [16, 16],
 });
 
-function MapPanFollower({
-  center,
-}: {
-  center: [number, number];
-}) {
+function MapPanFollower({ center }: { center: [number, number] }) {
   const map = useMap();
   useEffect(() => {
-    map.panTo(center, { animate: true, duration: 1.0 });
+    if (map && center && isValidLatLng(center[0], center[1])) {
+      try {
+        map.panTo(center, { animate: true, duration: 1.0 });
+      } catch (err) {
+        console.warn('Leaflet panTo error:', err);
+      }
+    }
   }, [center, map]);
   return null;
 }
@@ -70,28 +88,39 @@ export const TrackingMap: React.FC<TrackingMapProps> = ({
   destination,
   routeHistory = [],
 }) => {
-  const safeOriginLat = origin?.lat ?? 12.9716;
-  const safeOriginLng = origin?.lng ?? 77.5946;
-  const safeDestLat = destination?.lat ?? safeOriginLat;
-  const safeDestLng = destination?.lng ?? safeOriginLng;
+  // Defensive lat/lng extraction
+  const safeOriginLat = isValidLatLng(origin?.lat, origin?.lng) ? Number(origin.lat) : 13.020767;
+  const safeOriginLng = isValidLatLng(origin?.lat, origin?.lng) ? Number(origin.lng) : 80.178377;
+  const safeDestLat = isValidLatLng(destination?.lat, destination?.lng) ? Number(destination.lat) : safeOriginLat;
+  const safeDestLng = isValidLatLng(destination?.lat, destination?.lng) ? Number(destination.lng) : safeOriginLng;
 
-  const currentPos: [number, number] =
-    currentLocation && !isNaN(currentLocation.latitude) && !isNaN(currentLocation.longitude)
-      ? [currentLocation.latitude, currentLocation.longitude]
-      : [safeOriginLat, safeOriginLng];
+  const currentLat = currentLocation?.latitude;
+  const currentLng = currentLocation?.longitude;
+  const hasValidCurrent = isValidLatLng(currentLat, currentLng);
+  const currentPos: [number, number] = hasValidCurrent
+    ? [Number(currentLat), Number(currentLng)]
+    : [safeOriginLat, safeOriginLng];
 
   const vehicleIcon = createPulseVehicleIcon(currentLocation?.heading || 0);
 
-  // Combine route coordinates: Origin -> Route History -> Current Position
+  // Combine route coordinates: Origin -> Route History -> Current Position (strictly filter out non-numbers/NaNs)
+  const validHistory = Array.isArray(routeHistory)
+    ? routeHistory.filter(
+        (pt): pt is [number, number] =>
+          Array.isArray(pt) && pt.length >= 2 && isValidLatLng(pt[0], pt[1])
+      )
+    : [];
+
   const polylineCoords: [number, number][] = [
     [safeOriginLat, safeOriginLng],
-    ...routeHistory.filter(([lat, lng]) => !isNaN(lat) && !isNaN(lng)),
+    ...validHistory,
     currentPos,
   ];
 
   return (
     <div className="relative w-full h-full min-h-[400px]">
       <MapContainer
+        key={`${safeOriginLat.toFixed(4)}_${safeOriginLng.toFixed(4)}`}
         center={currentPos}
         zoom={14}
         scrollWheelZoom={true}
@@ -108,45 +137,53 @@ export const TrackingMap: React.FC<TrackingMapProps> = ({
         <MapPanFollower center={currentPos} />
 
         {/* Origin Marker */}
-        <Marker position={[safeOriginLat, safeOriginLng]} icon={originIcon}>
-          <Popup>
-            <div className="p-1 text-slate-900 font-semibold text-xs">
-              <strong>Origin:</strong> {origin?.name || 'Start Point'}
-            </div>
-          </Popup>
-        </Marker>
+        {isValidLatLng(safeOriginLat, safeOriginLng) && (
+          <Marker position={[safeOriginLat, safeOriginLng]} icon={originIcon}>
+            <Popup>
+              <div className="p-1 text-slate-900 font-semibold text-xs">
+                <strong>Origin:</strong> {origin?.name || 'Start Point'}
+              </div>
+            </Popup>
+          </Marker>
+        )}
 
         {/* Destination Marker */}
-        <Marker position={[safeDestLat, safeDestLng]} icon={destinationIcon}>
-          <Popup>
-            <div className="p-1 text-slate-900 font-semibold text-xs">
-              <strong>Destination:</strong> {destination?.name || 'Destination'}
-            </div>
-          </Popup>
-        </Marker>
+        {isValidLatLng(safeDestLat, safeDestLng) && (
+          <Marker position={[safeDestLat, safeDestLng]} icon={destinationIcon}>
+            <Popup>
+              <div className="p-1 text-slate-900 font-semibold text-xs">
+                <strong>Destination:</strong> {destination?.name || 'Destination'}
+              </div>
+            </Popup>
+          </Marker>
+        )}
 
         {/* Apple Maps Style Route Polyline */}
-        <Polyline
-          positions={polylineCoords}
-          pathOptions={{
-            color: '#0071e3',
-            weight: 6,
-            opacity: 0.9,
-            lineCap: 'round',
-            lineJoin: 'round',
-          }}
-        />
+        {polylineCoords.length >= 2 && (
+          <Polyline
+            positions={polylineCoords}
+            pathOptions={{
+              color: '#0071e3',
+              weight: 6,
+              opacity: 0.9,
+              lineCap: 'round',
+              lineJoin: 'round',
+            }}
+          />
+        )}
 
         {/* Current Vehicle Marker */}
-        <Marker position={currentPos} icon={vehicleIcon}>
-          <Popup>
-            <div className="p-1 text-slate-900 text-xs">
-              <strong className="text-emerald-700 font-bold block mb-1">Live Vehicle Position</strong>
-              <p>Speed: {currentLocation?.speed || 0} km/h</p>
-              <p>Heading: {currentLocation?.heading || 0}°</p>
-            </div>
-          </Popup>
-        </Marker>
+        {isValidLatLng(currentPos[0], currentPos[1]) && (
+          <Marker position={currentPos} icon={vehicleIcon}>
+            <Popup>
+              <div className="p-1 text-slate-900 text-xs">
+                <strong className="text-emerald-700 font-bold block mb-1">Live Vehicle Position</strong>
+                <p>Speed: {currentLocation?.speed || 0} km/h</p>
+                <p>Heading: {currentLocation?.heading || 0}°</p>
+              </div>
+            </Popup>
+          </Marker>
+        )}
       </MapContainer>
     </div>
   );

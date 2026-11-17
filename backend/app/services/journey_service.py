@@ -107,7 +107,7 @@ async def create_journey(
         "destname": destination_name,
         "dlat": destination_lat,
         "dlng": destination_lng,
-        "st": now.isoformat(),
+        "st": f"{now.isoformat()}Z",
         "exp": int(expires_at.timestamp()),
     }
     raw_token = jwt.encode(token_payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
@@ -156,7 +156,7 @@ async def create_journey(
         lng=origin_lng,
         speed=0.0,
         heading=0.0,
-        timestamp=now.isoformat(),
+        timestamp=f"{now.isoformat()}Z",
     )
 
     # 7. Formulate public tracking URL (relative path, dynamic domain resolution on client)
@@ -259,7 +259,7 @@ async def end_journey(
         "type": "JOURNEY_FINISHED",
         "journey_id": journey.id,
         "vehicle_id": journey.vehicle_id,
-        "ended_at": now.isoformat()
+        "ended_at": f"{now.isoformat()}Z"
     }, company_id=journey.company_id)
 
     return journey

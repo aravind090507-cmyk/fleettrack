@@ -202,7 +202,7 @@ async def get_active_journeys(
             "destname": j.destination_name,
             "dlat": j.destination_lat,
             "dlng": j.destination_lng,
-            "st": j.started_at.isoformat(),
+            "st": f"{j.started_at.isoformat()}Z" if not j.started_at.isoformat().endswith("Z") else j.started_at.isoformat(),
             "exp": int((j.started_at + timedelta(hours=settings.TRACKING_LINK_EXPIRE_HOURS)).timestamp()),
         }
         resp.tracking_token = jwt.encode(token_payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
@@ -262,7 +262,7 @@ async def get_journey_history(
             "destname": j.destination_name,
             "dlat": j.destination_lat,
             "dlng": j.destination_lng,
-            "st": j.started_at.isoformat(),
+            "st": f"{j.started_at.isoformat()}Z" if not j.started_at.isoformat().endswith("Z") else j.started_at.isoformat(),
             "exp": int((j.started_at + timedelta(hours=settings.TRACKING_LINK_EXPIRE_HOURS)).timestamp()),
         }
         resp.tracking_token = jwt.encode(token_payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
