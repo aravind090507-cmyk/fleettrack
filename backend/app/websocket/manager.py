@@ -26,6 +26,8 @@ class ConnectionManager:
         self.fleet_company_subscribers: Dict[str, List[WebSocket]] = {}
         # Global admin subscribers
         self.fleet_subscribers: List[WebSocket] = []
+        # Dedicated driver subscribers
+        self.driver_subscribers: Dict[str, List[WebSocket]] = {}
         self._lock = asyncio.Lock()
 
         # Coalescing buffer: company_id -> {"devices": [...], "positions": [...], "events": [...]}
@@ -69,6 +71,43 @@ class ConnectionManager:
             if websocket in self.fleet_subscribers:
                 self.fleet_subscribers.remove(websocket)
         logger.info("Company console disconnected from fleet stream")
+
+    async def connect_driver(self, websocket: WebSocket, driver_id: str):
+        await websocket.accept()
+        async with self._lock:
+            if driver_id not in self.driver_subscribers:
+                self.driver_subscribers[driver_id] = []
+            self.driver_subscribers[driver_id].append(websocket)
+        logger.info("Driver connected to driver stream: %s", driver_id)
+
+    async def disconnect_driver(self, websocket: WebSocket, driver_id: str):
+        async with self._lock:
+            if driver_id in self.driver_subscribers:
+                if websocket in self.driver_subscribers[driver_id]:
+                    self.driver_subscribers[driver_id].remove(websocket)
+                if not self.driver_subscribers[driver_id]:
+                    del self.driver_subscribers[driver_id]
+        logger.info("Driver disconnected from driver stream: %s", driver_id)
+
+    async def broadcast_to_driver(self, driver_id: str, message: dict):
+        dead_sockets = []
+        sockets = []
+        async with self._lock:
+            sockets = list(self.driver_subscribers.get(driver_id, []))
+
+        text_data = json.dumps(message)
+        for ws in sockets:
+            try:
+                await ws.send_text(text_data)
+            except Exception:
+                dead_sockets.append(ws)
+
+        if dead_sockets:
+            async with self._lock:
+                if driver_id in self.driver_subscribers:
+                    for ds in dead_sockets:
+                        if ds in self.driver_subscribers[driver_id]:
+                            self.driver_subscribers[driver_id].remove(ds)
 
     async def broadcast_to_journey(self, journey_id: str, message: dict):
         """Broadcast live coordinate update or status event to all viewers of a journey."""

@@ -81,6 +81,68 @@ export interface TrackingInfo {
   latest_event_type?: string | null;
   latest_event_at?: string | null;
   latest_event_note?: string | null;
+  ended_at?: string | null;
+  total_distance_km?: number | null;
+  duration_seconds?: number | null;
+  distance_travelled_km?: number | null;
+  trip_events?: PublicTripEvent[];
+}
+
+export interface PublicTripEvent {
+  id: string;
+  event_type: string;
+  latitude: number;
+  longitude: number;
+  description: string;
+  created_at: string;
+}
+
+export interface DeliveryAssignment {
+  id: string;
+  company_id: string;
+  manager_id: string;
+  manager_name?: string | null;
+  driver_id: string;
+  driver_name?: string | null;
+  destination_name: string;
+  destination_address?: string | null;
+  destination_lat: number;
+  destination_lng: number;
+  instructions?: string | null;
+  delivery_instructions?: string | null;
+  assignment_reference?: string | null;
+  status: 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+  journey_id?: string | null;
+  created_at: string;
+  accepted_at?: string | null;
+  rejected_at?: string | null;
+  started_at?: string | null;
+  completed_at?: string | null;
+  cancelled_at?: string | null;
+  tracking_url?: string | null;
+  driver?: any;
+}
+
+export interface DispatchDriverItem {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  availability: 'AVAILABLE' | 'UNAVAILABLE' | 'BUSY';
+  availability_preference: string;
+  availability_updated_at?: string | null;
+  assigned_vehicle_reg?: string | null;
+  assigned_vehicle_model?: string | null;
+  can_assign: boolean;
+  current_assignment?: DeliveryAssignment | null;
+}
+
+export interface DriverAvailabilityResponse {
+  driver_id: string;
+  driver_name: string;
+  availability: 'AVAILABLE' | 'UNAVAILABLE' | 'BUSY';
+  availability_preference: string;
+  availability_updated_at: string;
 }
 
 export interface DashboardOverview {
@@ -162,7 +224,7 @@ export interface OfflineGPSRecord {
 }
 
 export interface WebSocketMessage {
-  type: 'LOCATION_UPDATE' | 'JOURNEY_STARTED' | 'JOURNEY_COMPLETED' | 'INITIAL_STATE' | 'VEHICLE_MOVED' | 'JOURNEY_FINISHED' | 'TRIP_EVENT' | 'FLEET_STREAM_CONNECTED' | 'ENVELOPE' | 'DEVICE_STATUS';
+  type: string;
   [key: string]: any;
 }
 

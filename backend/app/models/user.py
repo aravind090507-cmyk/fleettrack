@@ -19,6 +19,11 @@ class User(Base):
     password_hash = Column(String(255), nullable=False)
     role = Column(String(50), nullable=False, default="DRIVER")  # DRIVER | FLEET_MANAGER | ADMIN
     is_active = Column(Boolean, default=True, nullable=False)
+    # Driver Availability: AVAILABLE | UNAVAILABLE | BUSY
+    availability = Column(String(50), nullable=False, default="AVAILABLE")
+    availability_preference = Column(String(50), nullable=False, default="AVAILABLE")
+    availability_updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
 
@@ -26,3 +31,5 @@ class User(Base):
     company = relationship("Company", back_populates="users")
     vehicles = relationship("Vehicle", back_populates="assigned_driver", foreign_keys="Vehicle.assigned_driver_id")
     journeys = relationship("Journey", back_populates="driver", foreign_keys="Journey.driver_id")
+    driver_assignments = relationship("DeliveryAssignment", back_populates="driver", foreign_keys="DeliveryAssignment.driver_id")
+    managed_assignments = relationship("DeliveryAssignment", back_populates="manager", foreign_keys="DeliveryAssignment.manager_id")

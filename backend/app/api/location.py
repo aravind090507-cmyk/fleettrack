@@ -362,3 +362,50 @@ async def search_places(q: str = Query(..., min_length=1)):
         logger.warning("Geocoding lookup failed for query '%s': %s", query, exc)
 
     return []
+
+
+@search_router.get("/reverse")
+async def reverse_geocode(
+    lat: float = Query(..., ge=-90.0, le=90.0),
+    lon: float = Query(..., ge=-180.0, le=180.0),
+):
+    """
+    Reverse geocoding using OpenStreetMap Nominatim with graceful coordinate fallback.
+    """
+    import httpx
+
+    fallback_name = f"Location ({lat:.5f}, {lon:.5f})"
+    url = "https://nominatim.openstreetmap.org/reverse"
+    params = {
+        "lat": lat,
+        "lon": lon,
+        "format": "json",
+        "zoom": 18,
+        "addressdetails": 1,
+    }
+    headers = {
+        "User-Agent": "FleetTrackEnterprise/1.0 (geospatial-fleet-geocoder)",
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=6.0) as client:
+            resp = await client.get(url, params=params, headers=headers)
+            if resp.status_code == 200:
+                data = resp.json()
+                display_name = data.get("display_name") or fallback_name
+                return {
+                    "display_name": display_name,
+                    "lat": lat,
+                    "lon": lon,
+                    "address": data.get("address", {}),
+                }
+    except Exception as exc:
+        logger.warning("Reverse geocoding failed for %s, %s: %s", lat, lon, exc)
+
+    return {
+        "display_name": fallback_name,
+        "lat": lat,
+        "lon": lon,
+        "address": {},
+    }
+

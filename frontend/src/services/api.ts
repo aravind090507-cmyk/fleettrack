@@ -3,13 +3,17 @@ import {
   ActiveJourneyTelemetry,
   ActiveVehicleTelemetry,
   DashboardOverview,
+  DeliveryAssignment,
   Device,
   DeviceDiagnostics,
+  DispatchDriverItem,
+  DriverAvailabilityResponse,
   Geofence,
   Journey,
   LatestLocation,
   LocationPing,
   Position,
+  PublicTripEvent,
   StopReportItem,
   SummaryReportItem,
   TelematicsEvent,
@@ -167,6 +171,10 @@ export const journeysApi = {
     const { data } = await api.get(`/api/journeys/${id}`);
     return data as Journey;
   },
+  getById: async (id: string) => {
+    const { data } = await api.get(`/api/journeys/${id}`);
+    return data as Journey;
+  },
   end: async (journeyId: string) => {
     const { data } = await api.post(`/api/journeys/${journeyId}/end`);
     return data as {
@@ -208,6 +216,10 @@ export const locationApi = {
     const { data } = await api.get(`/api/locations/search?q=${encodeURIComponent(query)}`);
     return data as { display_name: string; lat: number; lon: number; type: string }[];
   },
+  reverseGeocode: async (lat: number, lon: number) => {
+    const { data } = await api.get(`/api/locations/reverse?lat=${lat}&lon=${lon}`);
+    return data as { display_name: string; lat: number; lon: number; address: Record<string, any> };
+  },
 };
 
 // --- Tracking Endpoints (Public) ---
@@ -223,6 +235,10 @@ export const trackingApi = {
   getTrail: async (token: string) => {
     const { data } = await api.get(`/api/track/${token}/trail`);
     return data as LatestLocation[];
+  },
+  getEvents: async (token: string) => {
+    const { data } = await api.get(`/api/track/${token}/events`);
+    return data as PublicTripEvent[];
   },
 };
 
@@ -382,6 +398,86 @@ export const healthApi = {
     } catch {
       return null;
     }
+  },
+};
+
+// --- Manager Dispatch & Delivery Assignment Endpoints ---
+export const dispatchApi = {
+  getDrivers: async () => {
+    const { data } = await api.get('/api/dispatch/drivers');
+    return data as DispatchDriverItem[];
+  },
+  createAssignment: async (payload: {
+    driver_id: string;
+    destination_name: string;
+    destination_lat: number;
+    destination_lng: number;
+    instructions?: string;
+  }) => {
+    const { data } = await api.post('/api/dispatch/assignments', payload);
+    return data as DeliveryAssignment;
+  },
+  getAssignments: async (status?: string) => {
+    const url = status ? `/api/dispatch/assignments?status=${encodeURIComponent(status)}` : '/api/dispatch/assignments';
+    const { data } = await api.get(url);
+    return data as DeliveryAssignment[];
+  },
+  cancelAssignment: async (assignmentId: string) => {
+    const { data } = await api.post(`/api/dispatch/assignments/${assignmentId}/cancel`);
+    return data as DeliveryAssignment;
+  },
+};
+
+// --- Driver Availability & Deliveries Endpoints ---
+export const driverDispatchApi = {
+  getAvailability: async () => {
+    const { data } = await api.get('/api/driver/availability');
+    return data as DriverAvailabilityResponse;
+  },
+  updateAvailability: async (availability: 'AVAILABLE' | 'UNAVAILABLE') => {
+    const { data } = await api.put('/api/driver/availability', { availability });
+    return data as DriverAvailabilityResponse;
+  },
+  getActiveAssignment: async () => {
+    const { data } = await api.get('/api/driver/assignments/active');
+    return data as DeliveryAssignment | null;
+  },
+  getAssignments: async () => {
+    const { data } = await api.get('/api/driver/assignments');
+    return data as DeliveryAssignment[];
+  },
+  listAssignments: async () => {
+    const { data } = await api.get('/api/driver/assignments');
+    return data as DeliveryAssignment[];
+  },
+  acceptAssignment: async (assignmentId: string) => {
+    const { data } = await api.post(`/api/driver/assignments/${assignmentId}/accept`);
+    return data as DeliveryAssignment;
+  },
+  rejectAssignment: async (assignmentId: string) => {
+    const { data } = await api.post(`/api/driver/assignments/${assignmentId}/reject`);
+    return data as DeliveryAssignment;
+  },
+  startDelivery: async (
+    assignmentId: string,
+    payload?: {
+      vehicle_id?: string;
+      origin_name?: string;
+      origin_lat?: number;
+      origin_lng?: number;
+    }
+  ) => {
+    const { data } = await api.post(`/api/driver/assignments/${assignmentId}/start`, payload || {});
+    return data as {
+      assignment: DeliveryAssignment;
+      journey_id: string;
+      tracking_url: string;
+      tracking_token: string;
+    };
+  },
+  completeDelivery: async (assignmentId: string) => {
+    const { data } = await api.post(`/api/driver/assignments/${assignmentId}/complete`);
+    return data as DeliveryAssignment;
   },
 };
 

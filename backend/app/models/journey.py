@@ -42,3 +42,4 @@ class Journey(Base):
     locations = relationship("Location", back_populates="journey", order_by="Location.recorded_at")
     tracking_links = relationship("TrackingLink", back_populates="journey")
     trip_events = relationship("TripEvent", back_populates="journey", order_by="TripEvent.created_at")
+    delivery_assignment = relationship("DeliveryAssignment", back_populates="journey", uselist=False)

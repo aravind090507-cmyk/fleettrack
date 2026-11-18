@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.session import get_db
 from app.models.location import Location
-from app.schemas.tracking import LatestLocation, TrackingInfoResponse, TrackingLocationResponse
+from app.schemas.tracking import LatestLocation, TrackingInfoResponse, TrackingLocationResponse, PublicTripEvent
 from app.services.journey_service import validate_tracking_token
 from app.services.redis_service import get_redis_service
 
@@ -92,7 +92,8 @@ async def get_public_tracking_info(
         if avg_speed_kmh > 0:
             eta_minutes = round((dist_km / avg_speed_kmh) * 60, 1)
 
-    # --- Latest Trip Event ---
+    # --- Latest Trip Event & Public Timeline ---
+    from datetime import datetime, timezone
     from app.models.trip_event import TripEvent
     evt_stmt = (
         select(TripEvent)
@@ -102,6 +103,58 @@ async def get_public_tracking_info(
     )
     evt_res = await db.execute(evt_stmt)
     latest_event = evt_res.scalar_one_or_none()
+
+    # Query operational timeline events (sanitized, no internal private notes)
+    all_evts_stmt = (
+        select(TripEvent)
+        .where(TripEvent.journey_id == journey.id)
+        .order_by(TripEvent.created_at.asc())
+        .limit(30)
+    )
+    all_evts_res = await db.execute(all_evts_stmt)
+    raw_evts = all_evts_res.scalars().all()
+
+    def sanitize_event_desc(evt: TripEvent) -> str:
+        et = (evt.event_type or "").upper()
+        if et == "DEPARTURE":
+            return "Trip departed from origin"
+        elif et == "STOP":
+            return "Vehicle stationary / stopped"
+        elif et == "BREAK_START":
+            return "Driver scheduled rest break"
+        elif et == "BREAK_END":
+            return "Driver rest break completed"
+        elif et == "SOS":
+            return "Emergency alert reported"
+        elif et == "BREAKDOWN":
+            return "Vehicle maintenance alert"
+        elif et == "ARRIVAL":
+            return "Vehicle reached destination"
+        return f"Milestone: {et.replace('_', ' ').title()}"
+
+    public_events = [
+        PublicTripEvent(
+            id=e.id,
+            event_type=e.event_type,
+            latitude=e.latitude,
+            longitude=e.longitude,
+            description=sanitize_event_desc(e),
+            created_at=e.created_at,
+        )
+        for e in raw_evts
+    ]
+
+    now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
+    st = journey.started_at
+    if st.tzinfo is not None:
+        st = st.replace(tzinfo=None)
+    duration_secs = int((now_utc - st).total_seconds()) if now_utc >= st else 0
+
+    dist_travelled = 0.0
+    if latest_loc and hasattr(latest_loc, "total_distance_m") and latest_loc.total_distance_m:
+        dist_travelled = round(latest_loc.total_distance_m / 1000.0, 2)
+    elif journey.total_distance_km:
+        dist_travelled = journey.total_distance_km
 
     return TrackingInfoResponse(
         journey_id=journey.id,
@@ -128,6 +181,11 @@ async def get_public_tracking_info(
             if (latest_event and isinstance(latest_event.metadata_json, dict))
             else None
         ),
+        ended_at=journey.ended_at,
+        total_distance_km=journey.total_distance_km,
+        duration_seconds=journey.duration_seconds or duration_secs,
+        distance_travelled_km=dist_travelled,
+        trip_events=public_events,
     )
 
 
@@ -254,3 +312,62 @@ async def get_public_tracking_trail(
         )
         for loc in locations
     ]
+
+
+@router.get("/{token}/events", response_model=List[PublicTripEvent])
+async def get_public_tracking_events(
+    token: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Retrieve public trip events timeline for the active journey."""
+    redis_svc = get_redis_service()
+    validation_res = await validate_tracking_token(db=db, token=token, redis_svc=redis_svc)
+
+    if not validation_res:
+        raise HTTPException(
+            status_code=status.HTTP_410_GONE,
+            detail="THIS JOURNEY HAS ENDED. Tracking access is no longer available.",
+        )
+
+    journey, _ = validation_res
+
+    from app.models.trip_event import TripEvent
+    stmt = (
+        select(TripEvent)
+        .where(TripEvent.journey_id == journey.id)
+        .order_by(TripEvent.created_at.asc())
+        .limit(50)
+    )
+    res = await db.execute(stmt)
+    events = res.scalars().all()
+
+    def sanitize_event_desc(evt: TripEvent) -> str:
+        et = (evt.event_type or "").upper()
+        if et == "DEPARTURE":
+            return "Trip departed from origin"
+        elif et == "STOP":
+            return "Vehicle stationary / stopped"
+        elif et == "BREAK_START":
+            return "Driver scheduled rest break"
+        elif et == "BREAK_END":
+            return "Driver rest break completed"
+        elif et == "SOS":
+            return "Emergency alert reported"
+        elif et == "BREAKDOWN":
+            return "Vehicle maintenance alert"
+        elif et == "ARRIVAL":
+            return "Vehicle reached destination"
+        return f"Milestone: {et.replace('_', ' ').title()}"
+
+    return [
+        PublicTripEvent(
+            id=e.id,
+            event_type=e.event_type,
+            latitude=e.latitude,
+            longitude=e.longitude,
+            description=sanitize_event_desc(e),
+            created_at=e.created_at,
+        )
+        for e in events
+    ]
+

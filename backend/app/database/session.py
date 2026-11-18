@@ -68,6 +68,7 @@ async def init_db():
     import app.models.trip_event  # noqa: F401
     import app.models.event  # noqa: F401
     import app.models.geofence  # noqa: F401
+    import app.models.delivery_assignment  # noqa: F401
 
     if not settings.DATABASE_URL.startswith("sqlite"):
         from sqlalchemy import text
@@ -97,6 +98,9 @@ async def init_db():
                 "ALTER TABLE locations DROP COLUMN IF EXISTS device_id",
                 "ALTER TABLE journeys DROP COLUMN IF EXISTS device_id",
                 "ALTER TABLE trip_events ADD COLUMN IF NOT EXISTS is_dismissed BOOLEAN DEFAULT FALSE",
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS availability VARCHAR(50) DEFAULT 'AVAILABLE'",
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS availability_preference VARCHAR(50) DEFAULT 'AVAILABLE'",
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS availability_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
                 "DROP TABLE IF EXISTS device_geofences CASCADE",
                 "DROP TABLE IF EXISTS devices CASCADE",
             ]
@@ -123,6 +127,9 @@ async def init_db():
                 "ALTER TABLE locations ADD COLUMN attributes JSON",
                 "ALTER TABLE locations ADD COLUMN geom TEXT",
                 "ALTER TABLE trip_events ADD COLUMN is_dismissed BOOLEAN DEFAULT 0",
+                "ALTER TABLE users ADD COLUMN availability VARCHAR(50) DEFAULT 'AVAILABLE'",
+                "ALTER TABLE users ADD COLUMN availability_preference VARCHAR(50) DEFAULT 'AVAILABLE'",
+                "ALTER TABLE users ADD COLUMN availability_updated_at TIMESTAMP",
             ]:
                 try:
                     await conn.execute(text(col_sql))

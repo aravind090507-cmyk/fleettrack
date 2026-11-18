@@ -176,3 +176,51 @@ async def websocket_live_fleet(websocket: WebSocket, token: str = ""):
     except Exception as e:
         logger.error("Fleet WebSocket error: %s", e)
         await ws_mgr.disconnect_fleet(websocket, company_id=cid)
+
+
+@router.websocket("/ws/driver")
+async def websocket_driver(websocket: WebSocket, token: str = ""):
+    """
+    Authenticated real-time stream for mobile and desktop driver console.
+    Receives instant dispatch notifications, assignment requests, and cancellations.
+    """
+    if not is_allowed_origin(websocket):
+        logger.warning("Rejecting driver WebSocket: disallowed origin %s", websocket.headers.get("origin"))
+        await websocket.close(code=4403, reason="Forbidden: origin not allowed")
+        return
+
+    ws_mgr = get_ws_manager()
+
+    if not token:
+        await websocket.close(code=4401, reason="Unauthorized: token required")
+        return
+
+    payload = decode_access_token(token)
+    if not payload:
+        await websocket.close(code=4401, reason="Unauthorized: invalid token")
+        return
+
+    driver_id = payload.get("sub")
+    if not driver_id:
+        await websocket.close(code=4401, reason="Unauthorized: missing driver id")
+        return
+
+    # Accept and register driver connection
+    await ws_mgr.connect_driver(websocket, driver_id=driver_id)
+
+    await websocket.send_text(json.dumps({
+        "type": "DRIVER_STREAM_CONNECTED",
+        "driver_id": driver_id,
+        "driver_name": payload.get("name"),
+    }))
+
+    try:
+        while True:
+            data = await websocket.receive_text()
+            if data == "ping":
+                await websocket.send_text("pong")
+    except WebSocketDisconnect:
+        await ws_mgr.disconnect_driver(websocket, driver_id=driver_id)
+    except Exception as e:
+        logger.error("Driver WebSocket error: %s", e)
+        await ws_mgr.disconnect_driver(websocket, driver_id=driver_id)

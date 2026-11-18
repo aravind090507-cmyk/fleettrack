@@ -11,6 +11,7 @@ import {
   Shield,
   FileText,
   RotateCcw,
+  Send,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { useAuthStore } from '../../store/authStore';
@@ -27,6 +28,7 @@ export const Sidebar: React.FC = () => {
   const navItems = [
     { to: '/company', label: 'Overview', icon: LayoutDashboard, end: true },
     { to: '/company/live-map', label: 'Live Fleet Map', icon: MapPin },
+    { to: '/company/dispatch', label: 'Driver Dispatch', icon: Send },
     { to: '/company/vehicles', label: 'Fleet Assets', icon: Truck },
     { to: '/company/journeys', label: 'Active Trips', icon: Route },
     { to: '/company/history', label: 'Trip History', icon: History },

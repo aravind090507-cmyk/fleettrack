@@ -12,6 +12,7 @@ import { JourneyHistory } from './pages/JourneyHistory';
 import { GeofencesPage } from './pages/GeofencesPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { ReplayPage } from './pages/ReplayPage';
+import { DriverDispatchPage } from './pages/DriverDispatchPage';
 
 export const CompanyDashboard: React.FC = () => {
   return (
@@ -25,6 +26,7 @@ export const CompanyDashboard: React.FC = () => {
           <Routes>
             <Route index element={<Overview />} />
             <Route path="live-map" element={<LiveMap />} />
+            <Route path="dispatch" element={<DriverDispatchPage />} />
             <Route path="vehicles" element={<Vehicles />} />
             <Route path="journeys" element={<ActiveJourneys />} />
             <Route path="history" element={<JourneyHistory />} />

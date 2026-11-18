@@ -1,17 +1,57 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useParams } from 'react-router-dom';
-import { ShieldCheck, Radio, AlertOctagon, Gauge, MapPin, Navigation } from 'lucide-react';
+import {
+  ShieldCheck,
+  Radio,
+  AlertOctagon,
+  Gauge,
+  MapPin,
+  Navigation,
+  Compass,
+  Clock,
+  Activity,
+  Layers,
+  ChevronUp,
+  ChevronDown,
+  Share2,
+  CheckCircle2,
+  AlertTriangle,
+  Coffee,
+  Flag,
+  Crosshair,
+  Wifi,
+  WifiOff,
+} from 'lucide-react';
 import { trackingApi } from '../../services/api';
-import { LatestLocation, TrackingInfo, WebSocketMessage } from '../../types';
+import { LatestLocation, TrackingInfo, WebSocketMessage, PublicTripEvent } from '../../types';
 import { TrackingMap } from '../../components/map/TrackingMap';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { normalizeUtcTimestamp } from '../../utils/time';
 
 /**
+ * Format heading degrees into compass direction string (e.g. 45 -> "NE (45°)")
+ */
+function formatHeading(deg?: number): string {
+  if (deg === undefined || deg === null || isNaN(deg)) return 'N/A';
+  const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+  const idx = Math.round(((deg % 360) / 45)) % 8;
+  return `${dirs[idx]} (${Math.round(deg)}°)`;
+}
+
+/**
+ * Format seconds into HH:MM:SS
+ */
+function formatDuration(seconds: number): string {
+  if (!seconds || seconds < 0) return '00:00:00';
+  const hrs = Math.floor(seconds / 3600);
+  const mins = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
+  return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+}
+
+/**
  * Safe Base64URL JWT Decoder for Public Tracking Tokens
- * Replaces '-' with '+', '_' with '/', and pads with '=' before calling atob.
- * Fully wrapped in a try/catch block so invalid or malformed tokens never crash React.
  */
 function decodeTrackingJwt(token: string | undefined): TrackingInfo | null {
   if (!token) return null;
@@ -24,7 +64,6 @@ function decodeTrackingJwt(token: string | undefined): TrackingInfo | null {
       base64 += '=';
     }
 
-    // Decode UTF-8 correctly from binary string
     const binary = atob(base64);
     const bytes = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) {
@@ -68,6 +107,9 @@ function decodeTrackingJwt(token: string | undefined): TrackingInfo | null {
       },
       eta_minutes: undefined,
       distance_remaining_km: undefined,
+      distance_travelled_km: 0,
+      duration_seconds: 0,
+      trip_events: [],
     };
   } catch (err) {
     console.warn('Safe Base64URL JWT decoder caught token parse error:', err);
@@ -84,11 +126,16 @@ export const PublicTrackingPage: React.FC = () => {
   const [trackingInfo, setTrackingInfo] = useState<TrackingInfo | null>(null);
   const [currentLocation, setCurrentLocation] = useState<LatestLocation | null>(null);
   const [routeHistory, setRouteHistory] = useState<[number, number][]>([]);
+  const [tripEvents, setTripEvents] = useState<PublicTripEvent[]>([]);
   const [isEnded, setIsEnded] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(!fallbackInfo);
   const [networkError, setNetworkError] = useState<string | null>(null);
   const [lastPingTime, setLastPingTime] = useState<number>(Date.now());
   const [secondsSinceLastPing, setSecondsSinceLastPing] = useState<number>(0);
+  const [elapsedDuration, setElapsedDuration] = useState<number>(0);
+  const [activeSheetTab, setActiveSheetTab] = useState<'metrics' | 'timeline'>('metrics');
+  const [isSheetExpanded, setIsSheetExpanded] = useState<boolean>(false);
+  const [copiedToast, setCopiedToast] = useState(false);
 
   // Active tracking state: prioritizes live API response, falls back to decoded JWT claims
   const activeInfo = trackingInfo || fallbackInfo;
@@ -107,12 +154,14 @@ export const PublicTrackingPage: React.FC = () => {
         trackingApi.getTrail(token).catch(() => []),
       ]);
 
-      // Normalize started_at timestamp to avoid UTC/local offset bugs
       if (info && info.started_at) {
         info.started_at = normalizeUtcTimestamp(info.started_at) || info.started_at;
       }
 
       setTrackingInfo(info);
+      if (info.trip_events && Array.isArray(info.trip_events)) {
+        setTripEvents(info.trip_events);
+      }
       setNetworkError(null);
       setLastPingTime(Date.now());
 
@@ -158,6 +207,20 @@ export const PublicTrackingPage: React.FC = () => {
     }, 1000);
     return () => clearInterval(timer);
   }, [lastPingTime]);
+
+  // Live elapsed trip timer
+  useEffect(() => {
+    if (!activeInfo?.started_at) return;
+    const updateElapsed = () => {
+      const startMs = new Date(activeInfo.started_at).getTime();
+      const nowMs = Date.now();
+      const diffSec = Math.max(0, Math.floor((nowMs - startMs) / 1000));
+      setElapsedDuration(diffSec);
+    };
+    updateElapsed();
+    const interval = setInterval(updateElapsed, 1000);
+    return () => clearInterval(interval);
+  }, [activeInfo?.started_at]);
 
   // Initial load
   useEffect(() => {
@@ -205,6 +268,17 @@ export const PublicTrackingPage: React.FC = () => {
         }
         return [...prev, [msg.latitude, msg.longitude]];
       });
+    } else if (msg.type === 'TRIP_EVENT' || msg.type === 'GEOFENCE_ALERT') {
+      // Add live event to timeline
+      const newEvent: PublicTripEvent = {
+        id: `evt-${Date.now()}`,
+        event_type: msg.event_type || 'UPDATE',
+        latitude: msg.latitude || 0,
+        longitude: msg.longitude || 0,
+        description: msg.event_type ? `Milestone: ${msg.event_type.replace('_', ' ')}` : 'Operational update',
+        created_at: new Date().toISOString(),
+      };
+      setTripEvents((prev) => [newEvent, ...prev]);
     } else if (msg.type === 'JOURNEY_COMPLETED') {
       setIsEnded(true);
     }
@@ -231,31 +305,36 @@ export const PublicTrackingPage: React.FC = () => {
     return () => clearInterval(interval);
   }, [fetchLiveState, isEnded, token, isConnected]);
 
-  // If the journey has concluded or token expired
+  // If the journey has concluded or token expired (HTTP 410 / Code 4410)
   if (isEnded) {
     return (
-      <div className="min-h-screen bg-bespoke-dark flex items-center justify-center p-6 text-center select-none font-sans">
-        <div className="max-w-md w-full bg-bespoke-surface border border-bespoke-border rounded-xl p-8 shadow-2xl space-y-5">
-          <div className="w-16 h-16 rounded-xl bg-bespoke-error/15 border border-bespoke-error/40 text-bespoke-linen flex items-center justify-center mx-auto shadow-xl">
-            <AlertOctagon className="w-8 h-8 text-bespoke-error" />
+      <div className="min-h-screen bg-[#1C1C1E] flex items-center justify-center p-6 text-center select-none font-sans">
+        <div className="max-w-md w-full bg-[#2C2C2E] border border-white/10 rounded-3xl p-8 shadow-2xl space-y-5 animate-fadeIn">
+          <div className="w-16 h-16 rounded-2xl bg-rose-500/20 border border-rose-500/30 text-rose-400 flex items-center justify-center mx-auto shadow-xl">
+            <AlertOctagon className="w-8 h-8 text-rose-500" />
           </div>
 
           <div>
-            <h1 className="text-xl font-light text-bespoke-offwhite tracking-wider uppercase">
-              THIS JOURNEY HAS CONCLUDED
+            <span className="text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20">
+              TRACKING ENDED (HTTP 410)
+            </span>
+            <h1 className="text-xl font-bold text-white tracking-tight mt-3">
+              This Journey Has Concluded
             </h1>
-            <p className="text-sm text-bespoke-champagne/70 mt-2 font-normal">
-              Tracking session has expired.
+            <p className="text-xs text-zinc-400 mt-2 font-medium">
+              The destination has been reached and the ephemeral tracking credentials have been permanently revoked in accordance with privacy safeguards.
             </p>
           </div>
 
-          <div className="p-4 bg-bespoke-black/80 rounded border border-bespoke-border text-xs text-bespoke-dim leading-relaxed font-sans">
-            In accordance with advisory security protocols, temporary journey credentials are permanently revoked (HTTP
-            410 Gone) immediately upon destination conclusion.
+          <div className="p-4 bg-black/40 rounded-2xl border border-white/5 text-[11px] text-zinc-400 leading-relaxed font-sans text-left">
+            <p className="font-semibold text-zinc-300 mb-1 flex items-center gap-1.5">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> Ephemeral Privacy Protection:
+            </p>
+            Public tracking links expire immediately upon journey completion to protect driver privacy and asset telemetry.
           </div>
 
-          <div className="pt-2 text-[10px] text-bespoke-dim font-mono tracking-[0.14em] uppercase">
-            Bespoke Telematics Advisory Protocol
+          <div className="pt-1 text-[10px] text-zinc-500 font-mono tracking-wider uppercase">
+            FleetTrack Enterprise Telematics
           </div>
         </div>
       </div>
@@ -270,13 +349,13 @@ export const PublicTrackingPage: React.FC = () => {
   // If token is invalid or completely missing and no claims exist
   if (!activeInfo) {
     return (
-      <div className="min-h-screen bg-bespoke-dark flex items-center justify-center p-6 text-center select-none font-sans">
-        <div className="max-w-md w-full bg-bespoke-surface border border-bespoke-border rounded-xl p-8 shadow-2xl space-y-5">
-          <div className="w-16 h-16 rounded-xl bg-bespoke-card border border-bespoke-gold/30 text-bespoke-gold flex items-center justify-center mx-auto shadow-xl">
-            <Radio className="w-8 h-8 animate-pulse" />
+      <div className="min-h-screen bg-[#1C1C1E] flex items-center justify-center p-6 text-center select-none font-sans">
+        <div className="max-w-md w-full bg-[#2C2C2E] border border-white/10 rounded-3xl p-8 shadow-2xl space-y-5">
+          <div className="w-16 h-16 rounded-2xl bg-blue-500/20 border border-blue-500/30 text-blue-400 flex items-center justify-center mx-auto shadow-xl">
+            <Radio className="w-8 h-8 animate-pulse text-blue-400" />
           </div>
-          <h2 className="text-base font-light text-bespoke-offwhite uppercase tracking-wide">Connecting to Telematics Hub</h2>
-          <p className="text-xs text-bespoke-champagne/70">
+          <h2 className="text-base font-bold text-white uppercase tracking-wide">Connecting to Telematics Hub</h2>
+          <p className="text-xs text-zinc-400">
             {networkError || 'Establishing encrypted telemetry stream with driver unit...'}
           </p>
           <button
@@ -284,7 +363,7 @@ export const PublicTrackingPage: React.FC = () => {
               setIsLoading(true);
               fetchLiveState();
             }}
-            className="px-5 py-2.5 bg-bespoke-gold hover:bg-bespoke-goldHover text-bespoke-black rounded text-xs font-semibold uppercase tracking-[0.08em] transition shadow-lg cursor-pointer"
+            className="px-5 py-2.5 bg-[#0071E3] hover:bg-blue-600 text-white rounded-xl text-xs font-semibold uppercase tracking-wider transition shadow-lg cursor-pointer"
           >
             Retry Connection
           </button>
@@ -293,8 +372,9 @@ export const PublicTrackingPage: React.FC = () => {
     );
   }
 
-  const isSignalLost = secondsSinceLastPing > 15;
-  const [copiedToast, setCopiedToast] = useState(false);
+  // Status Badges (C.7)
+  const isStale = secondsSinceLastPing > 60;
+  const isReconnecting = !isConnected && !isStale;
 
   const handleShare = () => {
     navigator.clipboard?.writeText(window.location.href);
@@ -310,57 +390,77 @@ export const PublicTrackingPage: React.FC = () => {
       : `${Math.floor(activeInfo.eta_minutes / 60)}h ${Math.round(activeInfo.eta_minutes % 60)}m`
     : 'Calculating...';
 
-  // Calculate approximate completion progress
-  const totalApprox = (activeInfo.distance_remaining_km != null && routeHistory.length > 0)
-    ? Math.min(Math.max(Math.round((routeHistory.length / (routeHistory.length + (activeInfo.distance_remaining_km * 3))) * 100), 15), 98)
-    : 45;
+  // Distance calculations
+  const distTraveled = activeInfo.distance_travelled_km != null && activeInfo.distance_travelled_km > 0
+    ? activeInfo.distance_travelled_km
+    : (routeHistory.length > 1 ? (routeHistory.length * 0.05) : 0);
+  const distRemaining = activeInfo.distance_remaining_km ?? 0;
+  const totalDist = distTraveled + distRemaining;
+  const progressPercent = totalDist > 0
+    ? Math.min(Math.max(Math.round((distTraveled / totalDist) * 100), 5), 98)
+    : 35;
 
   return (
     <div className="flex flex-col h-screen bg-[#F2F2F7] text-[#1C1C1E] overflow-hidden relative font-sans select-none">
       
-      {/* FLOATING APPLE DYNAMIC ISLAND (TOP CENTER) */}
-      <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 pointer-events-auto">
-        <div className="bg-black/90 text-white backdrop-blur-2xl rounded-full px-5 py-2.5 shadow-2xl flex items-center space-x-3.5 border border-white/15 transition-all">
-          <div className="relative flex items-center justify-center">
-            <div className={`w-2.5 h-2.5 rounded-full ${isSignalLost ? 'bg-amber-400' : 'bg-emerald-500'}`} />
-            <div className={`absolute w-5 h-5 rounded-full ${isSignalLost ? 'bg-amber-400/40 animate-ping' : 'bg-emerald-400/40 animate-ping'}`} />
+      {/* C.1 & C.7: FLOATING TOP DYNAMIC BAR */}
+      <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 pointer-events-auto w-[94vw] max-w-xl">
+        <div className="bg-black/90 text-white backdrop-blur-2xl rounded-2xl px-4 py-2.5 shadow-2xl border border-white/15 flex items-center justify-between transition-all">
+          
+          {/* Status Indicator & Registration */}
+          <div className="flex items-center gap-3">
+            <div className="relative flex items-center justify-center">
+              {isStale ? (
+                <div className="w-2.5 h-2.5 rounded-full bg-amber-500 ring-4 ring-amber-500/20" />
+              ) : isConnected ? (
+                <>
+                  <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                  <div className="absolute w-5 h-5 rounded-full bg-emerald-400/40 animate-ping" />
+                </>
+              ) : (
+                <div className="w-2.5 h-2.5 rounded-full bg-blue-500" />
+              )}
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5">
+                <span className="font-bold text-xs text-white font-mono tracking-wider">
+                  {activeInfo.vehicle_registration}
+                </span>
+                <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full bg-white/10 text-zinc-300">
+                  {activeInfo.vehicle_type}
+                </span>
+              </div>
+              <p className="text-[10px] text-zinc-400 truncate max-w-[150px]">
+                Driver: {activeInfo.driver_name}
+              </p>
+            </div>
           </div>
-          <div className="flex items-center space-x-2 text-xs">
-            <span className="font-semibold text-zinc-300 font-mono tracking-wider">{activeInfo.vehicle_registration}</span>
-            <span className="text-zinc-600">•</span>
-            <span className="font-bold text-emerald-400">{etaDisplay}</span>
-            {activeInfo.distance_remaining_km != null && (
-              <>
-                <span className="text-zinc-600">•</span>
-                <span className="text-zinc-300">{activeInfo.distance_remaining_km.toFixed(1)} km</span>
-              </>
+
+          {/* Central ETA & State Badge */}
+          <div className="flex items-center gap-2">
+            {isStale ? (
+              <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1">
+                <AlertTriangle className="w-2.5 h-2.5" /> STALE ({secondsSinceLastPing}s)
+              </span>
+            ) : isReconnecting ? (
+              <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30 flex items-center gap-1">
+                <WifiOff className="w-2.5 h-2.5" /> RECONNECTING
+              </span>
+            ) : (
+              <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+                <Wifi className="w-2.5 h-2.5" /> LIVE
+              </span>
             )}
-          </div>
-          <div className="pl-2 border-l border-zinc-700/80 flex items-center space-x-1.5 text-zinc-400 text-xs">
-            <span className="text-[10px] uppercase font-semibold text-blue-400">
-              {isSignalLost ? 'SYNC PAUSED' : isConnected ? 'LIVE 5G' : 'GPS'}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* TOP LEFT ROUTE HUD */}
-      <div className="absolute top-4 left-4 z-20 hidden sm:block pointer-events-auto">
-        <div className="apple-glass rounded-2xl px-4 py-3 shadow-lg border border-white/80 max-w-xs">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-xl bg-emerald-500 text-white flex items-center justify-center text-lg shadow-md shadow-emerald-500/25">
-              <Navigation className="w-5 h-5" />
-            </div>
-            <div className="truncate">
-              <div className="text-[10px] font-bold tracking-wider uppercase text-emerald-600">Heading to</div>
-              <div className="text-xs font-bold text-zinc-900 truncate">{activeInfo.destination_name}</div>
+            <div className="text-right pl-2 border-l border-white/15">
+              <span className="text-[10px] text-zinc-400 uppercase font-medium block leading-none">ETA</span>
+              <span className="text-xs font-bold text-emerald-400">{etaDisplay}</span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* INTERACTIVE APPLE MAP */}
-      <div className="flex-1 w-full h-full">
+      {/* C.2: INTERACTIVE LEAFLET TRACKING MAP */}
+      <div className="flex-1 w-full h-full relative z-0">
         <TrackingMap
           currentLocation={currentLocation}
           origin={{
@@ -377,100 +477,225 @@ export const PublicTrackingPage: React.FC = () => {
         />
       </div>
 
-      {/* FLOATING APPLE BOTTOM SHEET */}
-      <div className="absolute bottom-5 left-1/2 -translate-x-1/2 w-[92vw] max-w-lg z-30 pointer-events-auto">
-        <div className="apple-glass rounded-[28px] p-5 shadow-2xl border border-white/90">
+      {/* C.1, C.3, C.4, C.5: CONSUMER DASHBOARD BOTTOM SHEET */}
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-[94vw] max-w-lg z-20 pointer-events-auto">
+        <div className="bg-white/90 backdrop-blur-2xl rounded-3xl p-4 shadow-2xl border border-white/80 transition-all">
           
-          {/* Grabber Handle */}
-          <div className="w-10 h-1 bg-zinc-300 rounded-full mx-auto mb-3.5" />
-
-          {/* Vehicle & Driver Identity */}
-          <div className="flex items-center justify-between mb-3.5">
-            <div className="flex items-center space-x-3">
-              <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-500 text-white flex items-center justify-center text-lg shadow-md shadow-blue-500/25">
-                <Navigation className="w-5 h-5" />
-              </div>
-              <div>
-                <div className="flex items-center space-x-2">
-                  <h2 className="text-sm font-bold text-zinc-900 font-mono tracking-tight">
-                    {activeInfo.vehicle_registration}
-                  </h2>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700">
-                    {activeInfo.vehicle_type}
+          {/* Header Controls & Tab Switcher */}
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-1 bg-zinc-100 p-0.5 rounded-xl border border-black/[0.04]">
+              <button
+                type="button"
+                onClick={() => setActiveSheetTab('metrics')}
+                className={`py-1.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  activeSheetTab === 'metrics'
+                    ? 'bg-white text-zinc-900 shadow-sm'
+                    : 'text-zinc-600 hover:text-zinc-900'
+                }`}
+              >
+                Live Telemetry
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveSheetTab('timeline')}
+                className={`py-1.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                  activeSheetTab === 'timeline'
+                    ? 'bg-white text-zinc-900 shadow-sm'
+                    : 'text-zinc-600 hover:text-zinc-900'
+                }`}
+              >
+                <span>Trip Events</span>
+                {tripEvents.length > 0 && (
+                  <span className="px-1.5 py-0.2 rounded-full bg-blue-100 text-[#0071E3] text-[9px] font-extrabold">
+                    {tripEvents.length}
                   </span>
+                )}
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleShare}
+                title="Share Tracking Link"
+                className="p-2 rounded-xl bg-blue-50 text-[#0071E3] hover:bg-blue-100 transition-colors text-xs font-bold flex items-center gap-1 cursor-pointer"
+              >
+                <Share2 className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">{copiedToast ? 'Copied!' : 'Share'}</span>
+              </button>
+              <button
+                onClick={() => setIsSheetExpanded(!isSheetExpanded)}
+                title={isSheetExpanded ? 'Minimize' : 'Expand'}
+                className="p-1.5 text-zinc-400 hover:text-zinc-700 rounded-lg hover:bg-zinc-100 transition-colors cursor-pointer"
+              >
+                {isSheetExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
+
+          {/* TAB 1: METRICS & JOURNEY PROGRESSION */}
+          {activeSheetTab === 'metrics' && (
+            <div className="space-y-3">
+              {/* C.3: Journey Progression Stepper */}
+              <div className="p-3 bg-zinc-50/80 rounded-2xl border border-black/[0.04] space-y-2">
+                <div className="flex items-center justify-between text-xs font-bold">
+                  <div className="flex items-center gap-1.5 text-zinc-700 min-w-0">
+                    <div className="w-2 h-2 rounded-full bg-zinc-900 shrink-0" />
+                    <span className="truncate max-w-[120px] text-[11px]">{activeInfo.origin_name}</span>
+                  </div>
+                  <span className="text-[#0071E3] font-mono text-[11px] font-extrabold shrink-0 px-2">
+                    {progressPercent}%
+                  </span>
+                  <div className="flex items-center gap-1.5 text-emerald-700 min-w-0 justify-end">
+                    <span className="truncate max-w-[120px] text-[11px] text-right">{activeInfo.destination_name}</span>
+                    <div className="w-2 h-2 rounded-full bg-rose-500 shrink-0" />
+                  </div>
                 </div>
-                <p className="text-xs text-zinc-500 font-medium mt-0.5">
-                  Driver: <strong className="text-zinc-800">{activeInfo.driver_name || 'Assigned Driver'}</strong>
-                </p>
-              </div>
-            </div>
 
-            <button
-              onClick={handleShare}
-              className="apple-pill-btn px-3.5 py-1.5 rounded-full bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-md shadow-blue-500/25 flex items-center space-x-1.5 cursor-pointer"
-            >
-              <span>{copiedToast ? '✓ Copied' : 'Share ETA'}</span>
-            </button>
-          </div>
+                {/* Progress Bar */}
+                <div className="w-full bg-zinc-200/80 rounded-full h-1.5 overflow-hidden">
+                  <div
+                    className="bg-gradient-to-r from-[#0071E3] to-emerald-500 h-1.5 rounded-full transition-all duration-500"
+                    style={{ width: `${progressPercent}%` }}
+                  />
+                </div>
 
-          {/* Metric Grid */}
-          <div className="grid grid-cols-4 gap-2 my-3">
-            <div className="bg-white/90 rounded-2xl p-2.5 text-center border border-black/[0.06] shadow-sm">
-              <div className="text-[10px] font-bold text-zinc-700 uppercase tracking-wider">Speed</div>
-              <div className="text-sm font-bold text-zinc-900 mt-0.5">
-                {currentLocation?.speed || 0} <span className="text-[10px] font-semibold text-zinc-600">km/h</span>
+                <div className="flex items-center justify-between text-[10px] text-zinc-500 font-medium pt-0.5">
+                  <span>Traveled: <strong>{distTraveled.toFixed(1)} km</strong></span>
+                  <span>Duration: <strong>{formatDuration(elapsedDuration)}</strong></span>
+                  <span>Remaining: <strong>{distRemaining.toFixed(1)} km</strong></span>
+                </div>
               </div>
-            </div>
-            <div className="bg-white/90 rounded-2xl p-2.5 text-center border border-black/[0.06] shadow-sm">
-              <div className="text-[10px] font-bold text-zinc-700 uppercase tracking-wider">ETA</div>
-              <div className="text-sm font-bold text-emerald-700 mt-0.5">{etaDisplay}</div>
-            </div>
-            <div className="bg-white/90 rounded-2xl p-2.5 text-center border border-black/[0.06] shadow-sm">
-              <div className="text-[10px] font-bold text-zinc-700 uppercase tracking-wider">Remaining</div>
-              <div className="text-sm font-bold text-zinc-900 mt-0.5">
-                {activeInfo.distance_remaining_km != null ? activeInfo.distance_remaining_km.toFixed(1) : '--'}
-                <span className="text-[10px] font-semibold text-zinc-600"> km</span>
-              </div>
-            </div>
-            <div className="bg-white/90 rounded-2xl p-2.5 text-center border border-black/[0.06] shadow-sm">
-              <div className="text-[10px] font-bold text-zinc-700 uppercase tracking-wider">Status</div>
-              <div className="text-xs font-bold text-[#0071E3] mt-1">
-                {isConnected ? 'Live' : 'Syncing'}
-              </div>
-            </div>
-          </div>
 
-          {/* Progress bar */}
-          <div className="my-2.5">
-            <div className="flex items-center justify-between text-[11px] font-bold text-zinc-800 mb-1">
-              <span className="truncate max-w-[140px]">{activeInfo.origin_name}</span>
-              <span className="text-blue-600 font-mono">{totalApprox}%</span>
-              <span className="truncate max-w-[140px] text-right">{activeInfo.destination_name}</span>
-            </div>
-            <div className="w-full bg-zinc-200/80 rounded-full h-1.5 overflow-hidden">
-              <div
-                className="bg-gradient-to-r from-blue-500 to-emerald-500 h-1.5 rounded-full transition-all duration-500"
-                style={{ width: `${totalApprox}%` }}
-              />
-            </div>
-          </div>
+              {/* C.4: Live Vehicle Information 4-Pill Grid */}
+              <div className="grid grid-cols-4 gap-2">
+                {/* Speed */}
+                <div className="bg-white rounded-2xl p-2.5 text-center border border-black/[0.06] shadow-sm">
+                  <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider flex items-center justify-center gap-1">
+                    <Gauge className="w-3 h-3 text-[#0071E3]" /> Speed
+                  </div>
+                  <div className="text-sm font-bold text-zinc-900 mt-1">
+                    {currentLocation?.speed || 0}{' '}
+                    <span className="text-[10px] font-normal text-zinc-500">km/h</span>
+                  </div>
+                </div>
 
-          {/* Emergency / Alert Banner if present */}
-          {activeInfo.latest_event_type && activeInfo.latest_event_type !== 'RESUME' && (
-            <div className="mt-2.5 px-3 py-2 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-900 text-xs font-semibold flex items-center justify-between">
-              <span>⚠️ Event: {activeInfo.latest_event_type}</span>
-              {activeInfo.latest_event_note && (
-                <span className="text-zinc-600 text-[11px] font-normal">{activeInfo.latest_event_note}</span>
+                {/* Heading / Direction */}
+                <div className="bg-white rounded-2xl p-2.5 text-center border border-black/[0.06] shadow-sm">
+                  <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider flex items-center justify-center gap-1">
+                    <Compass className="w-3 h-3 text-indigo-500" /> Heading
+                  </div>
+                  <div className="text-xs font-bold text-zinc-900 mt-1 truncate">
+                    {formatHeading(currentLocation?.heading)}
+                  </div>
+                </div>
+
+                {/* GPS Accuracy */}
+                <div className="bg-white rounded-2xl p-2.5 text-center border border-black/[0.06] shadow-sm">
+                  <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider flex items-center justify-center gap-1">
+                    <Crosshair className="w-3 h-3 text-emerald-500" /> GPS
+                  </div>
+                  <div className="text-xs font-bold text-zinc-900 mt-1">
+                    ±{currentLocation?.accuracy ? Math.round(currentLocation.accuracy) : 5}m
+                  </div>
+                </div>
+
+                {/* Total Traveled */}
+                <div className="bg-white rounded-2xl p-2.5 text-center border border-black/[0.06] shadow-sm">
+                  <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider flex items-center justify-center gap-1">
+                    <Activity className="w-3 h-3 text-amber-500" /> Distance
+                  </div>
+                  <div className="text-xs font-bold text-zinc-900 mt-1">
+                    {distTraveled.toFixed(1)}{' '}
+                    <span className="text-[10px] font-normal text-zinc-500">km</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Collapsible Details */}
+              {isSheetExpanded && (
+                <div className="pt-2 border-t border-black/[0.06] text-xs space-y-1.5 text-zinc-600 animate-fadeIn">
+                  <div className="flex justify-between">
+                    <span className="font-medium text-zinc-500">Journey ID:</span>
+                    <span className="font-mono text-zinc-800">{activeInfo.journey_id ? `REF-${activeInfo.journey_id.slice(0, 8)}` : 'ACTIVE-TRIP'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="font-medium text-zinc-500">Last Telemetry Ping:</span>
+                    <span className="text-zinc-800">
+                      {secondsSinceLastPing === 0 ? 'Just now' : `${secondsSinceLastPing}s ago`}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="font-medium text-zinc-500">Assigned Driver:</span>
+                    <span className="font-bold text-zinc-800">{activeInfo.driver_name}</span>
+                  </div>
+                </div>
               )}
             </div>
           )}
 
+          {/* TAB 2: C.5 TRIP EVENT TIMELINE */}
+          {activeSheetTab === 'timeline' && (
+            <div className="space-y-2.5 max-h-56 overflow-y-auto pr-1">
+              {tripEvents.length === 0 ? (
+                <div className="text-center py-6 text-zinc-400">
+                  <Activity className="w-6 h-6 mx-auto mb-1 opacity-50" />
+                  <p className="text-xs font-medium">No operational events reported yet.</p>
+                  <p className="text-[10px] text-zinc-400">Events such as Departure, Breaks, Stops, and Arrivals appear here.</p>
+                </div>
+              ) : (
+                <div className="relative pl-4 space-y-3 before:absolute before:left-1.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-zinc-200">
+                  {tripEvents.map((evt, idx) => {
+                    const isAlert = ['SOS', 'BREAKDOWN', 'INCIDENT'].includes(evt.event_type?.toUpperCase());
+                    const isArrival = evt.event_type?.toUpperCase() === 'ARRIVAL';
+                    const isDeparture = evt.event_type?.toUpperCase() === 'DEPARTURE';
+
+                    return (
+                      <div key={evt.id || idx} className="relative flex items-start gap-2.5 text-xs">
+                        {/* Dot */}
+                        <div
+                          className={`absolute -left-4 top-1 w-3 h-3 rounded-full border-2 border-white ${
+                            isAlert
+                              ? 'bg-rose-500'
+                              : isArrival
+                              ? 'bg-emerald-500'
+                              : isDeparture
+                              ? 'bg-blue-600'
+                              : 'bg-zinc-400'
+                          }`}
+                        />
+                        <div className="flex-1 min-w-0 bg-zinc-50 p-2 rounded-xl border border-black/[0.04]">
+                          <div className="flex items-center justify-between mb-0.5">
+                            <span className="font-bold text-zinc-900 text-[11px]">
+                              {evt.event_type.replace('_', ' ')}
+                            </span>
+                            <span className="text-[10px] text-zinc-400 font-mono">
+                              {evt.created_at
+                                ? new Date(evt.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                                : ''}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-zinc-600 leading-tight">
+                            {evt.description || 'Milestone logged along journey route.'}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Privacy Note (C.6) */}
+          <div className="pt-2 text-[10px] text-center text-zinc-400 font-medium">
+            Protected by FleetTrack Ephemeral Telematics Protocol • Read-Only
+          </div>
         </div>
       </div>
 
       {/* TOAST FEEDBACK */}
       {copiedToast && (
-        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-black/90 text-white text-xs font-medium px-4 py-2 rounded-full shadow-2xl border border-white/20 animate-fade-in">
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-black/90 text-white text-xs font-semibold px-4 py-2 rounded-full shadow-2xl border border-white/20 animate-fadeIn">
           Tracking link copied to clipboard!
         </div>
       )}
