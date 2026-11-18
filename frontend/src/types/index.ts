@@ -243,7 +243,9 @@ export interface Geofence {
   company_id: string;
   name: string;
   description?: string | null;
-  area: string;
+  kind?: string;
+  geometry?: any;
+  area?: string;
   attributes: Record<string, any>;
   created_at: string;
   device_ids?: string[];

@@ -37,3 +37,15 @@ class Geofence(Base):
 
     # Relationships
     company = relationship("Company")
+
+    @property
+    def area(self) -> str | None:
+        """Returns WKT area string representation for backward compatibility."""
+        if not self.geometry:
+            return None
+        from app.pipeline.geo import parse_geometry
+        try:
+            evaluator = parse_geometry(self.geometry)
+            return evaluator.to_wkt()
+        except Exception:
+            return None

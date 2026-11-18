@@ -93,6 +93,21 @@ async def test_geofences_crud_and_reports(auth_headers_factory):
         assert res_gf.status_code == 201
         gf_data = res_gf.json()
         gf_id = gf_data["id"]
+        assert "area" in gf_data
+        assert "CIRCLE" in gf_data["area"]
+
+        # Test creating geofence via area string (like the frontend form payload)
+        gf_area_payload = {
+            "name": "Warehouse Perimeter",
+            "description": "Logistics depot",
+            "area": "CIRCLE (13.03730 80.16487, 500)",
+        }
+        res_area_gf = await client.post("/api/geofences", json=gf_area_payload, headers=mgr_headers)
+        assert res_area_gf.status_code == 201
+        area_gf_data = res_area_gf.json()
+        assert area_gf_data["kind"] == "circle"
+        assert area_gf_data["geometry"]["center"] == [13.0373, 80.16487]
+        assert area_gf_data["geometry"]["radius"] == 500.0
 
         # List geofences
         res_gfs = await client.get("/api/geofences", headers=mgr_headers)

@@ -291,7 +291,14 @@ export const geofencesApi = {
     const { data } = await api.get(`/api/geofences/${id}`);
     return data as Geofence;
   },
-  create: async (geofence: { name: string; description?: string; area: string; attributes?: Record<string, any> }) => {
+  create: async (geofence: {
+    name: string;
+    description?: string;
+    kind?: string;
+    geometry?: any;
+    area?: string;
+    attributes?: Record<string, any>;
+  }) => {
     const { data } = await api.post('/api/geofences', geofence);
     return data as Geofence;
   },
