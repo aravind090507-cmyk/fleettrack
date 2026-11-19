@@ -19,127 +19,213 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     bind = op.get_bind()
     is_postgres = bind.dialect.name == "postgresql"
+    inspector = sa.inspect(bind)
+    existing_tables = set(inspector.get_table_names())
 
     # Enable PostGIS extension on PostgreSQL
     if is_postgres:
-        op.execute("CREATE EXTENSION IF NOT EXISTS postgis;")
+        try:
+            op.execute("CREATE EXTENSION IF NOT EXISTS postgis;")
+        except Exception:
+            pass
 
     # 1. Devices table
-    op.create_table(
-        "devices",
-        sa.Column("id", sa.String(36), primary_key=True),
-        sa.Column("company_id", sa.String(36), sa.ForeignKey("companies.id"), nullable=False, index=True),
-        sa.Column("unique_id", sa.String(100), unique=True, index=True, nullable=False),
-        sa.Column("name", sa.String(255), nullable=False),
-        sa.Column("vehicle_id", sa.String(36), sa.ForeignKey("vehicles.id"), unique=True, nullable=True),
-        sa.Column("status", sa.String(20), default="unknown", nullable=False),
-        sa.Column("last_update", sa.DateTime(), nullable=True),
-        sa.Column("position_id", sa.BigInteger(), nullable=True),
-        sa.Column("disabled", sa.Boolean(), default=False, nullable=False),
-        sa.Column("attributes", sa.JSON(), nullable=True),
-        # Traccar state fields
-        sa.Column("motion_streak", sa.Boolean(), default=False, nullable=False),
-        sa.Column("motion_state", sa.Boolean(), default=False, nullable=False),
-        sa.Column("motion_position_id", sa.BigInteger(), nullable=True),
-        sa.Column("motion_time", sa.DateTime(), nullable=True),
-        sa.Column("motion_distance_m", sa.Float(), default=0.0, nullable=False),
-        sa.Column("motion_lat", sa.Float(), nullable=True),
-        sa.Column("motion_lng", sa.Float(), nullable=True),
-        sa.Column("overspeed_state", sa.Boolean(), default=False, nullable=False),
-        sa.Column("overspeed_time", sa.DateTime(), nullable=True),
-        sa.Column("overspeed_geofence_id", sa.String(36), nullable=True),
-        sa.Column("created_at", sa.DateTime(), server_default=sa.func.now(), nullable=False),
-    )
+    if "devices" not in existing_tables:
+        op.create_table(
+            "devices",
+            sa.Column("id", sa.String(36), primary_key=True),
+            sa.Column("company_id", sa.String(36), sa.ForeignKey("companies.id"), nullable=False, index=True),
+            sa.Column("unique_id", sa.String(100), unique=True, index=True, nullable=False),
+            sa.Column("name", sa.String(255), nullable=False),
+            sa.Column("vehicle_id", sa.String(36), sa.ForeignKey("vehicles.id"), unique=True, nullable=True),
+            sa.Column("status", sa.String(20), default="unknown", nullable=False),
+            sa.Column("last_update", sa.DateTime(), nullable=True),
+            sa.Column("position_id", sa.BigInteger(), nullable=True),
+            sa.Column("disabled", sa.Boolean(), default=False, nullable=False),
+            sa.Column("attributes", sa.JSON(), nullable=True),
+            # Traccar state fields
+            sa.Column("motion_streak", sa.Boolean(), default=False, nullable=False),
+            sa.Column("motion_state", sa.Boolean(), default=False, nullable=False),
+            sa.Column("motion_position_id", sa.BigInteger(), nullable=True),
+            sa.Column("motion_time", sa.DateTime(), nullable=True),
+            sa.Column("motion_distance_m", sa.Float(), default=0.0, nullable=False),
+            sa.Column("motion_lat", sa.Float(), nullable=True),
+            sa.Column("motion_lng", sa.Float(), nullable=True),
+            sa.Column("overspeed_state", sa.Boolean(), default=False, nullable=False),
+            sa.Column("overspeed_time", sa.DateTime(), nullable=True),
+            sa.Column("overspeed_geofence_id", sa.String(36), nullable=True),
+            sa.Column("created_at", sa.DateTime(), server_default=sa.func.now(), nullable=False),
+        )
 
     # 2. Geofences table
-    op.create_table(
-        "geofences",
-        sa.Column("id", sa.String(36), primary_key=True),
-        sa.Column("company_id", sa.String(36), sa.ForeignKey("companies.id"), nullable=False, index=True),
-        sa.Column("name", sa.String(255), nullable=False),
-        sa.Column("description", sa.Text(), nullable=True),
-        sa.Column("kind", sa.String(20), nullable=False),
-        sa.Column("geometry", sa.JSON(), nullable=False),
-        sa.Column("geom", GeometryColumn("GEOMETRY", 4326), nullable=True),
-        sa.Column("attributes", sa.JSON(), nullable=True),
-        sa.Column("created_at", sa.DateTime(), server_default=sa.func.now(), nullable=False),
-    )
+    if "geofences" not in existing_tables:
+        op.create_table(
+            "geofences",
+            sa.Column("id", sa.String(36), primary_key=True),
+            sa.Column("company_id", sa.String(36), sa.ForeignKey("companies.id"), nullable=False, index=True),
+            sa.Column("name", sa.String(255), nullable=False),
+            sa.Column("description", sa.Text(), nullable=True),
+            sa.Column("kind", sa.String(20), nullable=False),
+            sa.Column("geometry", sa.JSON(), nullable=False),
+            sa.Column("geom", GeometryColumn("GEOMETRY", 4326), nullable=True),
+            sa.Column("attributes", sa.JSON(), nullable=True),
+            sa.Column("created_at", sa.DateTime(), server_default=sa.func.now(), nullable=False),
+        )
 
     # 3. DeviceGeofences table
-    op.create_table(
-        "device_geofences",
-        sa.Column("id", sa.Integer().with_variant(sa.BigInteger, "postgresql"), primary_key=True, autoincrement=True),
-        sa.Column("device_id", sa.String(36), sa.ForeignKey("devices.id", ondelete="CASCADE"), nullable=True, index=True),
-        sa.Column("geofence_id", sa.String(36), sa.ForeignKey("geofences.id", ondelete="CASCADE"), nullable=False, index=True),
-        sa.Column("all_devices", sa.Boolean(), default=False, nullable=False),
-    )
+    if "device_geofences" not in existing_tables:
+        op.create_table(
+            "device_geofences",
+            sa.Column("id", sa.Integer().with_variant(sa.BigInteger, "postgresql"), primary_key=True, autoincrement=True),
+            sa.Column("device_id", sa.String(36), sa.ForeignKey("devices.id", ondelete="CASCADE"), nullable=True, index=True),
+            sa.Column("geofence_id", sa.String(36), sa.ForeignKey("geofences.id", ondelete="CASCADE"), nullable=False, index=True),
+            sa.Column("all_devices", sa.Boolean(), default=False, nullable=False),
+        )
 
     # 4. Events table
-    op.create_table(
-        "events",
-        sa.Column("id", sa.String(36), primary_key=True),
-        sa.Column("company_id", sa.String(36), sa.ForeignKey("companies.id"), nullable=False, index=True),
-        sa.Column("device_id", sa.String(36), sa.ForeignKey("devices.id", ondelete="CASCADE"), nullable=False, index=True),
-        sa.Column("journey_id", sa.String(36), sa.ForeignKey("journeys.id", ondelete="SET NULL"), nullable=True, index=True),
-        sa.Column("position_id", sa.BigInteger(), nullable=True),
-        sa.Column("geofence_id", sa.String(36), sa.ForeignKey("geofences.id", ondelete="SET NULL"), nullable=True),
-        sa.Column("type", sa.String(50), nullable=False, index=True),
-        sa.Column("event_time", sa.DateTime(), nullable=False, index=True),
-        sa.Column("attributes", sa.JSON(), nullable=True),
-        sa.Column("created_at", sa.DateTime(), server_default=sa.func.now(), nullable=False),
-    )
+    if "events" not in existing_tables:
+        op.create_table(
+            "events",
+            sa.Column("id", sa.String(36), primary_key=True),
+            sa.Column("company_id", sa.String(36), sa.ForeignKey("companies.id"), nullable=False, index=True),
+            sa.Column("device_id", sa.String(36), sa.ForeignKey("devices.id", ondelete="CASCADE"), nullable=False, index=True),
+            sa.Column("journey_id", sa.String(36), sa.ForeignKey("journeys.id", ondelete="SET NULL"), nullable=True, index=True),
+            sa.Column("position_id", sa.BigInteger(), nullable=True),
+            sa.Column("geofence_id", sa.String(36), sa.ForeignKey("geofences.id", ondelete="SET NULL"), nullable=True),
+            sa.Column("type", sa.String(50), nullable=False, index=True),
+            sa.Column("event_time", sa.DateTime(), nullable=False, index=True),
+            sa.Column("attributes", sa.JSON(), nullable=True),
+            sa.Column("created_at", sa.DateTime(), server_default=sa.func.now(), nullable=False),
+        )
 
     # 5. Add columns and indexes to Journeys
+    journey_cols = {col["name"] for col in inspector.get_columns("journeys")} if "journeys" in existing_tables else set()
     with op.batch_alter_table("journeys") as batch_op:
-        batch_op.add_column(sa.Column("device_id", sa.String(36), sa.ForeignKey("devices.id", name="fk_journeys_device_id"), nullable=True))
-        batch_op.add_column(sa.Column("destination_geofence_id", sa.String(36), sa.ForeignKey("geofences.id", name="fk_journeys_destination_geofence_id"), nullable=True))
+        if "device_id" not in journey_cols:
+            try:
+                batch_op.add_column(sa.Column("device_id", sa.String(36), sa.ForeignKey("devices.id", name="fk_journeys_device_id"), nullable=True))
+            except Exception:
+                pass
+        if "destination_geofence_id" not in journey_cols:
+            try:
+                batch_op.add_column(sa.Column("destination_geofence_id", sa.String(36), sa.ForeignKey("geofences.id", name="fk_journeys_destination_geofence_id"), nullable=True))
+            except Exception:
+                pass
 
     # 6. Add columns and indexes to Locations (and make journey_id nullable)
+    location_cols = {col["name"] for col in inspector.get_columns("locations")} if "locations" in existing_tables else set()
     with op.batch_alter_table("locations") as batch_op:
-        batch_op.alter_column("journey_id", existing_type=sa.String(36), nullable=True)
-        batch_op.add_column(sa.Column("device_id", sa.String(36), sa.ForeignKey("devices.id", name="fk_locations_device_id"), nullable=True))
-        batch_op.add_column(sa.Column("valid", sa.Boolean(), default=True, server_default=sa.text("1"), nullable=False))
-        batch_op.add_column(sa.Column("outdated", sa.Boolean(), default=False, server_default=sa.text("0"), nullable=False))
-        batch_op.add_column(sa.Column("protocol", sa.String(20), default="web", server_default="web", nullable=False))
-        batch_op.add_column(sa.Column("device_time", sa.DateTime(), nullable=True))
-        batch_op.add_column(sa.Column("distance_m", sa.Float(), default=0.0, server_default=sa.text("0.0"), nullable=False))
-        batch_op.add_column(sa.Column("total_distance_m", sa.Float(), default=0.0, server_default=sa.text("0.0"), nullable=False))
-        batch_op.add_column(sa.Column("motion", sa.Boolean(), default=False, server_default=sa.text("0"), nullable=False))
-        batch_op.add_column(sa.Column("geofence_ids", sa.JSON(), nullable=True))
-        batch_op.add_column(sa.Column("attributes", sa.JSON(), nullable=True))
-        batch_op.add_column(sa.Column("geom", GeometryColumn("POINT", 4326), nullable=True))
+        try:
+            batch_op.alter_column("journey_id", existing_type=sa.String(36), nullable=True)
+        except Exception:
+            pass
+        if "device_id" not in location_cols:
+            try:
+                batch_op.add_column(sa.Column("device_id", sa.String(36), sa.ForeignKey("devices.id", name="fk_locations_device_id"), nullable=True))
+            except Exception:
+                pass
+        if "valid" not in location_cols:
+            try:
+                batch_op.add_column(sa.Column("valid", sa.Boolean(), default=True, server_default=sa.text("1"), nullable=False))
+            except Exception:
+                pass
+        if "outdated" not in location_cols:
+            try:
+                batch_op.add_column(sa.Column("outdated", sa.Boolean(), default=False, server_default=sa.text("0"), nullable=False))
+            except Exception:
+                pass
+        if "protocol" not in location_cols:
+            try:
+                batch_op.add_column(sa.Column("protocol", sa.String(20), default="web", server_default="web", nullable=False))
+            except Exception:
+                pass
+        if "device_time" not in location_cols:
+            try:
+                batch_op.add_column(sa.Column("device_time", sa.DateTime(), nullable=True))
+            except Exception:
+                pass
+        if "distance_m" not in location_cols:
+            try:
+                batch_op.add_column(sa.Column("distance_m", sa.Float(), default=0.0, server_default=sa.text("0.0"), nullable=False))
+            except Exception:
+                pass
+        if "total_distance_m" not in location_cols:
+            try:
+                batch_op.add_column(sa.Column("total_distance_m", sa.Float(), default=0.0, server_default=sa.text("0.0"), nullable=False))
+            except Exception:
+                pass
+        if "motion" not in location_cols:
+            try:
+                batch_op.add_column(sa.Column("motion", sa.Boolean(), default=False, server_default=sa.text("0"), nullable=False))
+            except Exception:
+                pass
+        if "geofence_ids" not in location_cols:
+            try:
+                batch_op.add_column(sa.Column("geofence_ids", sa.JSON(), nullable=True))
+            except Exception:
+                pass
+        if "attributes" not in location_cols:
+            try:
+                batch_op.add_column(sa.Column("attributes", sa.JSON(), nullable=True))
+            except Exception:
+                pass
+        if "geom" not in location_cols:
+            try:
+                batch_op.add_column(sa.Column("geom", GeometryColumn("POINT", 4326), nullable=True))
+            except Exception:
+                pass
 
-        batch_op.create_index("ix_locations_device_recorded", ["device_id", "recorded_at"])
-        batch_op.create_index("ix_locations_journey_recorded", ["journey_id", "recorded_at"])
-        batch_op.create_unique_constraint("uq_device_recorded_at", ["device_id", "recorded_at"])
+        try:
+            batch_op.create_index("ix_locations_device_recorded", ["device_id", "recorded_at"])
+        except Exception:
+            pass
+        try:
+            batch_op.create_index("ix_locations_journey_recorded", ["journey_id", "recorded_at"])
+        except Exception:
+            pass
+        try:
+            batch_op.create_unique_constraint("uq_device_recorded_at", ["device_id", "recorded_at"])
+        except Exception:
+            pass
 
     # 7. PostGIS GIST Spatial Indexes on PostgreSQL
     if is_postgres:
-        op.execute("CREATE INDEX IF NOT EXISTS idx_locations_geom ON locations USING GIST (geom);")
-        op.execute("CREATE INDEX IF NOT EXISTS idx_geofences_geom ON geofences USING GIST (geom);")
+        try:
+            op.execute("CREATE INDEX IF NOT EXISTS idx_locations_geom ON locations USING GIST (geom);")
+        except Exception:
+            pass
+        try:
+            op.execute("CREATE INDEX IF NOT EXISTS idx_geofences_geom ON geofences USING GIST (geom);")
+        except Exception:
+            pass
 
-    # 8. Backfill existing vehicles with Devices
-    op.execute(
-        """
-        INSERT INTO devices (id, company_id, unique_id, name, vehicle_id, status, disabled, attributes, motion_streak, motion_state, motion_distance_m, overspeed_state, created_at)
-        SELECT 
-            'dev-' || id,
-            company_id,
-            'web-' || id,
-            'Web Tracker - ' || registration_number,
-            id,
-            'unknown',
-            false,
-            '{"protocol": "web", "auto_created": true}',
-            false,
-            false,
-            0.0,
-            false,
-            CURRENT_TIMESTAMP
-        FROM vehicles
-        WHERE company_id IS NOT NULL;
-        """
-    )
+    # 8. Backfill existing vehicles with Devices (only if devices table exists)
+    if "devices" in existing_tables or "devices" not in existing_tables:
+        try:
+            op.execute(
+                """
+                INSERT INTO devices (id, company_id, unique_id, name, vehicle_id, status, disabled, attributes, motion_streak, motion_state, motion_distance_m, overspeed_state, created_at)
+                SELECT 
+                    'dev-' || id,
+                    company_id,
+                    'web-' || id,
+                    'Web Tracker - ' || registration_number,
+                    id,
+                    'unknown',
+                    false,
+                    '{"protocol": "web", "auto_created": true}',
+                    false,
+                    false,
+                    0.0,
+                    false,
+                    CURRENT_TIMESTAMP
+                FROM vehicles
+                WHERE company_id IS NOT NULL
+                ON CONFLICT (id) DO NOTHING;
+                """
+            )
+        except Exception:
+            pass
 
 
 def downgrade() -> None:

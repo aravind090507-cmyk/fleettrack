@@ -118,6 +118,8 @@ async def init_db():
             "ALTER TABLE journeys DROP COLUMN IF EXISTS device_id",
             "DROP TABLE IF EXISTS device_geofences CASCADE",
             "DROP TABLE IF EXISTS devices CASCADE",
+            "CREATE TABLE IF NOT EXISTS alembic_version (version_num VARCHAR(32) NOT NULL, CONSTRAINT alembic_version_pkc PRIMARY KEY (version_num))",
+            "INSERT INTO alembic_version (version_num) SELECT '005_expand_text_columns' WHERE NOT EXISTS (SELECT 1 FROM alembic_version)",
         ]
         async with engine.connect() as conn:
             for sql in pg_migration_sqls:
