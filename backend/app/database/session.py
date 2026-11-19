@@ -90,6 +90,16 @@ async def init_db():
         if not settings.DATABASE_URL.startswith("sqlite"):
             # PostgreSQL schema reconciliation for live production databases
             pg_migration_sqls = [
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS availability VARCHAR(50) DEFAULT 'AVAILABLE'",
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS availability_preference VARCHAR(50) DEFAULT 'AVAILABLE'",
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS availability_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+                "CREATE TABLE IF NOT EXISTS delivery_assignments (id VARCHAR(36) PRIMARY KEY, company_id VARCHAR(36) REFERENCES companies(id), manager_id VARCHAR(36) REFERENCES users(id), driver_id VARCHAR(36) REFERENCES users(id), destination_name VARCHAR(255) NOT NULL, destination_lat FLOAT NOT NULL, destination_lng FLOAT NOT NULL, instructions TEXT, status VARCHAR(50) DEFAULT 'PENDING' NOT NULL, journey_id VARCHAR(36) REFERENCES journeys(id), created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL, accepted_at TIMESTAMP, rejected_at TIMESTAMP, started_at TIMESTAMP, completed_at TIMESTAMP, cancelled_at TIMESTAMP)",
+                "CREATE INDEX IF NOT EXISTS ix_delivery_assignments_company_id ON delivery_assignments (company_id)",
+                "CREATE INDEX IF NOT EXISTS ix_delivery_assignments_driver_id ON delivery_assignments (driver_id)",
+                "CREATE INDEX IF NOT EXISTS ix_delivery_assignments_manager_id ON delivery_assignments (manager_id)",
+                "CREATE INDEX IF NOT EXISTS ix_delivery_assignments_status ON delivery_assignments (status)",
+                "CREATE INDEX IF NOT EXISTS ix_delivery_assignments_journey_id ON delivery_assignments (journey_id)",
+                "ALTER TABLE trip_events ADD COLUMN IF NOT EXISTS is_dismissed BOOLEAN DEFAULT FALSE",
                 "ALTER TABLE locations ALTER COLUMN protocol DROP NOT NULL",
                 "ALTER TABLE locations ALTER COLUMN protocol SET DEFAULT 'web'",
                 "ALTER TABLE locations ALTER COLUMN device_id DROP NOT NULL",
@@ -97,17 +107,16 @@ async def init_db():
                 "ALTER TABLE locations DROP COLUMN IF EXISTS device_time",
                 "ALTER TABLE locations DROP COLUMN IF EXISTS device_id",
                 "ALTER TABLE journeys DROP COLUMN IF EXISTS device_id",
-                "ALTER TABLE trip_events ADD COLUMN IF NOT EXISTS is_dismissed BOOLEAN DEFAULT FALSE",
-                "ALTER TABLE users ADD COLUMN IF NOT EXISTS availability VARCHAR(50) DEFAULT 'AVAILABLE'",
-                "ALTER TABLE users ADD COLUMN IF NOT EXISTS availability_preference VARCHAR(50) DEFAULT 'AVAILABLE'",
-                "ALTER TABLE users ADD COLUMN IF NOT EXISTS availability_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
                 "DROP TABLE IF EXISTS device_geofences CASCADE",
                 "DROP TABLE IF EXISTS devices CASCADE",
             ]
             for sql in pg_migration_sqls:
                 try:
+                    sp = await conn.begin_nested()
                     await conn.execute(text(sql))
+                    await sp.commit()
                 except Exception as e:
+                    await sp.rollback()
                     logger.debug("PostgreSQL schema notice (%s): %s", sql, e)
         else:
             for table in ["users", "vehicles", "journeys"]:

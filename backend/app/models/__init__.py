@@ -8,6 +8,7 @@ from app.models.tracking_link import TrackingLink
 from app.models.trip_event import TripEvent
 from app.models.event import Event
 from app.models.geofence import Geofence
+from app.models.delivery_assignment import DeliveryAssignment
 from app.models.types import PostGISGeometry
 
 __all__ = [
@@ -20,5 +21,6 @@ __all__ = [
     "TripEvent",
     "Event",
     "Geofence",
+    "DeliveryAssignment",
     "PostGISGeometry",
 ]

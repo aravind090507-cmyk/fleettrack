@@ -1,6 +1,6 @@
 """Add delivery assignments table and driver availability columns
 
-Revision ID: 004_delivery_assignments_and_driver_availability
+Revision ID: 004_delivery_assignments
 Revises: 003_remove_osmand_and_devices
 Create Date: 2026-11-18 20:55:00
 """
@@ -9,7 +9,7 @@ from typing import Sequence, Union
 from alembic import op
 import sqlalchemy as sa
 
-revision: str = "004_delivery_assignments_and_driver_availability"
+revision: str = "004_delivery_assignments"
 down_revision: Union[str, None] = "003_remove_osmand_and_devices"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -32,7 +32,7 @@ def upgrade() -> None:
             pass
         try:
             batch_op.add_column(
-                sa.Column("availability_updated_at", sa.DateTime(), nullable=True)
+                sa.Column("availability_updated_at", sa.DateTime(), nullable=True, server_default=sa.func.now())
             )
         except Exception:
             pass
