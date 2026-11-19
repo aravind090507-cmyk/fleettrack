@@ -32,6 +32,7 @@ import { LocationPing } from '../../../types';
 import { Button } from '../../../components/ui/Button';
 import { Card } from '../../../components/ui/Card';
 import { DriverMap } from '../../../components/map/DriverMap';
+import { adaptiveEngine, AdaptiveTrackingSnapshot } from '../../../services/adaptiveTracking';
 
 export const ActiveJourney: React.FC = () => {
   const {
@@ -56,6 +57,16 @@ export const ActiveJourney: React.FC = () => {
   const [uploaderState, setUploaderState] = useState<UploaderState>(positionUploader.getState());
   const [lastFixTime, setLastFixTime] = useState<number>(Date.now());
   const [fixAgeSec, setFixAgeSec] = useState<number>(0);
+  const [adaptiveSnapshot, setAdaptiveSnapshot] = useState<AdaptiveTrackingSnapshot>(() => adaptiveEngine.getSnapshot());
+
+  // Reset adaptive tracking engine when active journey changes
+  useEffect(() => {
+    adaptiveEngine.reset();
+    setAdaptiveSnapshot(adaptiveEngine.getSnapshot());
+    return () => {
+      adaptiveEngine.reset();
+    };
+  }, [currentJourney?.id]);
 
   // Guarantee clean public tracking URL (never hardcoded localhost on mobile)
   const effectiveTrackingUrl = useMemo(() => {
@@ -128,17 +139,31 @@ export const ActiveJourney: React.FC = () => {
     return () => clearInterval(timer);
   }, [lastFixTime]);
 
-  // Position upload callback via PositionUploader write-ahead service
+  // Position upload callback via PositionUploader write-ahead service with Adaptive GPS optimization
   const handleLocationPing = useCallback(
     async (ping: LocationPing) => {
       if (!currentJourney) return;
+
+      // Evaluate adaptive tracking state & transmission schedule
+      const evalResult = adaptiveEngine.processPing(ping);
+      setAdaptiveSnapshot(adaptiveEngine.getSnapshot());
+
+      // Annotate ping with dynamic adaptive telematics fields
+      ping.adaptive_state = evalResult.state;
+      ping.acquisition_interval_sec = evalResult.acquisitionIntervalSec;
+      ping.transmission_interval_sec = evalResult.transmissionIntervalSec;
+      ping.battery_saving = evalResult.batterySaving;
+
       setLastPing(ping);
       setGPSStatus('active');
       setLastFixTime(Date.now());
       setFixAgeSec(0);
       setPingCount((c) => c + 1);
 
-      await positionUploader.enqueue(currentJourney.id, ping);
+      // Battery & network optimization: Only upload when scheduled according to adaptive state
+      if (evalResult.shouldTransmit) {
+        await positionUploader.enqueue(currentJourney.id, ping);
+      }
     },
     [currentJourney, setGPSStatus, setLastPing]
   );
@@ -547,6 +572,47 @@ export const ActiveJourney: React.FC = () => {
                   <strong className={uploaderState.queueDepth > 0 ? 'text-amber-600 font-bold' : 'text-emerald-600 font-bold'}>
                     {uploaderState.queueDepth}
                   </strong>
+                </span>
+              </div>
+            </div>
+
+            {/* Dynamic Adaptive GPS Ping Interval & Power Status Indicator */}
+            <div className="p-3 bg-gradient-to-r from-blue-50/70 via-white to-blue-50/70 border border-blue-200/80 rounded-2xl flex flex-wrap items-center justify-between gap-2 shadow-sm text-xs">
+              <div className="flex items-center gap-2">
+                <span
+                  className={`w-2.5 h-2.5 rounded-full ${
+                    adaptiveSnapshot.state === 'MOVING'
+                      ? 'bg-emerald-500 animate-pulse'
+                      : adaptiveSnapshot.state === 'TRAFFIC'
+                      ? 'bg-amber-500'
+                      : adaptiveSnapshot.state === 'STATIONARY'
+                      ? 'bg-blue-500'
+                      : 'bg-purple-500'
+                  }`}
+                />
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 block">
+                    Adaptive State
+                  </span>
+                  <span className="font-bold text-zinc-900">{adaptiveSnapshot.statusLabel}</span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <div className="text-right">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 block">
+                    GPS Ping Interval
+                  </span>
+                  <span className="font-bold text-[#0071E3] font-mono">{adaptiveSnapshot.displayMessage}</span>
+                </div>
+                <span
+                  className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                    adaptiveSnapshot.batterySaving
+                      ? 'bg-purple-100 text-purple-700 border-purple-300'
+                      : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                  }`}
+                >
+                  {adaptiveSnapshot.batterySaving ? 'Eco Active (60s)' : `Standard (${adaptiveSnapshot.acquisitionIntervalSec}s)`}
                 </span>
               </div>
             </div>

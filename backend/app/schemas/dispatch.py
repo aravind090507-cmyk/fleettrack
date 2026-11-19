@@ -48,6 +48,11 @@ class DeliveryAssignmentResponse(BaseModel):
     completed_at: Optional[datetime] = None
     cancelled_at: Optional[datetime] = None
     tracking_url: Optional[str] = None
+    vehicle_registration: Optional[str] = None
+    vehicle_model: Optional[str] = None
+    origin_name: Optional[str] = None
+    origin_lat: Optional[float] = None
+    origin_lng: Optional[float] = None
 
     model_config = {"from_attributes": True}
 

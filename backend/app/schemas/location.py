@@ -14,6 +14,10 @@ class LocationPing(BaseModel):
     accuracy: float = Field(default=0.0, ge=0.0)
     altitude: Optional[float] = None
     timestamp: datetime
+    adaptive_state: Optional[str] = None
+    acquisition_interval_sec: Optional[int] = None
+    transmission_interval_sec: Optional[int] = None
+    battery_saving: Optional[bool] = None
 
 
 class LocationBatch(BaseModel):

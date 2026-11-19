@@ -81,6 +81,16 @@ async def post_single_location_ping(
         ws_mgr = get_ws_manager()
 
         rec_iso = res.position["recorded_at"].isoformat()
+        spd = float(res.position.get("speed") or 0.0)
+        adaptive_state = getattr(ping, "adaptive_state", None) or (
+            "MOVING" if spd > 5.0 else ("TRAFFIC" if spd > 1.5 else "STATIONARY")
+        )
+        acq_interval = getattr(ping, "acquisition_interval_sec", None) or (
+            5 if adaptive_state == "MOVING" else (15 if adaptive_state == "TRAFFIC" else (30 if adaptive_state == "STATIONARY" else 60))
+        )
+        trans_interval = getattr(ping, "transmission_interval_sec", None) or acq_interval
+        battery_saving = getattr(ping, "battery_saving", None) if getattr(ping, "battery_saving", None) is not None else (adaptive_state == "EXTENDED_IDLE")
+
         loc_payload = {
             "type": "LOCATION_UPDATE",
             "journey_id": journey.id,
@@ -93,6 +103,10 @@ async def post_single_location_ping(
             "total_distance_km": journey.total_distance_km,
             "timestamp": rec_iso,
             "recorded_at": rec_iso,
+            "adaptive_state": adaptive_state,
+            "acquisition_interval_sec": acq_interval,
+            "transmission_interval_sec": trans_interval,
+            "battery_saving": battery_saving,
         }
 
         await redis_svc.set_vehicle_location(journey.vehicle_id, loc_payload)
@@ -215,6 +229,17 @@ async def post_batch_location_pings(
         ws_mgr = get_ws_manager()
 
         rec_iso = last_recorded_pos["recorded_at"].isoformat()
+        last_ping = payload.pings[-1]
+        spd = float(last_recorded_pos.get("speed") or 0.0)
+        adaptive_state = getattr(last_ping, "adaptive_state", None) or (
+            "MOVING" if spd > 5.0 else ("TRAFFIC" if spd > 1.5 else "STATIONARY")
+        )
+        acq_interval = getattr(last_ping, "acquisition_interval_sec", None) or (
+            5 if adaptive_state == "MOVING" else (15 if adaptive_state == "TRAFFIC" else (30 if adaptive_state == "STATIONARY" else 60))
+        )
+        trans_interval = getattr(last_ping, "transmission_interval_sec", None) or acq_interval
+        battery_saving = getattr(last_ping, "battery_saving", None) if getattr(last_ping, "battery_saving", None) is not None else (adaptive_state == "EXTENDED_IDLE")
+
         loc_payload = {
             "type": "LOCATION_UPDATE",
             "journey_id": journey.id,
@@ -227,6 +252,10 @@ async def post_batch_location_pings(
             "total_distance_km": journey.total_distance_km,
             "timestamp": rec_iso,
             "recorded_at": rec_iso,
+            "adaptive_state": adaptive_state,
+            "acquisition_interval_sec": acq_interval,
+            "transmission_interval_sec": trans_interval,
+            "battery_saving": battery_saving,
         }
         await redis_svc.set_vehicle_location(journey.vehicle_id, loc_payload)
         await ws_mgr.broadcast_to_journey(journey.id, loc_payload)

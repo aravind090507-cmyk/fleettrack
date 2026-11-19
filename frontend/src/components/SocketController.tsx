@@ -106,7 +106,13 @@ export const SocketController: React.FC = () => {
           total_distance_m: msg.total_distance_m || 0,
           motion: msg.speed > 2,
           geofence_ids: msg.geofence_ids || [],
-          attributes: msg.attributes || {},
+          attributes: {
+            ...(msg.attributes || {}),
+            adaptive_state: msg.adaptive_state,
+            acquisition_interval_sec: msg.acquisition_interval_sec,
+            transmission_interval_sec: msg.transmission_interval_sec,
+            battery_saving: msg.battery_saving,
+          },
         };
         addPosition(pos);
         updateVehiclePosition({

@@ -506,6 +506,10 @@ export const dispatchApi = {
     const { data } = await api.get(url);
     return data as DeliveryAssignment[];
   },
+  getAssignment: async (assignmentId: string) => {
+    const { data } = await api.get(`/api/dispatch/assignments/${assignmentId}`);
+    return data as DeliveryAssignment;
+  },
   cancelAssignment: async (assignmentId: string) => {
     const { data } = await api.post(`/api/dispatch/assignments/${assignmentId}/cancel`);
     return data as DeliveryAssignment;

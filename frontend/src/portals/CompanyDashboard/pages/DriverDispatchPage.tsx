@@ -25,6 +25,7 @@ import { Button } from '../../../components/ui/Button';
 import { LoadingSpinner } from '../../../components/ui/LoadingSpinner';
 import { getMapTileConfig } from '../../../services/mapConfig';
 import { useAuthStore } from '../../../store/authStore';
+import { DeliveryTrackingView } from './DeliveryTrackingView';
 
 // Custom red destination pin icon matching Apple FleetTrack theme
 const destinationPinIcon = L.divIcon({
@@ -64,6 +65,10 @@ export const DriverDispatchPage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<'dispatch' | 'monitoring'>('dispatch');
+
+  // Interactive Live Tracking View & Details Modal State (MODULE A)
+  const [activeTrackingAssignmentId, setActiveTrackingAssignmentId] = useState<string | null>(null);
+  const [selectedDetailsAssignment, setSelectedDetailsAssignment] = useState<DeliveryAssignment | null>(null);
 
   // Assignment Modal State
   const [selectedDriver, setSelectedDriver] = useState<DispatchDriverItem | null>(null);
@@ -297,6 +302,19 @@ export const DriverDispatchPage: React.FC = () => {
 
   if (loading) return <LoadingSpinner label="Loading company dispatch console..." />;
 
+  // Render dedicated interactive live tracking view when an IN_PROGRESS delivery is selected
+  if (activeTrackingAssignmentId) {
+    return (
+      <DeliveryTrackingView
+        assignmentId={activeTrackingAssignmentId}
+        onBack={() => {
+          setActiveTrackingAssignmentId(null);
+          setActiveTab('monitoring');
+        }}
+      />
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Top Header */}
@@ -453,64 +471,110 @@ export const DriverDispatchPage: React.FC = () => {
                     </td>
                   </tr>
                 ) : (
-                  assignments.map((asg) => (
-                    <tr key={asg.id} className="hover:bg-black/[0.015] transition">
-                      <td className="py-3.5 px-3 max-w-[220px]">
-                        <div className="font-bold text-zinc-900 truncate" title={asg.destination_name}>
-                          {asg.destination_name}
-                        </div>
-                        <div className="text-[10px] text-zinc-500 font-mono">
-                          {asg.destination_lat.toFixed(5)}, {asg.destination_lng.toFixed(5)}
-                        </div>
-                      </td>
-                      <td className="py-3.5 px-3">
-                        <div className="font-bold text-zinc-900">{asg.driver_name || 'Driver'}</div>
-                        <div className="text-[10px] text-zinc-500">By {asg.manager_name || 'Manager'}</div>
-                      </td>
-                      <td className="py-3.5 px-3">{getStatusBadge(asg.status)}</td>
-                      <td className="py-3.5 px-3 text-zinc-500 text-[11px] font-mono">
-                        {new Date(asg.created_at).toLocaleString([], {
-                          month: 'short',
-                          day: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                      </td>
-                      <td className="py-3.5 px-3 max-w-[180px]">
-                        <span className="text-zinc-600 line-clamp-1 italic text-[11px]">
-                          {asg.instructions || 'Standard delivery'}
-                        </span>
-                      </td>
-                      <td className="py-3.5 px-3">
-                        {asg.tracking_url ? (
-                          <a
-                            href={asg.tracking_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-[11px] font-bold text-[#0071E3] hover:underline"
-                          >
-                            <span>Live Track</span>
-                            <ExternalLink className="w-3 h-3" />
-                          </a>
-                        ) : asg.status === 'IN_PROGRESS' ? (
-                          <span className="text-[11px] text-purple-700 font-semibold">Active Trip</span>
-                        ) : (
-                          <span className="text-[11px] text-zinc-400">Available on start</span>
-                        )}
-                      </td>
-                      <td className="py-3.5 px-3 text-right">
-                        {(asg.status === 'PENDING' || asg.status === 'ACCEPTED') && (
+                  assignments.map((asg) => {
+                    const isInTransit = asg.status === 'IN_PROGRESS';
+                    return (
+                      <tr
+                        key={asg.id}
+                        onClick={() => {
+                          if (isInTransit) {
+                            setActiveTrackingAssignmentId(asg.id);
+                          } else {
+                            setSelectedDetailsAssignment(asg);
+                          }
+                        }}
+                        className="hover:bg-blue-50/50 cursor-pointer transition group"
+                        title={isInTransit ? 'Click to open Live Tracking Map' : 'Click to view Assignment Details'}
+                      >
+                        <td className="py-3.5 px-3 max-w-[220px]">
+                          <div className="font-bold text-zinc-900 truncate group-hover:text-[#0071E3] transition" title={asg.destination_name}>
+                            {asg.destination_name}
+                          </div>
+                          <div className="text-[10px] text-zinc-500 font-mono flex items-center gap-1.5">
+                            <span>{asg.destination_lat.toFixed(5)}, {asg.destination_lng.toFixed(5)}</span>
+                            {isInTransit ? (
+                              <span className="text-[10px] font-bold text-[#0071E3] flex items-center gap-0.5">
+                                • Live Map ↗
+                              </span>
+                            ) : (
+                              <span className="text-[10px] text-zinc-400 group-hover:text-zinc-600">
+                                • Details
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-3.5 px-3">
+                          <div className="font-bold text-zinc-900">{asg.driver_name || 'Driver'}</div>
+                          <div className="text-[10px] text-zinc-500">By {asg.manager_name || 'Manager'}</div>
+                        </td>
+                        <td className="py-3.5 px-3">
                           <button
                             type="button"
-                            onClick={() => handleCancelAssignment(asg.id)}
-                            className="px-2.5 py-1 text-xs font-bold text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (isInTransit) {
+                                setActiveTrackingAssignmentId(asg.id);
+                              } else {
+                                setSelectedDetailsAssignment(asg);
+                              }
+                            }}
+                            className="cursor-pointer transition transform active:scale-95"
+                            title={isInTransit ? 'Click to open Live Tracking Map' : 'Click to view Details'}
                           >
-                            Cancel
+                            {getStatusBadge(asg.status)}
                           </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))
+                        </td>
+                        <td className="py-3.5 px-3 text-zinc-500 text-[11px] font-mono">
+                          {new Date(asg.created_at).toLocaleString([], {
+                            month: 'short',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </td>
+                        <td className="py-3.5 px-3 max-w-[180px]">
+                          <span className="text-zinc-600 line-clamp-1 italic text-[11px]">
+                            {asg.instructions || 'Standard delivery'}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-3">
+                          {asg.tracking_url ? (
+                            <a
+                              href={asg.tracking_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="inline-flex items-center gap-1 text-[11px] font-bold text-[#0071E3] hover:underline"
+                            >
+                              <span>Public Link</span>
+                              <ExternalLink className="w-3 h-3" />
+                            </a>
+                          ) : isInTransit ? (
+                            <span className="text-[11px] text-purple-700 font-semibold flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse" />
+                              <span>Active Trip</span>
+                            </span>
+                          ) : (
+                            <span className="text-[11px] text-zinc-400">Available on start</span>
+                          )}
+                        </td>
+                        <td className="py-3.5 px-3 text-right">
+                          {(asg.status === 'PENDING' || asg.status === 'ACCEPTED') && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCancelAssignment(asg.id);
+                              }}
+                              className="px-2.5 py-1 text-xs font-bold text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition"
+                            >
+                              Cancel
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -766,6 +830,92 @@ export const DriverDispatchPage: React.FC = () => {
                 </Button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ==================================================================== */}
+      {/* NON-TRANSIT ASSIGNMENT DETAILS MODAL (PENDING/ACCEPTED/COMPLETED/etc)*/}
+      {/* ==================================================================== */}
+      {selectedDetailsAssignment && (
+        <div className="fixed inset-0 bg-black/45 backdrop-blur-md flex items-center justify-center p-4 z-50">
+          <div className="bg-white border border-black/10 rounded-3xl w-full max-w-lg p-6 shadow-2xl space-y-4 animate-fadeIn">
+            <div className="flex items-center justify-between border-b border-black/[0.06] pb-3">
+              <div className="flex items-center gap-2">
+                <FileText className="w-5 h-5 text-[#0071E3]" />
+                <h3 className="font-bold text-base text-zinc-900">Delivery Assignment Details</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedDetailsAssignment(null)}
+                className="p-1 hover:bg-black/5 rounded-full transition text-zinc-500 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <span className="text-[10px] uppercase font-bold text-zinc-400 block">Status</span>
+                <div className="mt-1 flex items-center gap-2">
+                  {getStatusBadge(selectedDetailsAssignment.status)}
+                  <span className="text-[11px] text-zinc-500 font-medium">
+                    {selectedDetailsAssignment.status === 'COMPLETED'
+                      ? '• Delivery successfully fulfilled'
+                      : selectedDetailsAssignment.status === 'CANCELLED'
+                      ? '• Assignment was cancelled'
+                      : selectedDetailsAssignment.status === 'ACCEPTED'
+                      ? '• Driver accepted; journey not yet started'
+                      : '• Awaiting driver response'}
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <span className="text-[10px] uppercase font-bold text-zinc-400 block">Destination</span>
+                <p className="font-bold text-zinc-900 text-sm mt-0.5">{selectedDetailsAssignment.destination_name}</p>
+                <p className="font-mono text-zinc-500 text-[11px] mt-0.5">
+                  {selectedDetailsAssignment.destination_lat.toFixed(6)}, {selectedDetailsAssignment.destination_lng.toFixed(6)}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2.5 pt-1">
+                <div className="p-2.5 bg-zinc-50 rounded-xl border border-black/[0.04]">
+                  <span className="text-[10px] uppercase font-bold text-zinc-400 block">Assigned Driver</span>
+                  <p className="font-bold text-zinc-800 text-xs mt-0.5">{selectedDetailsAssignment.driver_name || 'Driver'}</p>
+                </div>
+                <div className="p-2.5 bg-zinc-50 rounded-xl border border-black/[0.04]">
+                  <span className="text-[10px] uppercase font-bold text-zinc-400 block">Dispatch Manager</span>
+                  <p className="font-bold text-zinc-800 text-xs mt-0.5">{selectedDetailsAssignment.manager_name || 'Manager'}</p>
+                </div>
+              </div>
+
+              <div className="p-2.5 bg-zinc-50 rounded-xl border border-black/[0.04] space-y-1">
+                <span className="text-[10px] uppercase font-bold text-zinc-400 block">Delivery Instructions</span>
+                <p className="text-zinc-800 italic">
+                  {selectedDetailsAssignment.instructions || 'Standard delivery. No special instructions provided.'}
+                </p>
+              </div>
+
+              <div className="text-[11px] text-zinc-500 space-y-1 font-mono pt-1 border-t border-black/[0.04]">
+                <p>Created: {new Date(selectedDetailsAssignment.created_at).toLocaleString()}</p>
+                {selectedDetailsAssignment.accepted_at && (
+                  <p>Accepted: {new Date(selectedDetailsAssignment.accepted_at).toLocaleString()}</p>
+                )}
+                {selectedDetailsAssignment.completed_at && (
+                  <p>Completed: {new Date(selectedDetailsAssignment.completed_at).toLocaleString()}</p>
+                )}
+                {selectedDetailsAssignment.cancelled_at && (
+                  <p>Cancelled: {new Date(selectedDetailsAssignment.cancelled_at).toLocaleString()}</p>
+                )}
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-3 border-t border-black/[0.06]">
+              <Button variant="secondary" size="sm" onClick={() => setSelectedDetailsAssignment(null)}>
+                Close Details
+              </Button>
+            </div>
           </div>
         </div>
       )}

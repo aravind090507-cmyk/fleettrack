@@ -11,9 +11,10 @@ from datetime import datetime, timezone
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select, update
+from sqlalchemy import inspect, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+from sqlalchemy.orm.attributes import NO_VALUE
 
 from app.database.session import get_db
 from app.models.delivery_assignment import DeliveryAssignment
@@ -40,13 +41,37 @@ router = APIRouter(tags=["Dispatch & Delivery Management"])
 
 
 def _build_assignment_response(asg: DeliveryAssignment, tracking_url: Optional[str] = None) -> DeliveryAssignmentResponse:
+    t_url = tracking_url
+    v_reg = None
+    v_model = None
+    o_name = None
+    o_lat = None
+    o_lng = None
+
+    ins = inspect(asg)
+    mgr_name = asg.manager.name if ins.attrs.manager.loaded_value is not NO_VALUE and asg.manager else None
+    drv_name = asg.driver.name if ins.attrs.driver.loaded_value is not NO_VALUE and asg.driver else None
+
+    if ins.attrs.journey.loaded_value is not NO_VALUE and asg.journey:
+        o_name = asg.journey.origin_name
+        o_lat = asg.journey.origin_lat
+        o_lng = asg.journey.origin_lng
+        j_ins = inspect(asg.journey)
+        if j_ins.attrs.vehicle.loaded_value is not NO_VALUE and asg.journey.vehicle:
+            v_reg = asg.journey.vehicle.registration_number
+            v_model = asg.journey.vehicle.model
+        if not t_url and j_ins.attrs.tracking_links.loaded_value is not NO_VALUE and asg.journey.tracking_links:
+            active_link = next((l for l in asg.journey.tracking_links if not l.revoked_at), None)
+            if active_link:
+                t_url = f"/track/{active_link.id}"
+
     return DeliveryAssignmentResponse(
         id=asg.id,
         company_id=asg.company_id,
         manager_id=asg.manager_id,
-        manager_name=asg.manager.name if asg.manager else None,
+        manager_name=mgr_name,
         driver_id=asg.driver_id,
-        driver_name=asg.driver.name if asg.driver else None,
+        driver_name=drv_name,
         destination_name=asg.destination_name,
         destination_lat=asg.destination_lat,
         destination_lng=asg.destination_lng,
@@ -59,7 +84,12 @@ def _build_assignment_response(asg: DeliveryAssignment, tracking_url: Optional[s
         started_at=asg.started_at,
         completed_at=asg.completed_at,
         cancelled_at=asg.cancelled_at,
-        tracking_url=tracking_url,
+        tracking_url=t_url,
+        vehicle_registration=v_reg,
+        vehicle_model=v_model,
+        origin_name=o_name,
+        origin_lat=o_lat,
+        origin_lng=o_lng,
     )
 
 
@@ -309,7 +339,12 @@ async def list_company_assignments(
     stmt = (
         select(DeliveryAssignment)
         .where(DeliveryAssignment.company_id == current_user.company_id)
-        .options(selectinload(DeliveryAssignment.manager), selectinload(DeliveryAssignment.driver))
+        .options(
+            selectinload(DeliveryAssignment.manager),
+            selectinload(DeliveryAssignment.driver),
+            selectinload(DeliveryAssignment.journey).selectinload(Journey.vehicle),
+            selectinload(DeliveryAssignment.journey).selectinload(Journey.tracking_links),
+        )
         .order_by(DeliveryAssignment.created_at.desc())
     )
     if status_filter:
@@ -318,6 +353,33 @@ async def list_company_assignments(
     res = await db.execute(stmt)
     assignments = res.scalars().all()
     return [_build_assignment_response(a) for a in assignments]
+
+
+@router.get("/api/dispatch/assignments/{assignment_id}", response_model=DeliveryAssignmentResponse)
+async def get_delivery_assignment_by_id(
+    assignment_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Retrieve full delivery assignment details for live monitoring."""
+    stmt = (
+        select(DeliveryAssignment)
+        .where(DeliveryAssignment.id == assignment_id)
+        .options(
+            selectinload(DeliveryAssignment.manager),
+            selectinload(DeliveryAssignment.driver),
+            selectinload(DeliveryAssignment.journey).selectinload(Journey.vehicle),
+            selectinload(DeliveryAssignment.journey).selectinload(Journey.tracking_links),
+        )
+    )
+    res = await db.execute(stmt)
+    asg = res.scalar_one_or_none()
+    if not asg:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Delivery assignment not found.")
+    if current_user.company_id and asg.company_id != current_user.company_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied to this company delivery.")
+
+    return _build_assignment_response(asg)
 
 
 @router.post("/api/dispatch/assignments/{assignment_id}/cancel", response_model=DeliveryAssignmentResponse)

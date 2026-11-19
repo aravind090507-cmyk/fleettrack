@@ -41,6 +41,8 @@ export interface Journey {
   driver_name?: string;
 }
 
+export type AdaptiveTrackingState = 'MOVING' | 'TRAFFIC' | 'STATIONARY' | 'EXTENDED_IDLE';
+
 export interface LocationPing {
   latitude: number;
   longitude: number;
@@ -49,6 +51,10 @@ export interface LocationPing {
   accuracy: number;
   altitude?: number | null;
   timestamp: string;
+  adaptive_state?: AdaptiveTrackingState;
+  acquisition_interval_sec?: number;
+  transmission_interval_sec?: number;
+  battery_saving?: boolean;
 }
 
 export interface LatestLocation {
@@ -58,6 +64,10 @@ export interface LatestLocation {
   heading: number;
   accuracy: number;
   recorded_at: string;
+  adaptive_state?: AdaptiveTrackingState;
+  acquisition_interval_sec?: number;
+  transmission_interval_sec?: number;
+  battery_saving?: boolean;
 }
 
 export interface TrackingInfo {
@@ -120,6 +130,11 @@ export interface DeliveryAssignment {
   completed_at?: string | null;
   cancelled_at?: string | null;
   tracking_url?: string | null;
+  vehicle_registration?: string | null;
+  vehicle_model?: string | null;
+  origin_name?: string | null;
+  origin_lat?: number | null;
+  origin_lng?: number | null;
   driver?: any;
 }
 
