@@ -253,7 +253,7 @@ async def create_delivery_assignment(
 
     # 4. Create DeliveryAssignment record (PENDING)
     asg = DeliveryAssignment(
-        id=f"asg-{uuid.uuid4()}",
+        id=str(uuid.uuid4()),
         company_id=current_user.company_id,
         manager_id=current_user.id,
         driver_id=driver.id,

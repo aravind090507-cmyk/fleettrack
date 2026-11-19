@@ -17,10 +17,10 @@ class Journey(Base):
     vehicle_id = Column(String(36), ForeignKey("vehicles.id"), nullable=False)
     driver_id = Column(String(36), ForeignKey("users.id"), nullable=False)
 
-    origin_name = Column(String(255), nullable=False)
+    origin_name = Column(Text, nullable=False)
     origin_lat = Column(Float, nullable=False)
     origin_lng = Column(Float, nullable=False)
-    destination_name = Column(String(255), nullable=False)
+    destination_name = Column(Text, nullable=False)
     destination_lat = Column(Float, nullable=False)
     destination_lng = Column(Float, nullable=False)
     destination_geofence_id = Column(String(36), ForeignKey("geofences.id"), nullable=True)

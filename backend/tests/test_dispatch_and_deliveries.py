@@ -318,3 +318,90 @@ async def test_reverse_geocoding_endpoint():
         assert "display_name" in data
         assert abs(data["lat"] - 13.0827) < 0.001
         assert abs(data["lon"] - 80.2707) < 0.001
+
+
+@pytest.mark.asyncio
+async def test_dispatch_assignment_long_address_support(auth_headers_factory):
+    """
+    Verify that long destination addresses (e.g. 150+ chars with street, ward, zone, city, state, postal code)
+    and custom instructions do not cause database VARCHAR overflow or truncation errors.
+    """
+    transport = ASGITransport(app=app)
+
+    async with AsyncSessionLocal() as db:
+        comp = Company(name="Long Address Express", invite_code=uuid.uuid4().hex[:8].upper())
+        db.add(comp)
+        await db.commit()
+        await db.refresh(comp)
+
+        manager = User(
+            company_id=comp.id,
+            name="Dispatch Manager",
+            email=f"mgr_{uuid.uuid4().hex[:6]}@longaddress.com",
+            password_hash="test_hash",
+            role="FLEET_MANAGER",
+            is_active=True,
+        )
+        driver = User(
+            company_id=comp.id,
+            name="Chennai Driver",
+            email=f"driver_{uuid.uuid4().hex[:6]}@longaddress.com",
+            password_hash="test_hash",
+            role="DRIVER",
+            availability="AVAILABLE",
+            availability_preference="AVAILABLE",
+            is_active=True,
+        )
+        vehicle = Vehicle(
+            company_id=comp.id,
+            registration_number=f"TN-{uuid.uuid4().hex[:4].upper()}",
+            model="Delivery Truck",
+            vehicle_type="TRUCK",
+            status="AVAILABLE",
+            assigned_driver_id=driver.id,
+        )
+        db.add_all([manager, driver, vehicle])
+        await db.commit()
+        await db.refresh(manager)
+        await db.refresh(driver)
+        await db.refresh(vehicle)
+
+    mgr_headers = auth_headers_factory(manager)
+    drv_headers = auth_headers_factory(driver)
+
+    long_destination = "Patha Vigneswarar Koil Street, Ward 50, Zone 5, Royapuram, Chennai, Chennai Metropolitan Area, Tondiarpet, Chennai District, Tamil Nadu, 600021, India"
+    long_instructions = "Handle with extreme care. Ring the doorbell on the 2nd floor and deliver the temperature-controlled medical packages to the receptionist before 5:00 PM."
+
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        # Create assignment with 150+ char destination
+        payload = {
+            "driver_id": driver.id,
+            "destination_name": long_destination,
+            "destination_lat": 13.113164,
+            "destination_lng": 80.293148,
+            "instructions": long_instructions,
+        }
+        res = await client.post("/api/dispatch/assignments", json=payload, headers=mgr_headers)
+        assert res.status_code == 201
+        data = res.json()
+        assert data["destination_name"] == long_destination
+        assert data["instructions"] == long_instructions
+        asg_id = data["id"]
+
+        # Driver checks active assignment and starts delivery
+        res_accept = await client.post(f"/api/driver/assignments/{asg_id}/accept", headers=drv_headers)
+        assert res_accept.status_code == 200
+
+        res_start = await client.post(
+            f"/api/driver/assignments/{asg_id}/start",
+            json={
+                "origin_name": "Chennai Central Sorting Hub, Poonamallee High Road, Park Town, Chennai, Tamil Nadu 600003",
+                "origin_lat": 13.0827,
+                "origin_lng": 80.2707,
+            },
+            headers=drv_headers,
+        )
+        assert res_start.status_code == 200
+        start_data = res_start.json()
+        assert start_data["assignment"]["destination_name"] == long_destination
+
