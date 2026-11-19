@@ -15,7 +15,7 @@ export const DriverLayout: React.FC<DriverLayoutProps> = ({ children }) => {
   const navigate = useNavigate();
 
   const handleLogout = () => {
-    logout();
+    logout('DRIVER');
     navigate('/login');
   };
 

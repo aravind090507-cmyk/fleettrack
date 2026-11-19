@@ -21,7 +21,7 @@ export const Sidebar: React.FC = () => {
   const navigate = useNavigate();
 
   const handleLogout = () => {
-    logout();
+    logout('FLEET_MANAGER');
     navigate('/login');
   };
 

@@ -53,25 +53,109 @@ const api = axios.create({
   },
 });
 
+export const getActiveTokenForRequest = (url?: string): string | null => {
+  if (typeof window === 'undefined') return null;
+
+  // 1. Explicit Driver endpoints always prioritize Driver session
+  if (url && (url.startsWith('/api/driver') || url.includes('/driver/'))) {
+    const driverToken = localStorage.getItem('fleet_driver_token');
+    if (driverToken) return driverToken;
+  }
+
+  // 2. Explicit Manager endpoints always prioritize Manager session
+  if (
+    url &&
+    (url.startsWith('/api/dispatch') ||
+      url.startsWith('/api/dashboard') ||
+      url.startsWith('/api/vehicles') ||
+      url.startsWith('/api/geofences') ||
+      url.startsWith('/api/reports'))
+  ) {
+    const managerToken = localStorage.getItem('fleet_manager_token');
+    if (managerToken) return managerToken;
+  }
+
+  // 3. Resolve by active route pathname
+  const pathname = window.location.pathname;
+  if (pathname.startsWith('/driver')) {
+    return localStorage.getItem('fleet_driver_token') || localStorage.getItem('fleet_token');
+  }
+  if (pathname.startsWith('/company') || pathname.startsWith('/dashboard')) {
+    return localStorage.getItem('fleet_manager_token') || localStorage.getItem('fleet_token');
+  }
+
+  // 4. Resolve by tab-isolated session storage
+  try {
+    const tabRole = sessionStorage.getItem('fleet_tab_role');
+    if (tabRole === 'DRIVER') {
+      return localStorage.getItem('fleet_driver_token') || localStorage.getItem('fleet_token');
+    }
+    if (tabRole === 'FLEET_MANAGER') {
+      return localStorage.getItem('fleet_manager_token') || localStorage.getItem('fleet_token');
+    }
+  } catch {}
+
+  // 5. General fallback
+  return (
+    localStorage.getItem('fleet_manager_token') ||
+    localStorage.getItem('fleet_driver_token') ||
+    localStorage.getItem('fleet_token')
+  );
+};
+
 // Dynamically attach baseURL & Authorization Bearer token to requests
 api.interceptors.request.use((config) => {
   config.baseURL = getApiBaseUrl();
-  const token = localStorage.getItem('fleet_token');
+  const token = getActiveTokenForRequest(config.url);
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
 });
 
-// Response interceptor to handle session expiration
+// Response interceptor to handle session expiration with portal isolation
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('fleet_token');
-      localStorage.removeItem('fleet_user');
-      if (!window.location.pathname.startsWith('/login') && !window.location.pathname.startsWith('/track')) {
-        window.location.href = '/login';
+      const reqUrl = error.config?.url || '';
+      const pathname = typeof window !== 'undefined' ? window.location.pathname : '';
+
+      if (reqUrl.startsWith('/api/driver') || pathname.startsWith('/driver')) {
+        // Clear driver session only
+        localStorage.removeItem('fleet_driver_token');
+        localStorage.removeItem('fleet_driver_user');
+        try {
+          if (sessionStorage.getItem('fleet_tab_role') === 'DRIVER') {
+            sessionStorage.removeItem('fleet_tab_role');
+          }
+        } catch {}
+        if (!pathname.startsWith('/login') && !pathname.startsWith('/track')) {
+          window.location.href = '/login';
+        }
+      } else if (
+        reqUrl.startsWith('/api/dispatch') ||
+        reqUrl.startsWith('/api/dashboard') ||
+        pathname.startsWith('/company') ||
+        pathname.startsWith('/dashboard')
+      ) {
+        // Clear manager session only
+        localStorage.removeItem('fleet_manager_token');
+        localStorage.removeItem('fleet_manager_user');
+        try {
+          if (sessionStorage.getItem('fleet_tab_role') === 'FLEET_MANAGER') {
+            sessionStorage.removeItem('fleet_tab_role');
+          }
+        } catch {}
+        if (!pathname.startsWith('/login') && !pathname.startsWith('/track')) {
+          window.location.href = '/login';
+        }
+      } else {
+        localStorage.removeItem('fleet_token');
+        localStorage.removeItem('fleet_user');
+        if (!pathname.startsWith('/login') && !pathname.startsWith('/track')) {
+          window.location.href = '/login';
+        }
       }
     }
     return Promise.reject(error);

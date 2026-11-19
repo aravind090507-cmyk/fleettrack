@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useAuthStore } from './store/authStore';
+import { useAuthStore, PortalRole } from './store/authStore';
 import { LoginPage } from './pages/LoginPage';
 import { DriverApp } from './portals/DriverApp/DriverApp';
 import { CompanyDashboard } from './portals/CompanyDashboard/CompanyDashboard';
@@ -17,25 +17,31 @@ const queryClient = new QueryClient({
   },
 });
 
-// Protected Route wrapper
+// Protected Route wrapper with isolated portal session resolution
 interface ProtectedRouteProps {
   children: React.ReactNode;
   allowedRoles?: string[];
+  portalRole?: PortalRole;
 }
 
-const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles }) => {
-  const { isAuthenticated, user } = useAuthStore();
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles, portalRole }) => {
+  const { initialize, getPortalSession } = useAuthStore();
 
-  if (!isAuthenticated) {
+  const targetRole: PortalRole =
+    portalRole || (allowedRoles?.includes('FLEET_MANAGER') ? 'FLEET_MANAGER' : 'DRIVER');
+
+  const session = getPortalSession(targetRole);
+
+  useEffect(() => {
+    initialize(targetRole);
+  }, [targetRole, initialize]);
+
+  if (!session.isAuthenticated || !session.user || !session.token) {
     return <Navigate to="/login" replace />;
   }
 
-  if (allowedRoles && user && !allowedRoles.includes(user.role)) {
-    // If driver tries to open company dashboard, redirect to /driver
-    if (user.role === 'DRIVER') {
-      return <Navigate to="/driver" replace />;
-    }
-    return <Navigate to="/company" replace />;
+  if (allowedRoles && !allowedRoles.includes(session.user.role)) {
+    return <Navigate to="/login" replace />;
   }
 
   return <>{children}</>;
@@ -63,7 +69,7 @@ export const App: React.FC = () => {
           <Route
             path="/driver"
             element={
-              <ProtectedRoute allowedRoles={['DRIVER', 'ADMIN']}>
+              <ProtectedRoute allowedRoles={['DRIVER', 'ADMIN']} portalRole="DRIVER">
                 <DriverApp />
               </ProtectedRoute>
             }
@@ -73,7 +79,7 @@ export const App: React.FC = () => {
           <Route
             path="/company/*"
             element={
-              <ProtectedRoute allowedRoles={['FLEET_MANAGER', 'ADMIN']}>
+              <ProtectedRoute allowedRoles={['FLEET_MANAGER', 'ADMIN']} portalRole="FLEET_MANAGER">
                 <CompanyDashboard />
               </ProtectedRoute>
             }
@@ -83,7 +89,7 @@ export const App: React.FC = () => {
           <Route
             path="/dashboard/*"
             element={
-              <ProtectedRoute allowedRoles={['FLEET_MANAGER', 'ADMIN']}>
+              <ProtectedRoute allowedRoles={['FLEET_MANAGER', 'ADMIN']} portalRole="FLEET_MANAGER">
                 <CompanyDashboard />
               </ProtectedRoute>
             }
