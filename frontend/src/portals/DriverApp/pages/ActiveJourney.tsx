@@ -33,6 +33,7 @@ import { Button } from '../../../components/ui/Button';
 import { Card } from '../../../components/ui/Card';
 import { DriverMap } from '../../../components/map/DriverMap';
 import { adaptiveEngine, AdaptiveTrackingSnapshot } from '../../../services/adaptiveTracking';
+import { backgroundLocation } from '../../../services/backgroundLocation';
 
 export const ActiveJourney: React.FC = () => {
   const {
@@ -139,6 +140,17 @@ export const ActiveJourney: React.FC = () => {
     return () => clearInterval(timer);
   }, [lastFixTime]);
 
+  const isAndroidNative = useMemo(() => backgroundLocation.isNativeAndroid(), []);
+  const [ignoringBattery, setIgnoringBattery] = useState<boolean>(true);
+  const [isNativeTrackingOn, setIsNativeTrackingOn] = useState<boolean>(false);
+
+  // Check battery optimization status on Android
+  useEffect(() => {
+    if (isAndroidNative) {
+      backgroundLocation.checkBatteryOptimizations().then(setIgnoringBattery);
+    }
+  }, [isAndroidNative]);
+
   // Position upload callback via PositionUploader write-ahead service with Adaptive GPS optimization
   const handleLocationPing = useCallback(
     async (ping: LocationPing) => {
@@ -164,8 +176,13 @@ export const ActiveJourney: React.FC = () => {
       if (evalResult.shouldTransmit) {
         await positionUploader.enqueue(currentJourney.id, ping);
       }
+
+      // Sync adaptive rate to native Android foreground service
+      if (isAndroidNative) {
+        backgroundLocation.updateAdaptiveState(adaptiveEngine.getSnapshot());
+      }
     },
-    [currentJourney, setGPSStatus, setLastPing]
+    [currentJourney, setGPSStatus, setLastPing, isAndroidNative]
   );
 
   const initialCoords = useMemo(
@@ -193,6 +210,46 @@ export const ActiveJourney: React.FC = () => {
     startWatching();
     return () => stopWatching();
   }, [startWatching, stopWatching]);
+
+  // Start native background tracking when journey is active on Android
+  useEffect(() => {
+    if (!currentJourney?.id || !isAndroidNative) return;
+
+    const token =
+      localStorage.getItem('fleet_driver_token') ||
+      localStorage.getItem('fleet_token') ||
+      '';
+    const apiBase = getApiBaseUrl();
+
+    backgroundLocation
+      .startTracking({
+        journeyId: currentJourney.id,
+        token,
+        apiBaseUrl: apiBase,
+        vehicleReg: currentJourney.vehicle_registration,
+        destination: currentJourney.destination_name,
+        intervalSec: adaptiveSnapshot.acquisitionIntervalSec,
+        adaptiveState: adaptiveSnapshot.state,
+        statusLabel: adaptiveSnapshot.statusLabel,
+        batterySaving: adaptiveSnapshot.batterySaving,
+      })
+      .then((ok) => {
+        setIsNativeTrackingOn(ok);
+      });
+
+    let cleanupListener: (() => void) | null = null;
+    backgroundLocation
+      .addLocationListener((ping) => {
+        handleLocationPing(ping);
+      })
+      .then((unsub) => {
+        cleanupListener = unsub;
+      });
+
+    return () => {
+      if (cleanupListener) cleanupListener();
+    };
+  }, [currentJourney?.id, isAndroidNative, handleLocationPing]);
 
   // Copy tracking link to clipboard
   const handleCopyLink = () => {
@@ -308,10 +365,16 @@ export const ActiveJourney: React.FC = () => {
   const handleEndJourney = async () => {
     if (!currentJourney) return;
     try {
+      if (isAndroidNative) {
+        await backgroundLocation.stopTracking();
+      }
       await journeysApi.end(currentJourney.id);
       stopWatching();
       useDriverStore.getState().setJourney(null);
     } catch (e: any) {
+      if (isAndroidNative) {
+        await backgroundLocation.stopTracking();
+      }
       const status = e.response?.status;
       // Journey already ended on the server — treat as success
       if (status === 404 || status === 410) {
@@ -615,6 +678,54 @@ export const ActiveJourney: React.FC = () => {
                   {adaptiveSnapshot.batterySaving ? 'Eco Active (60s)' : `Standard (${adaptiveSnapshot.acquisitionIntervalSec}s)`}
                 </span>
               </div>
+            </div>
+
+            {/* Reliable Background GPS Tracking Status Card */}
+            <div className="p-3.5 bg-white/90 border border-black/10 rounded-2xl shadow-sm text-xs space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Smartphone className="w-4 h-4 text-[#0071E3]" />
+                  <span className="font-bold text-zinc-900">
+                    {isAndroidNative ? 'Android Foreground GPS Tracking' : 'Web / PWA Tracking Mode'}
+                  </span>
+                </div>
+                <span
+                  className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                    isAndroidNative
+                      ? isNativeTrackingOn
+                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                        : 'bg-amber-50 text-amber-700 border border-amber-200'
+                      : 'bg-blue-50 text-blue-700 border border-blue-200'
+                  }`}
+                >
+                  {isAndroidNative
+                    ? isNativeTrackingOn
+                      ? 'Foreground Service Active'
+                      : 'Initializing Native Service...'
+                    : 'Screen Wake Lock Active'}
+                </span>
+              </div>
+
+              <p className="text-[11px] text-zinc-600 leading-relaxed font-medium">
+                {isAndroidNative
+                  ? 'Continuous background tracking is active via native Kotlin Foreground Service with persistent status notification. You can safely minimize FleetTrack, open WhatsApp, or lock your phone.'
+                  : 'FleetTrack is running in browser mode with Screen Wake Lock active. For native screen-off tracking while multitasking with other apps, launch the FleetTrack Android application.'}
+              </p>
+
+              {isAndroidNative && !ignoringBattery && (
+                <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-between gap-2">
+                  <span className="text-[11px] text-amber-900 font-medium">
+                    Battery optimization may throttle GPS when phone is locked.
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => backgroundLocation.requestIgnoreBatteryOptimizations()}
+                    className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-[10px] font-bold cursor-pointer transition shrink-0"
+                  >
+                    Exempt Battery
+                  </button>
+                </div>
+              )}
             </div>
 
             <div className="grid grid-cols-3 gap-2.5">

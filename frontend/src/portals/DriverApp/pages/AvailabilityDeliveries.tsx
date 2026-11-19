@@ -23,6 +23,7 @@ import { useDriverStore } from '../../../store/driverStore';
 import { Button } from '../../../components/ui/Button';
 import { Card } from '../../../components/ui/Card';
 import { getMapTileConfig } from '../../../services/mapConfig';
+import { backgroundLocation } from '../../../services/backgroundLocation';
 
 // Custom Marker for Destination Preview
 const destPinIcon = L.divIcon({
@@ -155,6 +156,14 @@ export const AvailabilityDeliveries: React.FC<AvailabilityDeliveriesProps> = ({ 
     setActionLoading('start');
     setErrorMsg(null);
     try {
+      if (backgroundLocation.isNativeAndroid()) {
+        try {
+          await backgroundLocation.requestPermissions();
+        } catch (permErr) {
+          console.warn('Android location permissions prompt skipped/denied:', permErr);
+        }
+      }
+
       const res = await driverDispatchApi.startDelivery(assignmentId);
       setSuccessMsg('Delivery trip started! Switching to live navigation...');
 
@@ -192,6 +201,9 @@ export const AvailabilityDeliveries: React.FC<AvailabilityDeliveriesProps> = ({ 
     setActionLoading('complete');
     setErrorMsg(null);
     try {
+      if (backgroundLocation.isNativeAndroid()) {
+        await backgroundLocation.stopTracking();
+      }
       const res = await driverDispatchApi.completeDelivery(assignmentId);
       setActiveAssignment(res);
       setAvailability(pref);

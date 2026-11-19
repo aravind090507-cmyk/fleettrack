@@ -12,6 +12,9 @@
     "test": "vitest run src/tests --environment jsdom --test-timeout=15000"
   },
   "dependencies": {
+    "@capacitor/android": "^8.6.2",
+    "@capacitor/cli": "^8.6.2",
+    "@capacitor/core": "^8.6.2",
     "@tanstack/react-query": "^5.60.5",
     "@types/leaflet": "^1.9.14",
     "axios": "^1.7.7",
