@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Radio, Truck, ArrowRight, UserPlus, LogIn, UserCheck, ShieldCheck, Zap } from 'lucide-react';
+import { Radio, Truck, ArrowRight, UserPlus, LogIn, UserCheck, ShieldCheck, Zap, CheckCircle2 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
+import { authApi } from '../services/api';
 import { Button } from '../components/ui/Button';
 
 export const LoginPage: React.FC = () => {
@@ -11,12 +12,38 @@ export const LoginPage: React.FC = () => {
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<'DRIVER' | 'FLEET_MANAGER'>('DRIVER');
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { login, register, isLoading } = useAuthStore();
   const navigate = useNavigate();
 
+  const extractErrorMessage = (err: any): string => {
+    const detail = err?.response?.data?.detail;
+    if (!detail) {
+      return err?.message || 'Authentication error. Please check your details and try again.';
+    }
+    if (typeof detail === 'string') {
+      return detail;
+    }
+    if (Array.isArray(detail)) {
+      return detail
+        .map((d: any) => {
+          const loc = Array.isArray(d.loc) ? d.loc[d.loc.length - 1] : '';
+          const msg = d.msg || d.message || 'Invalid value';
+          return loc ? `${loc}: ${msg}` : msg;
+        })
+        .join('. ');
+    }
+    if (typeof detail === 'object') {
+      return detail.msg || detail.message || JSON.stringify(detail);
+    }
+    return String(detail);
+  };
+
   const handleQuickLogin = async (demoEmail: string, demoRole: 'DRIVER' | 'FLEET_MANAGER') => {
     setError(null);
+    setSuccessMessage(null);
     setEmail(demoEmail);
     setPassword('Password123!');
     try {
@@ -27,7 +54,7 @@ export const LoginPage: React.FC = () => {
         navigate('/company');
       }
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Demo login failed. Creating account...');
+      setError(extractErrorMessage(err) || 'Demo login failed. Creating account...');
       // Fallback: try registering if not exists
       try {
         const user = await register(
@@ -42,24 +69,78 @@ export const LoginPage: React.FC = () => {
           navigate('/company');
         }
       } catch (regErr: any) {
-        setError(regErr.response?.data?.detail || 'Authentication error.');
+        setError(extractErrorMessage(regErr) || 'Authentication error.');
       }
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting || isLoading) return;
+
     setError(null);
+    setSuccessMessage(null);
+
+    const cleanEmail = email.trim();
+
     try {
+      setIsSubmitting(true);
+
       if (isRegistering) {
-        const user = await register(name, email, password, role);
-        if (user.role === 'DRIVER') {
-          navigate('/driver');
-        } else {
-          navigate('/company');
+        // 1. Mandatory field validation
+        const cleanName = name.trim();
+        if (!cleanName || cleanName.length < 2) {
+          setError('Please provide a full name with at least 2 characters.');
+          setIsSubmitting(false);
+          return;
         }
+
+        // 2. Email format validation
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!cleanEmail || !emailRegex.test(cleanEmail)) {
+          setError('Please provide a valid email address (e.g. name@company.com).');
+          setIsSubmitting(false);
+          return;
+        }
+
+        // 3. Password length validation
+        if (!password || password.length < 6) {
+          setError('Password must be at least 6 characters long.');
+          setIsSubmitting(false);
+          return;
+        }
+
+        // 4. Role validation
+        if (role !== 'DRIVER' && role !== 'FLEET_MANAGER') {
+          setError('Please select a valid role (Driver or Fleet Manager).');
+          setIsSubmitting(false);
+          return;
+        }
+
+        // 5. Submit user creation request
+        const res = await authApi.register(cleanName, cleanEmail, password, role);
+        const roleLabel = res.user.role === 'FLEET_MANAGER' ? 'Fleet Manager' : 'Driver';
+
+        // 6. Confirmation message and form reset
+        setSuccessMessage(`User "${res.user.name}" (${roleLabel}) created successfully! Enter password to sign in.`);
+        setName('');
+        setPassword('');
+        setIsRegistering(false); // Switch to Sign In tab so user can log in with new credentials
       } else {
-        const user = await login(email, password);
+        // Sign In Flow
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!cleanEmail || !emailRegex.test(cleanEmail)) {
+          setError('Please enter a valid email address.');
+          setIsSubmitting(false);
+          return;
+        }
+        if (!password) {
+          setError('Please enter your password.');
+          setIsSubmitting(false);
+          return;
+        }
+
+        const user = await login(cleanEmail, password);
         if (user.role === 'DRIVER') {
           navigate('/driver');
         } else {
@@ -67,12 +148,9 @@ export const LoginPage: React.FC = () => {
         }
       }
     } catch (err: any) {
-      const detail = err.response?.data?.detail;
-      if (detail) {
-        setError(detail);
-      } else {
-        setError('Authentication failed. If this is a new account, please click "Create Account" above.');
-      }
+      setError(extractErrorMessage(err));
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -115,9 +193,11 @@ export const LoginPage: React.FC = () => {
 
           <button
             type="button"
+            id="create-new-user-tab"
             onClick={() => {
               setIsRegistering(true);
               setError(null);
+              setSuccessMessage(null);
             }}
             className={`flex-1 py-2 text-xs font-semibold tracking-wide rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
               isRegistering
@@ -126,7 +206,7 @@ export const LoginPage: React.FC = () => {
             }`}
           >
             <UserPlus className="w-3.5 h-3.5" />
-            <span>Create Account</span>
+            <span>Create New User</span>
           </button>
         </div>
       </div>
@@ -173,6 +253,17 @@ export const LoginPage: React.FC = () => {
           </div>
 
           <form className="space-y-3.5" onSubmit={handleSubmit}>
+            {successMessage && (
+              <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs leading-relaxed space-y-1.5 shadow-sm">
+                <div className="flex items-start gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                  <div className="flex-1 font-semibold">
+                    {successMessage}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {error && (
               <div className="p-3 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium leading-relaxed">
                 {error}
@@ -260,10 +351,16 @@ export const LoginPage: React.FC = () => {
 
             <button
               type="submit"
-              disabled={isLoading}
-              className="w-full mt-3 py-3 rounded-full bg-[#0071E3] hover:bg-[#0077ED] text-white text-sm font-bold shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 transition-all active:scale-[0.98] cursor-pointer"
+              disabled={isLoading || isSubmitting}
+              className="w-full mt-3 py-3 rounded-full bg-[#0071E3] hover:bg-[#0077ED] disabled:opacity-60 text-white text-sm font-bold shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 transition-all active:scale-[0.98] cursor-pointer"
             >
-              <span>{isLoading ? 'Authenticating...' : isRegistering ? 'Create Account & Access' : 'Sign In'}</span>
+              <span>
+                {isLoading || isSubmitting
+                  ? (isRegistering ? 'Creating User Account...' : 'Signing In...')
+                  : isRegistering
+                  ? 'Create New User'
+                  : 'Sign In'}
+              </span>
               <ArrowRight className="w-4 h-4 ml-1" />
             </button>
           </form>

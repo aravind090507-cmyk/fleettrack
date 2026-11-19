@@ -172,6 +172,10 @@ export const authApi = {
     const { data } = await api.post('/api/auth/register', { name, email, password, role });
     return data as { access_token: string; token_type: string; user: User };
   },
+  createUser: async (name: string, email: string, password: string, role = 'DRIVER') => {
+    const { data } = await api.post('/api/auth/create-user', { name, email, password, role });
+    return data as { access_token: string; token_type: string; user: User };
+  },
   logout: async () => {
     const { data } = await api.post('/api/auth/logout');
     return data;

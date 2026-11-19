@@ -45,10 +45,11 @@ async def get_or_create_default_company(db: AsyncSession) -> Company:
 
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/create-user", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 async def register(payload: RegisterRequest, db: AsyncSession = Depends(get_db)):
     """
-    Public registration endpoint.
-    - Allows DRIVER or FLEET_MANAGER signup.
+    Public user creation and registration endpoint.
+    - Allows DRIVER or FLEET_MANAGER user creation.
     - If company_name is provided, creates that company and user becomes FLEET_MANAGER.
     - If invite_code is provided, user joins that existing company as a DRIVER.
     - If no company is provided, user joins the default corporate fleet under their selected role.
@@ -65,10 +66,16 @@ async def register(payload: RegisterRequest, db: AsyncSession = Depends(get_db))
             detail="An account with this email address already exists. Please log in.",
         )
 
-    # Multi-tenant company resolution
-    assigned_company: Company | None = None
+    # Multi-tenant company resolution and role validation
     raw_role = (payload.role or "DRIVER").upper().strip()
-    role_to_grant = raw_role if raw_role in ("DRIVER", "FLEET_MANAGER") else "DRIVER"
+    if raw_role not in ("DRIVER", "FLEET_MANAGER", "ADMIN"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid role. Must be 'DRIVER' or 'FLEET_MANAGER'.",
+        )
+    role_to_grant = "DRIVER" if raw_role == "ADMIN" else raw_role
+
+    assigned_company: Company | None = None
 
     if payload.company_name and payload.company_name.strip():
         # Tenant Owner creation flow
@@ -97,17 +104,27 @@ async def register(payload: RegisterRequest, db: AsyncSession = Depends(get_db))
         # Default company assignment
         assigned_company = await get_or_create_default_company(db)
 
-    new_user = User(
-        company_id=assigned_company.id if assigned_company else None,
-        name=payload.name.strip(),
-        email=email_clean,
-        password_hash=hash_password(payload.password),
-        role=role_to_grant,
-        is_active=True,
-    )
-    db.add(new_user)
-    await db.commit()
-    await db.refresh(new_user)
+    try:
+        new_user = User(
+            company_id=assigned_company.id if assigned_company else None,
+            name=payload.name.strip(),
+            email=email_clean,
+            password_hash=hash_password(payload.password),
+            role=role_to_grant,
+            is_active=True,
+            availability="AVAILABLE",
+            availability_preference="AVAILABLE",
+        )
+        db.add(new_user)
+        await db.commit()
+        await db.refresh(new_user)
+    except Exception as e:
+        await db.rollback()
+        logger.error("Failed to persist new user %s: %s", email_clean, e)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create user account. Please try again.",
+        )
 
     logger.info("New %s registered: %s (Company: %s)", new_user.role, new_user.email, assigned_company.name if assigned_company else "None")
 

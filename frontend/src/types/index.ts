@@ -47,7 +47,7 @@ export interface LocationPing {
   latitude: number;
   longitude: number;
   speed: number;
-  heading: number;
+  heading?: number;
   accuracy: number;
   altitude?: number | null;
   timestamp: string;

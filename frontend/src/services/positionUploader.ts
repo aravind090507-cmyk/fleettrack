@@ -87,7 +87,7 @@ class PositionUploaderService {
       latitude: ping.latitude,
       longitude: ping.longitude,
       speed: ping.speed,
-      heading: ping.heading,
+      heading: ping.heading ?? 0,
       accuracy: ping.accuracy,
       altitude: ping.altitude || undefined,
       timestamp: ping.timestamp,
