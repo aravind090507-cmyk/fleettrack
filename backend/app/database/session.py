@@ -75,56 +75,60 @@ async def init_db():
         from app.models.types import set_postgis_available
         try:
             async with engine.connect() as ext_conn:
-                await ext_conn.execution_options(isolation_level="AUTOCOMMIT").execute(
-                    text("CREATE EXTENSION IF NOT EXISTS postgis;")
-                )
+                await ext_conn.execute(text("CREATE EXTENSION IF NOT EXISTS postgis;"))
+                await ext_conn.commit()
                 set_postgis_available(True)
                 logger.info("Ensured PostGIS extension is active")
         except Exception as e:
             set_postgis_available(False)
             logger.warning("Notice on PostGIS extension creation (falling back to spatial text): %s", e)
 
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    # 1. Create any missing tables defined in Base metadata
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+    except Exception as e:
+        logger.debug("Base.metadata.create_all notice: %s", e)
+
+    # 2. Reconcile columns and tables with per-statement transactions to prevent Postgres abort cascades
+    if not settings.DATABASE_URL.startswith("sqlite"):
         from sqlalchemy import text
-        if not settings.DATABASE_URL.startswith("sqlite"):
-            # PostgreSQL schema reconciliation for live production databases
-            pg_migration_sqls = [
-                "ALTER TABLE users ADD COLUMN IF NOT EXISTS availability VARCHAR(50) DEFAULT 'AVAILABLE'",
-                "ALTER TABLE users ADD COLUMN IF NOT EXISTS availability_preference VARCHAR(50) DEFAULT 'AVAILABLE'",
-                "ALTER TABLE users ADD COLUMN IF NOT EXISTS availability_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
-                "CREATE TABLE IF NOT EXISTS delivery_assignments (id VARCHAR(36) PRIMARY KEY, company_id VARCHAR(36) REFERENCES companies(id), manager_id VARCHAR(36) REFERENCES users(id), driver_id VARCHAR(36) REFERENCES users(id), destination_name VARCHAR(255) NOT NULL, destination_lat FLOAT NOT NULL, destination_lng FLOAT NOT NULL, instructions TEXT, status VARCHAR(50) DEFAULT 'PENDING' NOT NULL, journey_id VARCHAR(36) REFERENCES journeys(id), created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL, accepted_at TIMESTAMP, rejected_at TIMESTAMP, started_at TIMESTAMP, completed_at TIMESTAMP, cancelled_at TIMESTAMP)",
-                "CREATE INDEX IF NOT EXISTS ix_delivery_assignments_company_id ON delivery_assignments (company_id)",
-                "CREATE INDEX IF NOT EXISTS ix_delivery_assignments_driver_id ON delivery_assignments (driver_id)",
-                "CREATE INDEX IF NOT EXISTS ix_delivery_assignments_manager_id ON delivery_assignments (manager_id)",
-                "CREATE INDEX IF NOT EXISTS ix_delivery_assignments_status ON delivery_assignments (status)",
-                "CREATE INDEX IF NOT EXISTS ix_delivery_assignments_journey_id ON delivery_assignments (journey_id)",
-                "ALTER TABLE trip_events ADD COLUMN IF NOT EXISTS is_dismissed BOOLEAN DEFAULT FALSE",
-                "ALTER TABLE locations ALTER COLUMN protocol DROP NOT NULL",
-                "ALTER TABLE locations ALTER COLUMN protocol SET DEFAULT 'web'",
-                "ALTER TABLE locations ALTER COLUMN device_id DROP NOT NULL",
-                "ALTER TABLE locations DROP COLUMN IF EXISTS protocol",
-                "ALTER TABLE locations DROP COLUMN IF EXISTS device_time",
-                "ALTER TABLE locations DROP COLUMN IF EXISTS device_id",
-                "ALTER TABLE journeys DROP COLUMN IF EXISTS device_id",
-                "DROP TABLE IF EXISTS device_geofences CASCADE",
-                "DROP TABLE IF EXISTS devices CASCADE",
-            ]
+        pg_migration_sqls = [
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS availability VARCHAR(50) DEFAULT 'AVAILABLE'",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS availability_preference VARCHAR(50) DEFAULT 'AVAILABLE'",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS availability_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+            "CREATE TABLE IF NOT EXISTS delivery_assignments (id VARCHAR(36) PRIMARY KEY, company_id VARCHAR(36) REFERENCES companies(id), manager_id VARCHAR(36) REFERENCES users(id), driver_id VARCHAR(36) REFERENCES users(id), destination_name VARCHAR(255) NOT NULL, destination_lat FLOAT NOT NULL, destination_lng FLOAT NOT NULL, instructions TEXT, status VARCHAR(50) DEFAULT 'PENDING' NOT NULL, journey_id VARCHAR(36) REFERENCES journeys(id), created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL, accepted_at TIMESTAMP, rejected_at TIMESTAMP, started_at TIMESTAMP, completed_at TIMESTAMP, cancelled_at TIMESTAMP)",
+            "CREATE INDEX IF NOT EXISTS ix_delivery_assignments_company_id ON delivery_assignments (company_id)",
+            "CREATE INDEX IF NOT EXISTS ix_delivery_assignments_driver_id ON delivery_assignments (driver_id)",
+            "CREATE INDEX IF NOT EXISTS ix_delivery_assignments_manager_id ON delivery_assignments (manager_id)",
+            "CREATE INDEX IF NOT EXISTS ix_delivery_assignments_status ON delivery_assignments (status)",
+            "CREATE INDEX IF NOT EXISTS ix_delivery_assignments_journey_id ON delivery_assignments (journey_id)",
+            "ALTER TABLE trip_events ADD COLUMN IF NOT EXISTS is_dismissed BOOLEAN DEFAULT FALSE",
+            "ALTER TABLE locations ALTER COLUMN protocol DROP NOT NULL",
+            "ALTER TABLE locations ALTER COLUMN protocol SET DEFAULT 'web'",
+            "ALTER TABLE locations ALTER COLUMN device_id DROP NOT NULL",
+            "ALTER TABLE locations DROP COLUMN IF EXISTS protocol",
+            "ALTER TABLE locations DROP COLUMN IF EXISTS device_time",
+            "ALTER TABLE locations DROP COLUMN IF EXISTS device_id",
+            "ALTER TABLE journeys DROP COLUMN IF EXISTS device_id",
+            "DROP TABLE IF EXISTS device_geofences CASCADE",
+            "DROP TABLE IF EXISTS devices CASCADE",
+        ]
+        async with engine.connect() as conn:
             for sql in pg_migration_sqls:
                 try:
-                    sp = await conn.begin_nested()
-                    await conn.execute(text(sql))
-                    await sp.commit()
+                    async with conn.begin():
+                        await conn.execute(text(sql))
                 except Exception as e:
-                    await sp.rollback()
                     logger.debug("PostgreSQL schema notice (%s): %s", sql, e)
-        else:
+    else:
+        async with engine.begin() as conn:
+            from sqlalchemy import text
             for table in ["users", "vehicles", "journeys"]:
                 try:
                     await conn.execute(text(f"ALTER TABLE {table} ADD COLUMN company_id VARCHAR(36)"))
                 except Exception:
                     pass
-            # Check and alter new Phase 2 columns if running on an existing populated SQLite database
             for col_sql in [
                 "ALTER TABLE journeys ADD COLUMN destination_geofence_id VARCHAR(36)",
                 "ALTER TABLE locations ADD COLUMN valid BOOLEAN DEFAULT 1",
