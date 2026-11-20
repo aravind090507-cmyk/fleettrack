@@ -39,6 +39,8 @@ export interface Journey {
   created_at: string;
   vehicle_registration?: string;
   driver_name?: string;
+  tracking_url?: string | null;
+  tracking_token?: string | null;
 }
 
 export type AdaptiveTrackingState = 'MOVING' | 'TRAFFIC' | 'STATIONARY' | 'EXTENDED_IDLE';

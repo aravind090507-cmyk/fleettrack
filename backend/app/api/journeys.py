@@ -24,7 +24,7 @@ from app.schemas.journey import (
     TripEventResponse,
 )
 from app.security.dependencies import get_current_user, require_driver
-from app.services.journey_service import create_journey, end_journey
+from app.services.journey_service import create_journey, end_journey, get_journey_tracking_token
 from app.services.redis_service import get_redis_service
 from app.websocket.manager import get_ws_manager
 
@@ -164,7 +164,7 @@ async def get_active_journeys(
     stmt = (
         select(Journey)
         .where(Journey.status == "IN_PROGRESS")
-        .options(selectinload(Journey.vehicle), selectinload(Journey.driver))
+        .options(selectinload(Journey.vehicle), selectinload(Journey.driver), selectinload(Journey.tracking_links))
         .order_by(Journey.started_at.desc())
     )
 
@@ -178,9 +178,6 @@ async def get_active_journeys(
     journeys = result.scalars().all()
 
     items = []
-    from app.config.settings import get_settings
-    settings = get_settings()
-
     for j in journeys:
         resp = JourneyResponse.model_validate(j)
         if j.vehicle:
@@ -188,25 +185,10 @@ async def get_active_journeys(
         if j.driver:
             resp.driver_name = j.driver.name
 
-        token_payload = {
-            "jid": j.id,
-            "cid": j.company_id,
-            "vid": j.vehicle_id,
-            "vreg": j.vehicle.registration_number if j.vehicle else "FLEET-01",
-            "vtype": j.vehicle.vehicle_type if j.vehicle else "VAN",
-            "did": j.driver_id,
-            "dname": j.driver.name if j.driver else "Driver",
-            "oname": j.origin_name,
-            "olat": j.origin_lat,
-            "olng": j.origin_lng,
-            "destname": j.destination_name,
-            "dlat": j.destination_lat,
-            "dlng": j.destination_lng,
-            "st": f"{j.started_at.isoformat()}Z" if not j.started_at.isoformat().endswith("Z") else j.started_at.isoformat(),
-            "exp": int((j.started_at + timedelta(hours=settings.TRACKING_LINK_EXPIRE_HOURS)).timestamp()),
-        }
-        resp.tracking_token = jwt.encode(token_payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
-        resp.tracking_url = f"/track/{resp.tracking_token}"
+        if j.status == "IN_PROGRESS":
+            token_info = get_journey_tracking_token(j)
+            if token_info:
+                resp.tracking_token, resp.tracking_url = token_info
         items.append(resp)
     return items
 
@@ -281,7 +263,11 @@ async def get_journey_by_id(
     stmt = (
         select(Journey)
         .where(Journey.id == journey_id)
-        .options(selectinload(Journey.vehicle), selectinload(Journey.driver))
+        .options(
+            selectinload(Journey.vehicle),
+            selectinload(Journey.driver),
+            selectinload(Journey.tracking_links),
+        )
     )
     result = await db.execute(stmt)
     journey = result.scalar_one_or_none()
@@ -299,6 +285,10 @@ async def get_journey_by_id(
         resp.vehicle_registration = journey.vehicle.registration_number
     if journey.driver:
         resp.driver_name = journey.driver.name
+    if journey.status == "IN_PROGRESS":
+        token_info = get_journey_tracking_token(journey)
+        if token_info:
+            resp.tracking_token, resp.tracking_url = token_info
     return resp
 
 

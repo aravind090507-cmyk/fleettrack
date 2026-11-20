@@ -538,9 +538,9 @@ export const DriverDispatchPage: React.FC = () => {
                           </span>
                         </td>
                         <td className="py-3.5 px-3">
-                          {asg.tracking_url ? (
+                          {asg.tracking_url && isInTransit ? (
                             <a
-                              href={asg.tracking_url}
+                              href={asg.tracking_url.startsWith('http') ? asg.tracking_url : `${window.location.origin}${asg.tracking_url.startsWith('/') ? '' : '/'}${asg.tracking_url}`}
                               target="_blank"
                               rel="noopener noreferrer"
                               onClick={(e) => e.stopPropagation()}

@@ -31,7 +31,7 @@ from app.schemas.dispatch import (
     DriverAvailabilityUpdate,
 )
 from app.security.dependencies import get_current_user, require_driver
-from app.services.journey_service import create_journey, end_journey
+from app.services.journey_service import create_journey, end_journey, get_journey_tracking_token
 from app.services.redis_service import get_redis_service
 from app.websocket.manager import get_ws_manager
 
@@ -60,10 +60,11 @@ def _build_assignment_response(asg: DeliveryAssignment, tracking_url: Optional[s
         if j_ins.attrs.vehicle.loaded_value is not NO_VALUE and asg.journey.vehicle:
             v_reg = asg.journey.vehicle.registration_number
             v_model = asg.journey.vehicle.model
-        if not t_url and j_ins.attrs.tracking_links.loaded_value is not NO_VALUE and asg.journey.tracking_links:
-            active_link = next((l for l in asg.journey.tracking_links if not l.revoked_at), None)
-            if active_link:
-                t_url = f"/track/{active_link.id}"
+        if not t_url and asg.status == "IN_PROGRESS" and asg.journey.status == "IN_PROGRESS":
+            if j_ins.attrs.tracking_links.loaded_value is not NO_VALUE:
+                token_info = get_journey_tracking_token(asg.journey)
+                if token_info:
+                    _, t_url = token_info
 
     return DeliveryAssignmentResponse(
         id=asg.id,
@@ -478,7 +479,12 @@ async def get_active_driver_assignment(
             DeliveryAssignment.driver_id == current_user.id,
             DeliveryAssignment.status.in_(["PENDING", "ACCEPTED", "IN_PROGRESS"]),
         )
-        .options(selectinload(DeliveryAssignment.manager), selectinload(DeliveryAssignment.driver))
+        .options(
+            selectinload(DeliveryAssignment.manager),
+            selectinload(DeliveryAssignment.driver),
+            selectinload(DeliveryAssignment.journey).selectinload(Journey.vehicle),
+            selectinload(DeliveryAssignment.journey).selectinload(Journey.tracking_links),
+        )
         .order_by(DeliveryAssignment.created_at.desc())
     )
     res = await db.execute(stmt)
@@ -486,16 +492,7 @@ async def get_active_driver_assignment(
     if not asg:
         return None
 
-    tracking_url = None
-    if asg.journey_id:
-        from app.models.tracking_link import TrackingLink
-        tl_stmt = select(TrackingLink).where(TrackingLink.journey_id == asg.journey_id, TrackingLink.revoked_at.is_(None))
-        tl_res = await db.execute(tl_stmt)
-        tl = tl_res.scalar_one_or_none()
-        if tl:
-            tracking_url = f"/track/{tl.token_hash}"
-
-    return _build_assignment_response(asg, tracking_url=tracking_url)
+    return _build_assignment_response(asg)
 
 
 @router.post("/api/driver/assignments/{assignment_id}/accept", response_model=DeliveryAssignmentResponse)

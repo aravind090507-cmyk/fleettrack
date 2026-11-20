@@ -172,6 +172,17 @@ export const DeliveryTrackingView: React.FC<DeliveryTrackingViewProps> = ({
 
   const mapTile = useMemo(() => getMapTileConfig('apple'), []);
 
+  const customerTrackingUrl = useMemo(() => {
+    if (!assignment?.tracking_url) return null;
+    if (assignment.tracking_url.startsWith('http')) {
+      return assignment.tracking_url;
+    }
+    const cleanPath = assignment.tracking_url.startsWith('/')
+      ? assignment.tracking_url
+      : `/${assignment.tracking_url}`;
+    return `${window.location.origin}${cleanPath}`;
+  }, [assignment?.tracking_url]);
+
   // Fetch Assignment Details & Initial Journey State
   const loadAssignmentData = useCallback(async () => {
     try {
@@ -188,6 +199,9 @@ export const DeliveryTrackingView: React.FC<DeliveryTrackingViewProps> = ({
           }
           if (journeyData.total_distance_km) {
             setTotalDistanceKm(journeyData.total_distance_km);
+          }
+          if (!asg.tracking_url && journeyData.tracking_url) {
+            setAssignment((prev) => (prev ? { ...prev, tracking_url: journeyData.tracking_url } : prev));
           }
         } catch (e) {
           console.warn('Could not fetch journey details', e);
@@ -457,18 +471,29 @@ export const DeliveryTrackingView: React.FC<DeliveryTrackingViewProps> = ({
             <span>{freshness.connectionStatus}</span>
           </div>
 
-          {assignment.tracking_url && (
-            <a
-              href={assignment.tracking_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-3 py-1.5 bg-[#0071E3] hover:bg-blue-600 active:scale-95 text-white rounded-full text-xs font-bold flex items-center gap-1.5 shadow-sm shadow-blue-500/20 transition"
-              title="Open Ephemeral Public Tracking Link"
-            >
-              <span>Customer Link</span>
-              <ExternalLink className="w-3.5 h-3.5" />
-            </a>
-          )}
+          <button
+            type="button"
+            onClick={() => {
+              if (customerTrackingUrl && assignment.status === 'IN_PROGRESS') {
+                window.open(customerTrackingUrl, '_blank', 'noopener,noreferrer');
+              } else {
+                alert('No active public tracking link is available for this delivery. The journey has not started yet or has already concluded.');
+              }
+            }}
+            className={`px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 transition cursor-pointer ${
+              customerTrackingUrl && assignment.status === 'IN_PROGRESS'
+                ? 'bg-[#0071E3] hover:bg-blue-600 active:scale-95 text-white shadow-sm shadow-blue-500/20'
+                : 'bg-zinc-200 text-zinc-500 hover:bg-zinc-300'
+            }`}
+            title={
+              customerTrackingUrl && assignment.status === 'IN_PROGRESS'
+                ? 'Open Ephemeral Public Tracking Link'
+                : 'Public tracking link is unavailable'
+            }
+          >
+            <span>Customer Link</span>
+            <ExternalLink className="w-3.5 h-3.5" />
+          </button>
         </div>
       </div>
 

@@ -113,10 +113,11 @@ async def create_journey(
     raw_token = jwt.encode(token_payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
     token_hash = hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
 
-    # 3. Create TrackingLink record with SHA-256 hash
+    # 3. Create TrackingLink record with SHA-256 hash and persistent raw token
     tracking_link = TrackingLink(
         journey_id=journey.id,
         token_hash=token_hash,
+        token=raw_token,
         expires_at=expires_at,
     )
     db.add(tracking_link)
@@ -265,6 +266,61 @@ async def end_journey(
     return journey
 
 
+def get_journey_tracking_token(journey: Journey) -> Optional[Tuple[str, str]]:
+    """
+    Retrieves the canonical single-source-of-truth public tracking token and URL for an active journey.
+    Returns (raw_token, tracking_url) if an active (unrevoked, unexpired) link exists, else None.
+    """
+    if not journey or journey.status != "IN_PROGRESS":
+        return None
+    if not journey.tracking_links:
+        return None
+
+    now = datetime.now(timezone.utc)
+    active_link = next(
+        (
+            l for l in journey.tracking_links
+            if not l.revoked_at and (
+                l.expires_at.replace(tzinfo=timezone.utc) if l.expires_at.tzinfo is None else l.expires_at
+            ) > now
+        ),
+        None,
+    )
+    if not active_link:
+        return None
+
+    raw_token = active_link.token
+    if not raw_token:
+        # Fallback: deterministic signed token from journey state
+        started_at = journey.started_at
+        st_str = started_at.isoformat() if not started_at.isoformat().endswith("Z") else started_at.isoformat()
+        if not st_str.endswith("Z"):
+            st_str = f"{st_str}Z"
+        expires_at = active_link.expires_at
+        veh = getattr(journey, "vehicle", None)
+        drv = getattr(journey, "driver", None)
+        token_payload = {
+            "jid": journey.id,
+            "cid": journey.company_id,
+            "vid": journey.vehicle_id,
+            "vreg": veh.registration_number if veh else "FLEET-01",
+            "vtype": veh.vehicle_type if veh else "VAN",
+            "did": journey.driver_id,
+            "dname": drv.name if drv else "Driver",
+            "oname": journey.origin_name,
+            "olat": journey.origin_lat,
+            "olng": journey.origin_lng,
+            "destname": journey.destination_name,
+            "dlat": journey.destination_lat,
+            "dlng": journey.destination_lng,
+            "st": st_str,
+            "exp": int(expires_at.timestamp()),
+        }
+        raw_token = jwt.encode(token_payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+
+    return raw_token, f"/track/{raw_token}"
+
+
 # In-memory throttle tracker for tracking token access counter commits (at most once every 60s)
 _token_last_access_commit: dict[str, float] = {}
 
@@ -287,7 +343,10 @@ async def validate_tracking_token(
 
     stmt = (
         select(TrackingLink)
-        .where(TrackingLink.token_hash == token_hash)
+        .where(
+            (TrackingLink.token_hash == token_hash) |
+            (TrackingLink.token == token)
+        )
         .options(
             selectinload(TrackingLink.journey).selectinload(Journey.vehicle),
             selectinload(TrackingLink.journey).selectinload(Journey.driver),
