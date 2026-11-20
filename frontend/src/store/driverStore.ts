@@ -1,6 +1,23 @@
 import { create } from 'zustand';
 import { Journey, LocationPing } from '../types';
 
+export type LocationPermissionState =
+  | 'checking'
+  | 'prompt'
+  | 'granted'
+  | 'denied'
+  | 'device_disabled'
+  | 'unavailable';
+
+export interface LastKnownCoords {
+  latitude: number;
+  longitude: number;
+  accuracy: number;
+  heading?: number;
+  speed?: number;
+  timestamp: string;
+}
+
 interface DriverState {
   currentJourney: Journey | null;
   trackingUrl: string | null;
@@ -11,6 +28,8 @@ interface DriverState {
   isOnline: boolean;
   offlineQueueCount: number;
   journeyDuration: number;
+  locationPermission: LocationPermissionState;
+  lastKnownLocation: LastKnownCoords | null;
 
   setDriverName: (name: string) => void;
   setJourney: (journey: Journey | null, trackingUrl?: string, trackingToken?: string, customDriverName?: string) => void;
@@ -19,6 +38,8 @@ interface DriverState {
   setOnlineStatus: (isOnline: boolean) => void;
   setOfflineQueueCount: (count: number) => void;
   setJourneyDuration: (seconds: number) => void;
+  setLocationPermission: (status: LocationPermissionState) => void;
+  setLastKnownLocation: (coords: LastKnownCoords | null) => void;
   clearJourney: () => void;
 }
 
@@ -29,9 +50,11 @@ export const useDriverStore = create<DriverState>((set) => ({
   driverName: typeof window !== 'undefined' ? localStorage.getItem('fleet_driver_name') : null,
   gpsStatus: 'idle',
   lastPing: null,
-  isOnline: navigator.onLine,
+  isOnline: typeof navigator !== 'undefined' ? navigator.onLine : true,
   offlineQueueCount: 0,
   journeyDuration: 0,
+  locationPermission: 'checking',
+  lastKnownLocation: null,
 
   setDriverName: (name: string) => {
     const clean = name ? name.trim() : '';
@@ -74,6 +97,8 @@ export const useDriverStore = create<DriverState>((set) => ({
   setOnlineStatus: (isOnline) => set({ isOnline }),
   setOfflineQueueCount: (offlineQueueCount) => set({ offlineQueueCount }),
   setJourneyDuration: (journeyDuration) => set({ journeyDuration }),
+  setLocationPermission: (locationPermission) => set({ locationPermission }),
+  setLastKnownLocation: (lastKnownLocation) => set({ lastKnownLocation }),
 
   clearJourney: () => {
     if (typeof window !== 'undefined') {

@@ -4,6 +4,7 @@ import { LogOut, Radio } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { ConnectionStatus } from '../../components/ui/ConnectionStatus';
 import { useDriverStore } from '../../store/driverStore';
+import { LocationStatusIndicator } from '../../components/driver/LocationStatusIndicator';
 
 interface DriverLayoutProps {
   children: React.ReactNode;
@@ -51,7 +52,10 @@ export const DriverLayout: React.FC<DriverLayoutProps> = ({ children }) => {
       </header>
 
       {/* Main Content Area */}
-      <main className="flex-1 p-4 flex flex-col bg-[#F2F2F7]">{children}</main>
+      <main className="flex-1 p-4 flex flex-col bg-[#F2F2F7]">
+        <LocationStatusIndicator />
+        {children}
+      </main>
     </div>
   );
 };

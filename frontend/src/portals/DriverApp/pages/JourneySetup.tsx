@@ -167,8 +167,25 @@ export const JourneySetup: React.FC = () => {
   useEffect(() => {
     loadVehicles();
 
-    // Acquire current GPS to center the start pin immediately
-    if (navigator.geolocation) {
+    // Use pre-acquired GPS coordinates from automatic permission flow or acquire fresh
+    const preAcquired = useDriverStore.getState().lastKnownLocation;
+    if (preAcquired) {
+      const lat = preAcquired.latitude;
+      const lng = preAcquired.longitude;
+      setOriginCoords([lat, lng]);
+      setStartLatInput(lat.toString());
+      setStartLngInput(lng.toString());
+
+      const destLat = lat;
+      const destLng = parseFloat((lng + 0.0001).toFixed(6));
+      setDestCoords([destLat, destLng]);
+      setDestLatInput(destLat.toString());
+      setDestLngInput(destLng.toString());
+
+      setMapTarget([lat, lng]);
+      setOriginName((prev) => (prev === 'My Starting Location' ? 'Current Office Location' : prev));
+      setDestinationName((prev) => (prev === 'Destination Point' ? '10m Walk Endpoint' : prev));
+    } else if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           const lat = parseFloat(pos.coords.latitude.toFixed(6));
