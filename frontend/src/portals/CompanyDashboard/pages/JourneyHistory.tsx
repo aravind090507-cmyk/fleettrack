@@ -151,7 +151,7 @@ export const JourneyHistory: React.FC = () => {
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              navigate(`/company/live-map?journeyId=${j.id}`);
+                              navigate(`/company/view-path?journeyId=${j.id}&from=history`);
                             }}
                             className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-[#0071E3] hover:bg-blue-600 text-white rounded-full text-xs font-semibold shadow-sm shadow-blue-500/20 transition cursor-pointer"
                           >

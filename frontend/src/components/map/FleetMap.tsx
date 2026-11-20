@@ -282,18 +282,9 @@ export const FleetMap: React.FC<FleetMapProps> = ({
     [vehicles]
   );
 
-  // Full polyline coordinates: origin -> journey path breadcrumbs -> destination/latest
+  // Full polyline coordinates strictly from verified journey path breadcrumbs
   const fullPolyline: [number, number][] = useMemo(() => {
     const pts: [number, number][] = [];
-    if (
-      selectedTransit &&
-      selectedTransit.origin_lat != null &&
-      selectedTransit.origin_lng != null &&
-      !isNaN(selectedTransit.origin_lat) &&
-      !isNaN(selectedTransit.origin_lng)
-    ) {
-      pts.push([selectedTransit.origin_lat, selectedTransit.origin_lng]);
-    }
     if (journeyPath && journeyPath.length > 0) {
       for (const pt of journeyPath) {
         if (pt && pt[0] != null && pt[1] != null && !isNaN(pt[0]) && !isNaN(pt[1])) {
@@ -302,7 +293,7 @@ export const FleetMap: React.FC<FleetMapProps> = ({
       }
     }
     return pts;
-  }, [selectedTransit, journeyPath]);
+  }, [journeyPath]);
 
   const [followSelected, setFollowSelected] = useState<boolean>(true);
   const [mapStyle, setMapStyle] = useState<'apple' | 'dark'>('apple');
@@ -355,27 +346,27 @@ export const FleetMap: React.FC<FleetMapProps> = ({
           followSelected={followSelected}
         />
 
-        {/* Selected Transit Path (Traveled Breadcrumb Polyline) */}
+        {/* Selected Transit Path (Verified Breadcrumb Polyline - Bright Blue) */}
         {fullPolyline.length > 1 && (
           <>
-            {/* Soft glowing outer halo */}
+            {/* Soft glowing outer halo (bright blue) */}
             <Polyline
               positions={fullPolyline}
               pathOptions={{
-                color: '#a3644b',
-                weight: 6,
+                color: '#0071E3',
+                weight: 8,
                 opacity: 0.35,
                 lineCap: 'round',
                 lineJoin: 'round',
               }}
             />
-            {/* Crisp vibrant inner route */}
+            {/* Crisp vibrant inner route (bright blue core) */}
             <Polyline
               positions={fullPolyline}
               pathOptions={{
-                color: '#cb886c',
-                weight: 3.5,
-                opacity: 0.95,
+                color: '#0071E3',
+                weight: 4.5,
+                opacity: 1.0,
                 lineCap: 'round',
                 lineJoin: 'round',
               }}

@@ -70,7 +70,7 @@ export const ActiveJourneys: React.FC = () => {
                 {journeys.map((j) => (
                   <tr
                     key={j.id}
-                    onClick={() => navigate(`/company/live-map?journeyId=${j.id}`)}
+                    onClick={() => navigate(`/company/view-path?journeyId=${j.id}&from=active`)}
                     className="hover:bg-zinc-50/60 cursor-pointer transition-colors"
                   >
                     <td className="py-3 px-4 font-bold font-mono text-[#0071E3] tracking-tight">
@@ -89,12 +89,12 @@ export const ActiveJourneys: React.FC = () => {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          navigate(`/company/live-map?journeyId=${j.id}`);
+                          navigate(`/company/view-path?journeyId=${j.id}&from=active`);
                         }}
                         className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#0071E3] hover:bg-[#0077ED] text-white rounded-full text-xs font-bold transition shadow-sm cursor-pointer"
                       >
                         <MapPin className="w-3 h-3" />
-                        <span>Track Route</span>
+                        <span>View Path</span>
                       </button>
                     </td>
                   </tr>

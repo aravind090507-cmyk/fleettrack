@@ -133,9 +133,9 @@ export const LiveMap: React.FC = () => {
       setActiveJourneys(resolvedJourneys);
       setRecentEvents(filteredEvents);
 
-      // If no active journeys exist, clear any active selections
+      // If no active journeys exist and no specific trip requested, clear active selections
       const current = selectedTransitRef.current;
-      if (resolvedJourneys.length === 0) {
+      if (resolvedJourneys.length === 0 && !queryJourneyId && current?.status !== 'COMPLETED') {
         setSelectedTransit(null);
         setSelectedVehicleId(null);
         setJourneyPath([]);
