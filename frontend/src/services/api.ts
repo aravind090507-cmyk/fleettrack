@@ -14,12 +14,9 @@ import {
   LocationPing,
   Position,
   PublicTripEvent,
-  StopReportItem,
-  SummaryReportItem,
   TelematicsEvent,
   TrackingInfo,
   TripAlert,
-  TripReportItem,
   User,
   Vehicle,
 } from '../types';
@@ -68,8 +65,7 @@ export const getActiveTokenForRequest = (url?: string): string | null => {
     (url.startsWith('/api/dispatch') ||
       url.startsWith('/api/dashboard') ||
       url.startsWith('/api/vehicles') ||
-      url.startsWith('/api/geofences') ||
-      url.startsWith('/api/reports'))
+      url.startsWith('/api/geofences'))
   ) {
     const managerToken = localStorage.getItem('fleet_manager_token');
     if (managerToken) return managerToken;
@@ -412,68 +408,6 @@ export const geofencesApi = {
   },
   delete: async (id: string) => {
     await api.delete(`/api/geofences/${id}`);
-  },
-};
-
-// --- Reports Endpoints ---
-export const reportsApi = {
-  getRoute: async (params: { vehicle_id?: string; journey_id?: string; device_id?: string; from: string; to: string; format?: 'json' | 'csv' | 'gpx' }) => {
-    const query = new URLSearchParams();
-    if (params.vehicle_id) query.append('vehicle_id', params.vehicle_id);
-    if (params.journey_id) query.append('journey_id', params.journey_id);
-    if (params.device_id) query.append('vehicle_id', params.device_id);
-    query.append('from', params.from);
-    query.append('to', params.to);
-    if (params.format) query.append('format', params.format);
-    
-    if (params.format === 'csv' || params.format === 'gpx') {
-      const response = await api.get(`/api/reports/route?${query.toString()}`, { responseType: 'blob' });
-      return response.data;
-    }
-    const { data } = await api.get(`/api/reports/route?${query.toString()}`);
-    return data as Position[];
-  },
-  getTrips: async (params: { vehicle_id?: string; journey_id?: string; device_id?: string; from: string; to: string; format?: 'json' | 'csv' }) => {
-    const query = new URLSearchParams();
-    if (params.vehicle_id) query.append('vehicle_id', params.vehicle_id);
-    if (params.journey_id) query.append('journey_id', params.journey_id);
-    if (params.device_id) query.append('vehicle_id', params.device_id);
-    query.append('from', params.from);
-    query.append('to', params.to);
-    if (params.format) query.append('format', params.format);
-
-    if (params.format === 'csv') {
-      const response = await api.get(`/api/reports/trips?${query.toString()}`, { responseType: 'blob' });
-      return response.data;
-    }
-    const { data } = await api.get(`/api/reports/trips?${query.toString()}`);
-    return data as TripReportItem[];
-  },
-  getStops: async (params: { vehicle_id?: string; journey_id?: string; device_id?: string; from: string; to: string; format?: 'json' | 'csv' }) => {
-    const query = new URLSearchParams();
-    if (params.vehicle_id) query.append('vehicle_id', params.vehicle_id);
-    if (params.journey_id) query.append('journey_id', params.journey_id);
-    if (params.device_id) query.append('vehicle_id', params.device_id);
-    query.append('from', params.from);
-    query.append('to', params.to);
-    if (params.format) query.append('format', params.format);
-
-    if (params.format === 'csv') {
-      const response = await api.get(`/api/reports/stops?${query.toString()}`, { responseType: 'blob' });
-      return response.data;
-    }
-    const { data } = await api.get(`/api/reports/stops?${query.toString()}`);
-    return data as StopReportItem[];
-  },
-  getSummary: async (params: { vehicle_id?: string; journey_id?: string; device_id?: string; from: string; to: string }) => {
-    const query = new URLSearchParams();
-    if (params.vehicle_id) query.append('vehicle_id', params.vehicle_id);
-    if (params.journey_id) query.append('journey_id', params.journey_id);
-    if (params.device_id) query.append('vehicle_id', params.device_id);
-    query.append('from', params.from);
-    query.append('to', params.to);
-    const { data } = await api.get(`/api/reports/summary?${query.toString()}`);
-    return data as SummaryReportItem[];
   },
 };
 

@@ -328,51 +328,6 @@ export interface Geofence {
   device_ids?: string[];
 }
 
-export interface TripReportItem {
-  device_id: string;
-  start_time: string;
-  start_position_id?: number | null;
-  start_lat: number;
-  start_lng: number;
-  start_address?: string | null;
-  end_time: string;
-  end_position_id?: number | null;
-  end_lat: number;
-  end_lng: number;
-  end_address?: string | null;
-  distance_km: number;
-  duration_seconds: number;
-  max_speed_kmh: number;
-  avg_speed_kmh: number;
-}
-
-export interface StopReportItem {
-  device_id: string;
-  start_time: string;
-  end_time: string;
-  duration_seconds: number;
-  position_id?: number | null;
-  latitude: number;
-  longitude: number;
-  address?: string | null;
-  spent_fuel: number;
-}
-
-export interface SummaryReportItem {
-  device_id: string;
-  device_name: string;
-  start_time: string;
-  end_time: string;
-  distance_km: number;
-  max_speed_kmh: number;
-  avg_speed_kmh: number;
-  engine_hours: number;
-  spent_fuel: number;
-  moving_duration_seconds: number;
-  stop_duration_seconds: number;
-  position_count: number;
-}
-
 export interface TelematicsEnvelope {
   type: 'ENVELOPE';
   devices?: Device[];

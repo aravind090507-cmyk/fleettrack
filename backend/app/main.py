@@ -21,7 +21,6 @@ from app.api.websocket_routes import router as ws_router
 from app.api.positions import router as positions_router
 from app.api.events import router as events_router
 from app.api.geofences import router as geofences_router
-from app.api.reports import router as reports_router
 from app.api.dispatch import router as dispatch_router
 from app.config.settings import get_settings
 from app.database.session import AsyncSessionLocal, init_db
@@ -112,7 +111,6 @@ app.include_router(ws_router)
 app.include_router(positions_router)
 app.include_router(events_router)
 app.include_router(geofences_router)
-app.include_router(reports_router)
 app.include_router(dispatch_router)
 
 

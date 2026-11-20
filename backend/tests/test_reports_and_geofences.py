@@ -119,41 +119,18 @@ async def test_geofences_crud_and_reports(auth_headers_factory):
         assert res_pos.status_code == 200
         assert len(res_pos.json()) == 6
 
-        # 3. Route Report (JSON, CSV, GPX)
+        # 3. Verify Reports endpoints are removed (404 Not Found)
         from_str = t0.isoformat()
         to_str = (t0 + timedelta(hours=1)).isoformat()
 
         res_route = await client.get(f"/api/reports/route?vehicle_id={veh.id}&from={from_str}&to={to_str}", headers=mgr_headers)
-        assert res_route.status_code == 200
-        assert len(res_route.json()) == 6
+        assert res_route.status_code == 404
 
-        res_route_csv = await client.get(f"/api/reports/route?vehicle_id={veh.id}&from={from_str}&to={to_str}&format=csv", headers=mgr_headers)
-        assert res_route_csv.status_code == 200
-        assert "latitude,longitude" in res_route_csv.text
-
-        res_route_gpx = await client.get(f"/api/reports/route?vehicle_id={veh.id}&from={from_str}&to={to_str}&format=gpx", headers=mgr_headers)
-        assert res_route_gpx.status_code == 200
-        assert "<gpx" in res_route_gpx.text
-        assert "<trkpt" in res_route_gpx.text
-
-        # 4. Trips Report
         res_trips = await client.get(f"/api/reports/trips?vehicle_id={veh.id}&from={from_str}&to={to_str}", headers=mgr_headers)
-        assert res_trips.status_code == 200
-        trips = res_trips.json()
-        assert len(trips) == 1
-        assert trips[0]["distance_km"] == 1.1
-        assert trips[0]["max_speed_kmh"] == 50.0
+        assert res_trips.status_code == 404
 
-        # 5. Stops Report
         res_stops = await client.get(f"/api/reports/stops?vehicle_id={veh.id}&from={from_str}&to={to_str}", headers=mgr_headers)
-        assert res_stops.status_code == 200
-        stops = res_stops.json()
-        assert len(stops) == 2  # 2 stationary intervals >= 30s
+        assert res_stops.status_code == 404
 
-        # 6. Summary Report
         res_sum = await client.get(f"/api/reports/summary?vehicle_id={veh.id}&from={from_str}&to={to_str}", headers=mgr_headers)
-        assert res_sum.status_code == 200
-        summary = res_sum.json()
-        assert summary["total_distance_km"] == 1.1
-        assert summary["max_speed_kmh"] == 50.0
-        assert summary["total_positions_count"] == 6
+        assert res_sum.status_code == 404
