@@ -55,7 +55,11 @@
       "destination": "https://fleettrack-production-d254.up.railway.app/openapi.json"
     },
     {
-      "source": "/((?!assets/|.*\\.[\\w]+$).*)",
+      "source": "/assets/:match*",
+      "destination": "/404.html"
+    },
+    {
+      "source": "/(.*)",
       "destination": "/index.html"
     }
   ]
