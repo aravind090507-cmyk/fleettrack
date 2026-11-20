@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { History, Calendar, CheckCircle, ArrowRight, Download, Play } from 'lucide-react';
+import { History, Calendar, CheckCircle, ArrowRight, Download, MapPin } from 'lucide-react';
 import { journeysApi } from '../../../services/api';
 import { useTelematicsStore } from '../../../store/telematicsStore';
 import { Journey } from '../../../types';
@@ -140,13 +140,13 @@ export const JourneyHistory: React.FC = () => {
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              navigate(`/company/live-map?journeyId=${j.id}&replay=true`);
+                              navigate(`/company/live-map?journeyId=${j.id}`);
                             }}
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-800 rounded-full text-xs font-semibold transition shadow-sm cursor-pointer border border-zinc-200/80"
-                            title="Interactive Route Replay"
+                            title="Track Route"
                           >
-                            <Play className="w-3 h-3 text-[#0071E3]" />
-                            <span>Replay</span>
+                            <MapPin className="w-3 h-3 text-[#0071E3]" />
+                            <span>Track Route</span>
                           </button>
                         </div>
                       </td>

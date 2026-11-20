@@ -10,7 +10,6 @@ import {
   Radio,
   Shield,
   FileText,
-  RotateCcw,
   Send,
 } from 'lucide-react';
 import clsx from 'clsx';
@@ -34,7 +33,6 @@ export const Sidebar: React.FC = () => {
     { to: '/company/history', label: 'Trip History', icon: History },
     { to: '/company/geofences', label: 'Geofences', icon: Shield },
     { to: '/company/reports', label: 'Reports & Logs', icon: FileText },
-    { to: '/company/replay', label: 'Route Replay', icon: RotateCcw },
   ];
 
   return (

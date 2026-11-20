@@ -22,15 +22,6 @@ export interface SelectedTransitInfo {
   latest_speed?: number | null;
 }
 
-export interface ReplayPoint {
-  latitude: number;
-  longitude: number;
-  speed: number;
-  heading: number;
-  recorded_at?: string;
-  accuracy?: number;
-}
-
 function getCardinalDirection(heading: number = 0): string {
   const directions = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
   const index = Math.round(((heading % 360) / 45)) % 8;
@@ -43,25 +34,17 @@ function MapController({
   selectedId,
   selectedTransit,
   journeyPath,
-  replayPoint,
   followSelected = false,
 }: {
   vehicles: ActiveVehicleTelemetry[];
   selectedId: string | null;
   selectedTransit?: SelectedTransitInfo | null;
   journeyPath?: [number, number][];
-  replayPoint?: ReplayPoint | null;
   followSelected?: boolean;
 }) {
   const map = useMap();
 
   useEffect(() => {
-    // 0. If route playback is running, follow replay vehicle smoothly
-    if (replayPoint && replayPoint.latitude && replayPoint.longitude) {
-      map.panTo([replayPoint.latitude, replayPoint.longitude], { animate: true, duration: 0.3 });
-      return;
-    }
-
     // 1. If followSelected is enabled and a vehicle is selected, pan to it smoothly
     if (followSelected && selectedId) {
       const selected = vehicles.find((v) => v.vehicle_id === selectedId);
@@ -116,29 +99,6 @@ function MapController({
   }, [map, selectedId, selectedTransit, journeyPath, vehicles]);
 
   return null;
-}
-
-function createReplayIcon(heading: number = 0, speed: number = 0) {
-  const html = `
-    <div style="position: relative; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;">
-      <div style="position: absolute; width: 48px; height: 48px; border-radius: 50%; background-color: rgba(99, 102, 241, 0.4); animation: ping 1.2s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>
-      <div style="position: absolute; top: -14px; background: #4f46e5; color: white; font-size: 9px; font-weight: 800; padding: 1px 6px; border-radius: 9999px; border: 1.5px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.4); white-space: nowrap; z-index: 10;">
-        ${Math.round(speed)} km/h
-      </div>
-      <div style="transform: rotate(${heading}deg) scale(1.3); width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; position: relative; z-index: 5;">
-        <svg width="34" height="34" viewBox="0 0 24 24" fill="#6366f1" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="filter: drop-shadow(0 4px 6px rgba(0,0,0,0.6));">
-          <polygon points="12 2 19 21 12 17 5 21 12 2"/>
-        </svg>
-      </div>
-    </div>
-  `;
-  return L.divIcon({
-    html,
-    className: 'replay-vehicle-div-icon',
-    iconSize: [48, 48],
-    iconAnchor: [24, 24],
-    popupAnchor: [0, -22],
-  });
 }
 
 // Function to generate rotated SVG marker for vehicles
@@ -263,7 +223,6 @@ interface FleetMapProps {
   onSelectVehicle?: (id: string) => void;
   selectedTransit?: SelectedTransitInfo | null;
   journeyPath?: [number, number][];
-  replayPoint?: ReplayPoint | null;
 }
 
 export const FleetMap: React.FC<FleetMapProps> = ({
@@ -272,7 +231,6 @@ export const FleetMap: React.FC<FleetMapProps> = ({
   onSelectVehicle,
   selectedTransit,
   journeyPath = [],
-  replayPoint,
 }) => {
   // Default to Bangalore / India if no coordinates
   const defaultCenter: [number, number] = [12.9716, 77.5946];
@@ -342,7 +300,6 @@ export const FleetMap: React.FC<FleetMapProps> = ({
           selectedId={selectedVehicleId}
           selectedTransit={selectedTransit}
           journeyPath={journeyPath}
-          replayPoint={replayPoint}
           followSelected={followSelected}
         />
 
@@ -417,45 +374,6 @@ export const FleetMap: React.FC<FleetMapProps> = ({
               </Popup>
             </Marker>
           )}
-
-        {/* Active Route Playback Marker (Traccar style animated replay) */}
-        {replayPoint && (
-          <Marker
-            position={[replayPoint.latitude, replayPoint.longitude]}
-            icon={createReplayIcon(replayPoint.heading || 0, replayPoint.speed || 0)}
-          >
-            <Popup className="custom-leaflet-popup" autoPan={false}>
-              <div className="p-1 min-w-[200px] text-slate-900 font-sans">
-                <div className="flex items-center justify-between border-b pb-1 mb-1.5">
-                  <span className="font-black text-xs text-indigo-700 uppercase tracking-wider flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-indigo-600 animate-ping"></span>
-                    Trip Replay Position
-                  </span>
-                  <span className="text-[10px] font-mono font-bold bg-indigo-100 text-indigo-900 px-1.5 py-0.5 rounded">
-                    {Math.round(replayPoint.speed || 0)} km/h
-                  </span>
-                </div>
-                <div className="space-y-1 text-xs">
-                  <div className="flex justify-between text-slate-600">
-                    <span>Course:</span>
-                    <strong className="text-slate-800">{Math.round(replayPoint.heading || 0)}° ({getCardinalDirection(replayPoint.heading || 0)})</strong>
-                  </div>
-                  <div className="flex justify-between text-slate-600">
-                    <span>Coordinates:</span>
-                    <strong className="text-slate-800 font-mono text-[11px]">{replayPoint.latitude.toFixed(5)}, {replayPoint.longitude.toFixed(5)}</strong>
-                  </div>
-                  {replayPoint.recorded_at && (
-                    <div className="flex justify-between text-slate-600 border-t pt-1 mt-1 text-[10px]">
-                      <span>Timestamp:</span>
-                      <strong className="text-slate-700">{new Date(replayPoint.recorded_at).toLocaleTimeString()}</strong>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </Popup>
-          </Marker>
-        )}
-
 
         {/* Fleet Vehicle Markers */}
         {vehiclesWithCoords.map((v) => {

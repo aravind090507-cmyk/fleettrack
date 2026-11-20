@@ -532,7 +532,7 @@ async def get_journey_location_history(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Retrieve historical GPS track for route reconstruction and playback."""
+    """Retrieve historical GPS track for route reconstruction."""
     j_stmt = select(Journey).where(Journey.id == journey_id)
     j_res = await db.execute(j_stmt)
     journey = j_res.scalar_one_or_none()
