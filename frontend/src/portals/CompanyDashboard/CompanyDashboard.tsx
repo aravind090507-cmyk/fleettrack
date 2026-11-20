@@ -13,7 +13,6 @@ import { GeofencesPage } from './pages/GeofencesPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { ReplayPage } from './pages/ReplayPage';
 import { DriverDispatchPage } from './pages/DriverDispatchPage';
-import { TripPathView } from './pages/TripPathView';
 
 export const CompanyDashboard: React.FC = () => {
   return (
@@ -34,7 +33,6 @@ export const CompanyDashboard: React.FC = () => {
             <Route path="geofences" element={<GeofencesPage />} />
             <Route path="reports" element={<ReportsPage />} />
             <Route path="replay" element={<ReplayPage />} />
-            <Route path="view-path" element={<TripPathView />} />
             <Route path="*" element={<Navigate to="/company" replace />} />
           </Routes>
         </main>

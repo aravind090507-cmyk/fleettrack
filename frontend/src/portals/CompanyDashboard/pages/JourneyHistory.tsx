@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { History, Calendar, CheckCircle, MapPin, ArrowRight, Download, Play } from 'lucide-react';
+import { History, Calendar, CheckCircle, ArrowRight, Download, Play } from 'lucide-react';
 import { journeysApi } from '../../../services/api';
 import { useTelematicsStore } from '../../../store/telematicsStore';
 import { Journey } from '../../../types';
@@ -67,7 +67,7 @@ export const JourneyHistory: React.FC = () => {
             Trip Archives & Historical Records
           </h2>
           <p className="text-xs text-zinc-600 mt-0.5">
-            Completed journey records, duration metrics, and distance audit trails. Click any trip to view its path on the map.
+            Completed journey records, duration metrics, and distance audit trails. Click any trip to view on live map.
           </p>
         </div>
         {history.length > 0 && (
@@ -136,7 +136,7 @@ export const JourneyHistory: React.FC = () => {
                         <StatusBadge status={j.status} size="sm" />
                       </td>
                       <td className="py-3 px-4 text-right">
-                        <div className="flex items-center justify-end gap-2">
+                        <div className="flex items-center justify-end">
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -147,16 +147,6 @@ export const JourneyHistory: React.FC = () => {
                           >
                             <Play className="w-3 h-3 text-[#0071E3]" />
                             <span>Replay</span>
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              navigate(`/company/view-path?journeyId=${j.id}&from=history`);
-                            }}
-                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-[#0071E3] hover:bg-blue-600 text-white rounded-full text-xs font-semibold shadow-sm shadow-blue-500/20 transition cursor-pointer"
-                          >
-                            <MapPin className="w-3 h-3" />
-                            <span>View Path</span>
                           </button>
                         </div>
                       </td>

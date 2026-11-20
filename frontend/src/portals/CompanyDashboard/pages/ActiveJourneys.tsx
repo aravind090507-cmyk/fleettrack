@@ -38,7 +38,7 @@ export const ActiveJourneys: React.FC = () => {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold text-zinc-900 tracking-tight">Active Dispatches & Transits</h2>
-          <p className="text-xs text-zinc-600 font-medium mt-0.5">All vehicular movements currently underway. Click any row to view live path.</p>
+          <p className="text-xs text-zinc-600 font-medium mt-0.5">All vehicular movements currently underway. Click any row to track on live map.</p>
         </div>
         <span className="text-xs font-bold px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/80 shadow-sm">
           {socketConnected ? 'Live Socket Stream' : 'Safety Poll 10s'}
@@ -70,7 +70,7 @@ export const ActiveJourneys: React.FC = () => {
                 {journeys.map((j) => (
                   <tr
                     key={j.id}
-                    onClick={() => navigate(`/company/view-path?journeyId=${j.id}&from=active`)}
+                    onClick={() => navigate(`/company/live-map?journeyId=${j.id}`)}
                     className="hover:bg-zinc-50/60 cursor-pointer transition-colors"
                   >
                     <td className="py-3 px-4 font-bold font-mono text-[#0071E3] tracking-tight">
@@ -89,12 +89,12 @@ export const ActiveJourneys: React.FC = () => {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          navigate(`/company/view-path?journeyId=${j.id}&from=active`);
+                          navigate(`/company/live-map?journeyId=${j.id}`);
                         }}
                         className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#0071E3] hover:bg-[#0077ED] text-white rounded-full text-xs font-bold transition shadow-sm cursor-pointer"
                       >
                         <MapPin className="w-3 h-3" />
-                        <span>View Path</span>
+                        <span>Track Route</span>
                       </button>
                     </td>
                   </tr>
