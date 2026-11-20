@@ -17,7 +17,7 @@ export const SocketController: React.FC = () => {
     setPositions,
     setSocketState,
   } = useTelematicsStore();
-  const { updateVehiclePosition, setOverview, setActiveVehicles } = useFleetStore();
+  const { updateVehiclePosition, updateVehicleStatus, setOverview, setActiveVehicles } = useFleetStore();
 
   // Construct WebSocket URL
   const wsUrl = React.useMemo(() => {
@@ -139,9 +139,48 @@ export const SocketController: React.FC = () => {
             status: msg.status,
           });
         }
+      } else if (
+        msg.type === 'DELIVERY_ASSIGNED' ||
+        msg.type === 'DELIVERY_ACCEPTED' ||
+        msg.type === 'DELIVERY_REJECTED' ||
+        msg.type === 'DELIVERY_STARTED' ||
+        msg.type === 'DELIVERY_COMPLETED' ||
+        msg.type === 'JOURNEY_STARTED' ||
+        msg.type === 'JOURNEY_COMPLETED' ||
+        msg.type === 'JOURNEY_TERMINATED'
+      ) {
+        if (msg.vehicle_id) {
+          if (msg.type === 'DELIVERY_ASSIGNED' || msg.type === 'DELIVERY_ACCEPTED') {
+            updateVehicleStatus(msg.vehicle_id, {
+              status: 'BUSY',
+              assigned_driver_name: msg.driver_name,
+              destination_name: msg.destination_name,
+            });
+          } else if (msg.type === 'DELIVERY_STARTED' || msg.type === 'JOURNEY_STARTED') {
+            updateVehicleStatus(msg.vehicle_id, {
+              status: 'IN_TRANSIT',
+              assigned_driver_name: msg.driver_name,
+              origin_name: msg.origin_name,
+              destination_name: msg.destination_name,
+            });
+          } else if (
+            msg.type === 'DELIVERY_COMPLETED' ||
+            msg.type === 'JOURNEY_COMPLETED' ||
+            msg.type === 'JOURNEY_TERMINATED'
+          ) {
+            updateVehicleStatus(msg.vehicle_id, {
+              status: 'AVAILABLE',
+              origin_name: undefined,
+              destination_name: undefined,
+              latest_speed: 0,
+            });
+          }
+        }
+        // Immediately resync authoritative telemetry and metrics
+        resyncRef.current();
       }
     },
-    [handleEnvelope, addPosition, addEvent, updateDevice, updateVehiclePosition]
+    [handleEnvelope, addPosition, addEvent, updateDevice, updateVehiclePosition, updateVehicleStatus]
   );
 
   const onOpen = useCallback(() => {

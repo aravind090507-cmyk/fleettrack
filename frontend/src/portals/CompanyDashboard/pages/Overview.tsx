@@ -24,10 +24,21 @@ export const Overview: React.FC = () => {
 
   useEffect(() => {
     loadData();
-    const pollInterval = socketConnected ? 60000 : 10000;
+    const pollInterval = socketConnected ? 10000 : 5000;
     const interval = setInterval(loadData, pollInterval);
     return () => clearInterval(interval);
   }, [loadData, socketConnected]);
+
+  const isLocationStale = (recordedAt?: string | null) => {
+    if (!recordedAt) return false;
+    try {
+      const recTime = new Date(recordedAt).getTime();
+      if (isNaN(recTime)) return false;
+      return Date.now() - recTime > 5 * 60 * 1000; // > 5 minutes
+    } catch {
+      return false;
+    }
+  };
 
   if (loading) return <LoadingSpinner label="Compiling fleet analytics..." />;
 
@@ -119,17 +130,37 @@ export const Overview: React.FC = () => {
                             {v.destination_name}
                           </span>
                         </div>
+                      ) : v.destination_name ? (
+                        <div className="flex items-center gap-1.5 text-xs">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                          <span className="text-amber-800 font-bold text-[10px] uppercase tracking-wider">Assigned:</span>
+                          <span className="text-zinc-900 font-bold truncate max-w-[160px]" title={v.destination_name}>
+                            {v.destination_name}
+                          </span>
+                        </div>
                       ) : (
-                        <span className="text-zinc-600 font-medium italic text-[11px]">No active dispatch</span>
+                        <span className="text-zinc-500 font-medium italic text-[11px]">No active dispatch</span>
                       )}
                     </td>
                     <td className="py-3 px-4 font-mono font-bold text-zinc-900">
                       {v.latest_speed != null ? `${v.latest_speed} km/h` : '0 km/h'}
                     </td>
                     <td className="py-3 px-4 font-mono text-[11px] text-zinc-700 font-medium">
-                      {v.latest_latitude && v.latest_longitude
-                        ? `${v.latest_latitude.toFixed(4)}, ${v.latest_longitude.toFixed(4)}`
-                        : '--'}
+                      {v.latest_latitude && v.latest_longitude ? (
+                        <div className="flex items-center gap-1.5">
+                          <span>{`${v.latest_latitude.toFixed(4)}, ${v.latest_longitude.toFixed(4)}`}</span>
+                          {isLocationStale(v.latest_recorded_at) && v.status === 'IN_TRANSIT' && (
+                            <span
+                              className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-100 text-amber-800 border border-amber-200"
+                              title="No recent GPS communication"
+                            >
+                              STALE
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-zinc-400">--</span>
+                      )}
                     </td>
                   </tr>
                 ))

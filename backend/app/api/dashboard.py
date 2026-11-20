@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.database.session import get_db
+from app.models.delivery_assignment import DeliveryAssignment
 from app.models.journey import Journey
 from app.models.location import Location
 from app.models.trip_event import TripEvent
@@ -88,12 +89,13 @@ async def get_active_vehicles_with_telemetry(
     current_user: User = Depends(require_fleet_manager),
     db: AsyncSession = Depends(get_db),
 ):
-    """Retrieve all corporate vehicles combined with their latest real-time GPS coordinates."""
+    """Retrieve all corporate vehicles combined with their synchronized dispatch and real-time GPS telemetry."""
     stmt = (
         select(Vehicle)
         .options(
             selectinload(Vehicle.assigned_driver),
             selectinload(Vehicle.journeys).selectinload(Journey.trip_events),
+            selectinload(Vehicle.journeys).selectinload(Journey.driver),
         )
         .order_by(Vehicle.registration_number.asc())
     )
@@ -101,6 +103,28 @@ async def get_active_vehicles_with_telemetry(
         stmt = stmt.where(Vehicle.company_id == current_user.company_id)
     result = await db.execute(stmt)
     vehicles = result.scalars().all()
+
+    # Bulk fetch active/pending delivery assignments for company to reflect real-time dispatch state
+    asg_stmt = (
+        select(DeliveryAssignment)
+        .where(DeliveryAssignment.status.in_(["PENDING", "ACCEPTED", "IN_PROGRESS"]))
+        .options(
+            selectinload(DeliveryAssignment.driver),
+            selectinload(DeliveryAssignment.journey),
+        )
+    )
+    if current_user.company_id:
+        asg_stmt = asg_stmt.where(DeliveryAssignment.company_id == current_user.company_id)
+    asg_res = await db.execute(asg_stmt)
+    active_assignments = asg_res.scalars().all()
+
+    asg_by_vehicle_id = {}
+    asg_by_driver_id = {}
+    for asg in active_assignments:
+        if asg.journey and asg.journey.vehicle_id:
+            asg_by_vehicle_id[asg.journey.vehicle_id] = asg
+        if asg.driver_id:
+            asg_by_driver_id[asg.driver_id] = asg
 
     # Bulk fetch latest location for active journeys in a single set-based query
     active_j_map = {v.id: next((j for j in v.journeys if j.status == "IN_PROGRESS"), None) for v in vehicles}
@@ -129,7 +153,62 @@ async def get_active_vehicles_with_telemetry(
         active_j = active_j_map.get(v.id)
         active_j_id = active_j.id if active_j else None
 
-        # Check Redis for live position
+        # Check for active delivery assignment for this vehicle or its assigned driver
+        active_asg = asg_by_vehicle_id.get(v.id)
+        if not active_asg and v.assigned_driver_id:
+            active_asg = asg_by_driver_id.get(v.assigned_driver_id)
+
+        # Synchronize Status:
+        # Available -> AVAILABLE
+        # Driver assigned / delivery accepted -> BUSY
+        # Active journey -> IN_TRANSIT
+        # Journey completed -> AVAILABLE
+        effective_status = v.status
+        if active_j:
+            effective_status = "IN_TRANSIT"
+        elif active_asg:
+            if active_asg.status in ("ACCEPTED", "PENDING"):
+                effective_status = "BUSY"
+            elif active_asg.status == "IN_PROGRESS":
+                effective_status = "IN_TRANSIT"
+        elif v.status == "IN_TRANSIT":
+            # Vehicle DB record said IN_TRANSIT but journey is no longer in progress
+            effective_status = "AVAILABLE"
+
+        # Synchronize Assigned Driver
+        assigned_driver_id = v.assigned_driver_id
+        assigned_driver_name = v.assigned_driver.name if v.assigned_driver else None
+
+        if not assigned_driver_name:
+            if active_j and active_j.driver:
+                assigned_driver_id = active_j.driver_id
+                assigned_driver_name = active_j.driver.name
+            elif active_asg and active_asg.driver:
+                assigned_driver_id = active_asg.driver_id
+                assigned_driver_name = active_asg.driver.name
+
+        # Synchronize Active Route
+        origin_name = None
+        origin_lat = None
+        origin_lng = None
+        destination_name = None
+        destination_lat = None
+        destination_lng = None
+
+        if active_j:
+            origin_name = active_j.origin_name
+            origin_lat = active_j.origin_lat
+            origin_lng = active_j.origin_lng
+            destination_name = active_j.destination_name
+            destination_lat = active_j.destination_lat
+            destination_lng = active_j.destination_lng
+        elif active_asg:
+            # Active assignment waiting to start -> route destination is assigned target
+            destination_name = active_asg.destination_name
+            destination_lat = active_asg.destination_lat
+            destination_lng = active_asg.destination_lng
+
+        # Check Redis for live telemetry
         latest_cache = await redis_svc.get_latest_vehicle_location(v.id)
 
         lat = None
@@ -146,7 +225,11 @@ async def get_active_vehicles_with_telemetry(
                 speed = latest_cache.get("speed")
                 heading = latest_cache.get("heading")
                 if latest_cache.get("timestamp"):
-                    rec_at = datetime.fromisoformat(latest_cache["timestamp"])
+                    try:
+                        ts_clean = latest_cache["timestamp"].replace("Z", "+00:00")
+                        rec_at = datetime.fromisoformat(ts_clean)
+                    except Exception:
+                        rec_at = None
             else:
                 loc = latest_loc_by_journey.get(active_j.id)
                 if loc:
@@ -163,15 +246,21 @@ async def get_active_vehicles_with_telemetry(
                     heading = 0.0
                     rec_at = active_j.started_at
         else:
-            # Vehicle is available/stationary: no active journey
+            # Vehicle is available/stationary
             speed = 0.0
             heading = 0.0
             if latest_cache:
                 from datetime import datetime
                 lat = latest_cache.get("latitude")
                 lng = latest_cache.get("longitude")
+                speed = latest_cache.get("speed") or 0.0
+                heading = latest_cache.get("heading") or 0.0
                 if latest_cache.get("timestamp"):
-                    rec_at = datetime.fromisoformat(latest_cache["timestamp"])
+                    try:
+                        ts_clean = latest_cache["timestamp"].replace("Z", "+00:00")
+                        rec_at = datetime.fromisoformat(ts_clean)
+                    except Exception:
+                        rec_at = None
 
         # Resolve latest event for vehicle (SOS, BREAKDOWN, BREAK_START)
         latest_ev_type = None
@@ -203,9 +292,9 @@ async def get_active_vehicles_with_telemetry(
                 registration_number=v.registration_number,
                 model=v.model,
                 vehicle_type=v.vehicle_type,
-                status=v.status,
-                assigned_driver_id=v.assigned_driver_id,
-                assigned_driver_name=v.assigned_driver.name if v.assigned_driver else None,
+                status=effective_status,
+                assigned_driver_id=assigned_driver_id,
+                assigned_driver_name=assigned_driver_name,
                 current_journey_id=active_j_id,
                 latest_latitude=lat,
                 latest_longitude=lng,
@@ -213,12 +302,12 @@ async def get_active_vehicles_with_telemetry(
                 latest_heading=heading,
                 latest_recorded_at=rec_at,
                 latest_event_type=latest_ev_type,
-                origin_name=active_j.origin_name if active_j else None,
-                origin_lat=active_j.origin_lat if active_j else None,
-                origin_lng=active_j.origin_lng if active_j else None,
-                destination_name=active_j.destination_name if active_j else None,
-                destination_lat=active_j.destination_lat if active_j else None,
-                destination_lng=active_j.destination_lng if active_j else None,
+                origin_name=origin_name,
+                origin_lat=origin_lat,
+                origin_lng=origin_lng,
+                destination_name=destination_name,
+                destination_lat=destination_lat,
+                destination_lng=destination_lng,
             )
         )
 

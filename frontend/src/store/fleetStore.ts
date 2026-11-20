@@ -21,6 +21,7 @@ interface FleetState {
     heading: number;
     recorded_at: string;
   }) => void;
+  updateVehicleStatus: (vehicle_id: string, updates: Partial<ActiveVehicleTelemetry>) => void;
 }
 
 export const useFleetStore = create<FleetState>((set) => ({
@@ -48,6 +49,20 @@ export const useFleetStore = create<FleetState>((set) => ({
             latest_heading: update.heading,
             latest_recorded_at: update.recorded_at,
             status: 'IN_TRANSIT',
+          };
+        }
+        return v;
+      });
+      return { activeVehicles: updatedActive };
+    }),
+
+  updateVehicleStatus: (vehicle_id, updates) =>
+    set((state) => {
+      const updatedActive = state.activeVehicles.map((v) => {
+        if (v.vehicle_id === vehicle_id || (v as any).id === vehicle_id) {
+          return {
+            ...v,
+            ...updates,
           };
         }
         return v;

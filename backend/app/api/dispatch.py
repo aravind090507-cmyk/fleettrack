@@ -305,6 +305,8 @@ async def create_delivery_assignment(
     asg.driver = driver
 
     # 5. Real-time Notifications: Push to assigned driver and company console
+    v_res = await db.execute(select(Vehicle).where(Vehicle.assigned_driver_id == driver.id))
+    assigned_v = v_res.scalars().first()
     ws_mgr = get_ws_manager()
     dispatch_msg = {
         "type": "DELIVERY_ASSIGNED",
@@ -318,6 +320,8 @@ async def create_delivery_assignment(
         "instructions": asg.instructions,
         "status": asg.status,
         "created_at": asg.created_at.isoformat(),
+        "vehicle_id": assigned_v.id if assigned_v else None,
+        "vehicle_reg": assigned_v.registration_number if assigned_v else None,
     }
     # Notify dedicated driver socket
     await ws_mgr.broadcast_to_driver(driver.id, dispatch_msg)
@@ -507,7 +511,11 @@ async def accept_delivery_assignment(
     stmt = (
         select(DeliveryAssignment)
         .where(DeliveryAssignment.id == assignment_id, DeliveryAssignment.driver_id == current_user.id)
-        .options(selectinload(DeliveryAssignment.manager), selectinload(DeliveryAssignment.driver))
+        .options(
+            selectinload(DeliveryAssignment.manager),
+            selectinload(DeliveryAssignment.driver),
+            selectinload(DeliveryAssignment.journey),
+        )
     )
     res = await db.execute(stmt)
     asg = res.scalar_one_or_none()
@@ -528,6 +536,8 @@ async def accept_delivery_assignment(
     await db.refresh(asg)
 
     # Notify manager via WebSocket
+    v_res = await db.execute(select(Vehicle).where(Vehicle.assigned_driver_id == current_user.id))
+    assigned_v = v_res.scalars().first()
     ws_mgr = get_ws_manager()
     accept_msg = {
         "type": "DELIVERY_ACCEPTED",
@@ -536,6 +546,8 @@ async def accept_delivery_assignment(
         "driver_name": current_user.name,
         "status": "ACCEPTED",
         "company_id": asg.company_id,
+        "vehicle_id": assigned_v.id if assigned_v else None,
+        "vehicle_reg": assigned_v.registration_number if assigned_v else None,
     }
     await ws_mgr.broadcast_to_fleet(accept_msg, company_id=asg.company_id)
     await ws_mgr.broadcast_to_driver(current_user.id, accept_msg)
@@ -556,7 +568,11 @@ async def reject_delivery_assignment(
     stmt = (
         select(DeliveryAssignment)
         .where(DeliveryAssignment.id == assignment_id, DeliveryAssignment.driver_id == current_user.id)
-        .options(selectinload(DeliveryAssignment.manager), selectinload(DeliveryAssignment.driver))
+        .options(
+            selectinload(DeliveryAssignment.manager),
+            selectinload(DeliveryAssignment.driver),
+            selectinload(DeliveryAssignment.journey),
+        )
     )
     res = await db.execute(stmt)
     asg = res.scalar_one_or_none()
@@ -607,7 +623,11 @@ async def start_delivery_assignment(
     stmt = (
         select(DeliveryAssignment)
         .where(DeliveryAssignment.id == assignment_id, DeliveryAssignment.driver_id == current_user.id)
-        .options(selectinload(DeliveryAssignment.manager), selectinload(DeliveryAssignment.driver))
+        .options(
+            selectinload(DeliveryAssignment.manager),
+            selectinload(DeliveryAssignment.driver),
+            selectinload(DeliveryAssignment.journey),
+        )
     )
     res = await db.execute(stmt)
     asg = res.scalar_one_or_none()
@@ -689,8 +709,12 @@ async def start_delivery_assignment(
         "type": "DELIVERY_STARTED",
         "assignment_id": asg.id,
         "journey_id": journey.id,
+        "vehicle_id": vehicle.id,
+        "vehicle_reg": vehicle.registration_number,
         "driver_id": current_user.id,
         "driver_name": current_user.name,
+        "origin_name": origin_name,
+        "destination_name": asg.destination_name,
         "tracking_url": tracking_url,
         "status": "IN_PROGRESS",
         "company_id": asg.company_id,
@@ -720,7 +744,11 @@ async def complete_delivery_assignment(
     stmt = (
         select(DeliveryAssignment)
         .where(DeliveryAssignment.id == assignment_id, DeliveryAssignment.driver_id == current_user.id)
-        .options(selectinload(DeliveryAssignment.manager), selectinload(DeliveryAssignment.driver))
+        .options(
+            selectinload(DeliveryAssignment.manager),
+            selectinload(DeliveryAssignment.driver),
+            selectinload(DeliveryAssignment.journey),
+        )
     )
     res = await db.execute(stmt)
     asg = res.scalar_one_or_none()
@@ -758,10 +786,19 @@ async def complete_delivery_assignment(
     await db.refresh(asg)
 
     # 4. Notify manager console
+    v_id = None
+    if asg.journey_id:
+        j_res = await db.execute(select(Journey.vehicle_id).where(Journey.id == asg.journey_id))
+        v_id = j_res.scalar_one_or_none()
+    if not v_id:
+        v_res = await db.execute(select(Vehicle.id).where(Vehicle.assigned_driver_id == current_user.id))
+        v_id = v_res.scalars().first()
+
     complete_msg = {
         "type": "DELIVERY_COMPLETED",
         "assignment_id": asg.id,
         "journey_id": asg.journey_id,
+        "vehicle_id": v_id,
         "driver_id": current_user.id,
         "driver_name": current_user.name,
         "status": "COMPLETED",
