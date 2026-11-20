@@ -13,12 +13,16 @@ from app.models.journey import Journey
 from app.models.location import Location
 from app.models.geofence import Geofence
 from app.models.user import User
+from app.models.trip_event import TripEvent
+from app.models.delivery_assignment import DeliveryAssignment
 from app.schemas.location import LocationBatch, LocationIngestResult, LocationPing, LocationResponse
 from app.security.dependencies import get_current_user, require_driver
 from app.pipeline.runner import PipelineRunner
 from app.pipeline.reasons import PipelineStatus
 from app.services.redis_service import get_redis_service
+from app.services.journey_service import haversine_distance, end_journey
 from app.websocket.manager import get_ws_manager
+from sqlalchemy.orm import selectinload
 
 logger = logging.getLogger("fleettrack.location")
 router = APIRouter(prefix="/api/journeys", tags=["GPS Telemetry"])
@@ -29,7 +33,218 @@ async def _get_active_geofences(db: AsyncSession, company_id: Optional[str]) -> 
         return []
     stmt = select(Geofence).where(Geofence.company_id == company_id)
     gfs = (await db.execute(stmt)).scalars().all()
-    return [{"id": g.id, "name": g.name, "geometry": g.geometry} for g in gfs]
+    return [{"id": g.id, "name": g.name, "geometry": g.geometry, "kind": g.kind} for g in gfs]
+
+
+async def _process_geofence_and_arrival_events(
+    db: AsyncSession,
+    journey: Journey,
+    position: Dict[str, Any],
+    events: List[Dict[str, Any]],
+    redis_svc: Any,
+    ws_mgr: Any,
+    effective_company_id: Optional[str],
+):
+    """
+    Evaluates detected geofence entry/exit events and destination arrival.
+    Generates persistent TripEvent notifications and handles automatic completion safely.
+    """
+    v_reg = journey.vehicle.registration_number if journey.vehicle else None
+    d_name = journey.driver.name if journey.driver else None
+
+    # 1. Process Geofence Enter & Exit Notifications
+    for evt in events:
+        evt_type = evt.get("type")
+        if evt_type in ("geofenceEnter", "geofenceExit"):
+            is_enter = (evt_type == "geofenceEnter")
+            gf_name = evt.get("geofence_name") or evt.get("attributes", {}).get("geofence_name") or "Geofence Perimeter"
+            gf_id = evt.get("geofence_id")
+            gf_kind = evt.get("attributes", {}).get("kind") or "circle"
+            display_ev_type = "GEOFENCE ENTERED" if is_enter else "GEOFENCE EXITED"
+            internal_ev_type = "GEOFENCE_ENTER" if is_enter else "GEOFENCE_EXIT"
+
+            trip_ev = TripEvent(
+                journey_id=journey.id,
+                event_type=internal_ev_type,
+                latitude=float(position.get("latitude", 0.0)),
+                longitude=float(position.get("longitude", 0.0)),
+                metadata_json={
+                    "geofence_id": gf_id,
+                    "geofence_name": gf_name,
+                    "vehicle_registration": v_reg,
+                    "driver_name": d_name,
+                    "kind": gf_kind,
+                    "location": f"{round(position.get('latitude', 0.0), 5)}, {round(position.get('longitude', 0.0), 5)}",
+                    "event_type": display_ev_type,
+                },
+            )
+            db.add(trip_ev)
+            await db.commit()
+
+            # Real-time WebSocket push to Manager Console
+            gf_alert_msg = {
+                "type": "TRIP_EVENT",
+                "id": trip_ev.id,
+                "event_type": trip_ev.event_type,
+                "journey_id": journey.id,
+                "vehicle_id": journey.vehicle_id,
+                "vehicle_registration": v_reg,
+                "driver_name": d_name,
+                "geofence_name": gf_name,
+                "latitude": trip_ev.latitude,
+                "longitude": trip_ev.longitude,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "metadata": trip_ev.metadata_json,
+                "company_id": effective_company_id,
+            }
+            await ws_mgr.broadcast_to_fleet(gf_alert_msg, company_id=effective_company_id)
+
+    # 2. Destination Arrival Detection & Automatic Completion
+    if (
+        journey.destination_lat is not None
+        and journey.destination_lng is not None
+        and journey.status == "IN_PROGRESS"
+    ):
+        lat = float(position.get("latitude", 0.0))
+        lng = float(position.get("longitude", 0.0))
+        acc = float(position.get("accuracy", 0.0) or 0.0)
+        spd = float(position.get("speed", 0.0) or 0.0)
+
+        # Distance to target destination in meters
+        dist_to_dest_m = haversine_distance(lat, lng, journey.destination_lat, journey.destination_lng) * 1000.0
+
+        # Reliable confirmation conditions:
+        # a) GPS accuracy within 100m (filters cell-tower jitter)
+        # b) Within arrival radius (<= 100m)
+        is_accurate = (acc <= 100.0 or acc == 0.0)
+        within_radius = (dist_to_dest_m <= 100.0)
+
+        if is_accurate and within_radius:
+            reached_key = f"journey:{journey.id}:destination_reached"
+            dwell_key = f"journey:{journey.id}:arrival_dwell"
+
+            # Check if this journey has already triggered arrival
+            already_reached = await redis_svc.get(reached_key)
+            if not already_reached and journey.status == "IN_PROGRESS":
+                now_dt = datetime.now(timezone.utc)
+                first_dwell = await redis_svc.get(dwell_key)
+                confirmed = False
+
+                if spd <= 25.0:
+                    # Slowing down, stopping or parked at destination
+                    confirmed = True
+                elif not first_dwell:
+                    # First fix inside arrival radius, start dwell timer
+                    await redis_svc.set(dwell_key, str(now_dt.timestamp()), ex=1800)
+                else:
+                    # Dwell confirmation
+                    try:
+                        elapsed = now_dt.timestamp() - float(first_dwell)
+                        if elapsed >= 3.0:
+                            confirmed = True
+                    except Exception:
+                        confirmed = True
+
+                if confirmed:
+                    # Mark arrival as processed in Redis (prevents duplicate triggers)
+                    await redis_svc.set(reached_key, "1", ex=86400)
+                    now_naive = now_dt.replace(tzinfo=None)
+
+                    # Create DESTINATION_REACHED TripEvent
+                    arr_event = TripEvent(
+                        journey_id=journey.id,
+                        event_type="DESTINATION_REACHED",
+                        latitude=lat,
+                        longitude=lng,
+                        metadata_json={
+                            "destination_name": journey.destination_name,
+                            "destination_lat": journey.destination_lat,
+                            "destination_lng": journey.destination_lng,
+                            "distance_m": round(dist_to_dest_m, 1),
+                            "vehicle_registration": v_reg,
+                            "driver_name": d_name,
+                            "arrival_time": now_dt.isoformat(),
+                            "event_type": "DESTINATION REACHED",
+                            "completion_status": "COMPLETED",
+                        },
+                    )
+                    db.add(arr_event)
+                    await db.flush()
+
+                    # Find and complete associated DeliveryAssignment
+                    asg_stmt = (
+                        select(DeliveryAssignment)
+                        .where(
+                            DeliveryAssignment.journey_id == journey.id,
+                            DeliveryAssignment.status.in_(["IN_PROGRESS", "ACCEPTED", "PENDING"]),
+                        )
+                        .options(selectinload(DeliveryAssignment.driver))
+                    )
+                    asg = (await db.execute(asg_stmt)).scalar_one_or_none()
+                    if not asg and journey.driver_id:
+                        asg_stmt2 = (
+                            select(DeliveryAssignment)
+                            .where(
+                                DeliveryAssignment.driver_id == journey.driver_id,
+                                DeliveryAssignment.status.in_(["IN_PROGRESS", "ACCEPTED"]),
+                            )
+                            .options(selectinload(DeliveryAssignment.driver))
+                        )
+                        asg = (await db.execute(asg_stmt2)).scalar_one_or_none()
+
+                    if asg:
+                        asg.status = "COMPLETED"
+                        asg.completed_at = now_naive
+                        if asg.driver:
+                            asg.driver.availability = asg.driver.availability_preference or "AVAILABLE"
+                            asg.driver.availability_updated_at = now_naive
+
+                    # Conclude the journey through existing end_journey lifecycle
+                    await end_journey(
+                        db=db,
+                        journey_id=journey.id,
+                        driver_id=journey.driver_id,
+                        redis_svc=redis_svc,
+                        ws_mgr=ws_mgr,
+                    )
+
+                    # Notify manager console of automatic destination arrival
+                    dest_msg = {
+                        "type": "DESTINATION_REACHED",
+                        "journey_id": journey.id,
+                        "vehicle_id": journey.vehicle_id,
+                        "vehicle_registration": v_reg,
+                        "driver_name": d_name,
+                        "destination_name": journey.destination_name,
+                        "destination_lat": journey.destination_lat,
+                        "destination_lng": journey.destination_lng,
+                        "arrival_time": now_dt.isoformat(),
+                        "event_type": "DESTINATION REACHED",
+                        "completion_status": "COMPLETED",
+                        "company_id": effective_company_id,
+                    }
+                    await ws_mgr.broadcast_to_fleet(dest_msg, company_id=effective_company_id)
+                    await ws_mgr.broadcast_to_fleet({
+                        "type": "TRIP_EVENT",
+                        "id": arr_event.id,
+                        "event_type": "DESTINATION_REACHED",
+                        "journey_id": journey.id,
+                        "vehicle_id": journey.vehicle_id,
+                        "vehicle_registration": v_reg,
+                        "driver_name": d_name,
+                        "created_at": now_dt.isoformat(),
+                        "metadata": arr_event.metadata_json,
+                        "company_id": effective_company_id,
+                    }, company_id=effective_company_id)
+
+                    # Notify driver console
+                    if journey.driver_id:
+                        await ws_mgr.broadcast_to_driver(journey.driver_id, {
+                            "type": "DESTINATION_REACHED",
+                            "journey_id": journey.id,
+                            "status": "COMPLETED",
+                            "message": "Destination reached! Delivery completed.",
+                        })
 
 
 @router.post("/{journey_id}/location", response_model=LocationIngestResult)
@@ -43,7 +258,11 @@ async def post_single_location_ping(
     Ingest real-time GPS coordinate ping through the Traccar pipeline.
     Validates, corrects time skew, suppresses jitter, evaluates geofences, and pushes updates.
     """
-    stmt = select(Journey).where(Journey.id == journey_id)
+    stmt = (
+        select(Journey)
+        .where(Journey.id == journey_id)
+        .options(selectinload(Journey.vehicle), selectinload(Journey.driver))
+    )
     result = await db.execute(stmt)
     journey = result.scalar_one_or_none()
 
@@ -116,6 +335,17 @@ async def post_single_location_ping(
         await ws_mgr.broadcast_to_fleet(loc_payload, company_id=effective_company_id)
         await ws_mgr.queue_coalesced_update(company_id=effective_company_id, position=loc_payload)
 
+        # Process geofence containment transitions and destination arrival detection
+        await _process_geofence_and_arrival_events(
+            db=db,
+            journey=journey,
+            position=res.position,
+            events=res.events,
+            redis_svc=redis_svc,
+            ws_mgr=ws_mgr,
+            effective_company_id=effective_company_id,
+        )
+
     status_str = "recorded" if res.status == PipelineStatus.RECORDED else res.status.value
     now_utc = datetime.now(timezone.utc)
     return LocationIngestResult(
@@ -148,7 +378,11 @@ async def post_batch_location_pings(
             detail="Payload Too Large: batch exceeds maximum 1000 pings",
         )
 
-    stmt = select(Journey).where(Journey.id == journey_id)
+    stmt = (
+        select(Journey)
+        .where(Journey.id == journey_id)
+        .options(selectinload(Journey.vehicle), selectinload(Journey.driver))
+    )
     result = await db.execute(stmt)
     journey = result.scalar_one_or_none()
 
@@ -199,6 +433,7 @@ async def post_batch_location_pings(
     rejected = 0
     results_list = []
     last_recorded_pos = None
+    batch_events = []
 
     for idx, p in enumerate(sorted_pings):
         res = await runner.process_position(
@@ -210,6 +445,8 @@ async def post_batch_location_pings(
         if res.status == PipelineStatus.RECORDED:
             accepted += 1
             last_recorded_pos = res.position
+            if res.events:
+                batch_events.extend(res.events)
         elif res.status == PipelineStatus.FILTERED:
             filtered += 1
         else:
@@ -263,6 +500,17 @@ async def post_batch_location_pings(
         effective_company_id = journey.company_id or (journey.vehicle.company_id if journey.vehicle else None)
         await ws_mgr.broadcast_to_fleet(loc_payload, company_id=effective_company_id)
         await ws_mgr.queue_coalesced_update(company_id=effective_company_id, position=loc_payload)
+
+        # Process geofence containment transitions and destination arrival detection
+        await _process_geofence_and_arrival_events(
+            db=db,
+            journey=journey,
+            position=last_recorded_pos,
+            events=batch_events,
+            redis_svc=redis_svc,
+            ws_mgr=ws_mgr,
+            effective_company_id=effective_company_id,
+        )
 
     return LocationIngestResult(
         status="batch_recorded",

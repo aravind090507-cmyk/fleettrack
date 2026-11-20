@@ -80,6 +80,37 @@ class RedisService:
     def is_connected(self) -> bool:
         return self._is_connected
 
+    async def get(self, key: str) -> Optional[str]:
+        """Generic string retrieval."""
+        if self._is_connected and self._client:
+            try:
+                return await self._client.get(key)
+            except Exception as e:
+                logger.error("Redis get error for %s: %s", key, e)
+        return self._memory_kv.get(key)
+
+    async def set(self, key: str, value: str, ex: Optional[int] = None):
+        """Generic string storage with optional expiration in seconds."""
+        if self._is_connected and self._client:
+            try:
+                if ex:
+                    await self._client.set(key, value, ex=ex)
+                else:
+                    await self._client.set(key, value)
+                return
+            except Exception as e:
+                logger.error("Redis set error for %s: %s", key, e)
+        self._memory_kv[key] = value
+
+    async def delete(self, key: str):
+        """Generic key removal."""
+        if self._is_connected and self._client:
+            try:
+                await self._client.delete(key)
+            except Exception as e:
+                logger.error("Redis delete error for %s: %s", key, e)
+        self._memory_kv.pop(key, None)
+
     # --- Ephemeral Token Management ---
     async def set_tracking_token(self, token_hash: str, journey_id: str, expire_hours: int = 24):
         key = f"token:{token_hash}"

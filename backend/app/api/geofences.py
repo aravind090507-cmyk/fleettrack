@@ -119,12 +119,15 @@ async def create_geofence(
 
     kind, geometry = resolve_geofence_geometry(payload.kind, payload.geometry, payload.area)
 
+    cleaned_name = payload.name.strip()[:255] if payload.name else "Unnamed Geofence"
+    cleaned_desc = payload.description.strip() if payload.description else None
+
     gf = Geofence(
-        id=f"gf-{uuid.uuid4()}",
+        id=str(uuid.uuid4()),
         company_id=current_user.company_id,
-        name=payload.name,
-        description=payload.description,
-        kind=kind.lower(),
+        name=cleaned_name,
+        description=cleaned_desc,
+        kind=kind.lower()[:20],
         geometry=geometry,
         attributes=payload.attributes or {},
     )
@@ -164,9 +167,9 @@ async def update_geofence(
         raise HTTPException(status_code=403, detail="Access denied")
 
     if payload.name is not None:
-        gf.name = payload.name
+        gf.name = payload.name.strip()[:255]
     if payload.description is not None:
-        gf.description = payload.description
+        gf.description = payload.description.strip() if payload.description else None
 
     if payload.geometry is not None or payload.area is not None:
         resolved_kind, resolved_geom = resolve_geofence_geometry(

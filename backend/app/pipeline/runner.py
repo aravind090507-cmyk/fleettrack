@@ -210,6 +210,7 @@ class PipelineRunner:
             # 8. Event detector
             comp_id = (journey.company_id if journey and journey.company_id else None) or (device.company_id if device and hasattr(device, "company_id") else "default")
             dev_id = (device.id if device and hasattr(device, "id") else None) or (journey.vehicle_id if journey else "phone")
+            gf_map = {gf["id"]: gf for gf in active_geofences if isinstance(gf, dict) and "id" in gf}
             events = self.event_detector.detect(
                 pos,
                 last_pos,
@@ -217,6 +218,7 @@ class PipelineRunner:
                 company_id=comp_id,
                 device_id=dev_id,
                 journey_id=journey.id if journey else None,
+                geofences_map=gf_map,
             )
 
             # 9. Persist Location to Database

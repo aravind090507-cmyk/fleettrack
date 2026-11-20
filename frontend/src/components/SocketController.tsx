@@ -147,7 +147,8 @@ export const SocketController: React.FC = () => {
         msg.type === 'DELIVERY_COMPLETED' ||
         msg.type === 'JOURNEY_STARTED' ||
         msg.type === 'JOURNEY_COMPLETED' ||
-        msg.type === 'JOURNEY_TERMINATED'
+        msg.type === 'JOURNEY_TERMINATED' ||
+        msg.type === 'DESTINATION_REACHED'
       ) {
         if (msg.vehicle_id) {
           if (msg.type === 'DELIVERY_ASSIGNED' || msg.type === 'DELIVERY_ACCEPTED') {
@@ -166,7 +167,8 @@ export const SocketController: React.FC = () => {
           } else if (
             msg.type === 'DELIVERY_COMPLETED' ||
             msg.type === 'JOURNEY_COMPLETED' ||
-            msg.type === 'JOURNEY_TERMINATED'
+            msg.type === 'JOURNEY_TERMINATED' ||
+            msg.type === 'DESTINATION_REACHED'
           ) {
             updateVehicleStatus(msg.vehicle_id, {
               status: 'AVAILABLE',
@@ -175,6 +177,20 @@ export const SocketController: React.FC = () => {
               latest_speed: 0,
             });
           }
+        }
+        if (msg.type === 'DESTINATION_REACHED') {
+          addEvent({
+            id: msg.id || String(Date.now()),
+            type: 'DESTINATION_REACHED',
+            event_time: msg.arrival_time || new Date().toISOString(),
+            device_id: msg.vehicle_id || msg.device_id,
+            journey_id: msg.journey_id,
+            attributes: {
+              destination_name: msg.destination_name,
+              driver_name: msg.driver_name,
+              vehicle_registration: msg.vehicle_registration,
+            },
+          });
         }
         // Immediately resync authoritative telemetry and metrics
         resyncRef.current();

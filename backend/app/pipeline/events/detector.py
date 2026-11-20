@@ -24,6 +24,7 @@ class EventDetector:
         company_id: Optional[str] = None,
         device_id: Optional[str] = None,
         journey_id: Optional[str] = None,
+        geofences_map: Optional[Dict[str, Dict[str, Any]]] = None,
     ) -> List[Dict[str, Any]]:
         """Compares current and prior state to produce events."""
         events: List[Dict[str, Any]] = []
@@ -37,7 +38,7 @@ class EventDetector:
             if curr_motion != prev_motion:
                 event_type = EventType.DEVICE_MOVING if curr_motion else EventType.DEVICE_STOPPED
                 events.append({
-                    "id": f"evt-{uuid.uuid4()}",
+                    "id": str(uuid.uuid4()),
                     "company_id": company_id,
                     "device_id": device_id,
                     "journey_id": journey_id,
@@ -57,7 +58,7 @@ class EventDetector:
             prev_speed = float(last_position.get("speed", 0.0) or 0.0) if last_position else 0.0
             if prev_speed <= overspeed_threshold:
                 events.append({
-                    "id": f"evt-{uuid.uuid4()}",
+                    "id": str(uuid.uuid4()),
                     "company_id": company_id,
                     "device_id": device_id,
                     "journey_id": journey_id,
@@ -72,41 +73,57 @@ class EventDetector:
                 })
 
         # 3. Geofence Events (geofenceEnter / geofenceExit)
-        curr_geofences: Set[str] = set(position.get("geofence_ids") or [])
-        prev_geofences: Set[str] = set(last_position.get("geofence_ids") or []) if last_position else set()
+        # Suppress geofence boundary bouncing if fix is outdated, invalid, or accuracy is poor (> 80m)
+        is_pos_valid = position.get("valid", True) and not position.get("outdated", False)
+        acc = float(position.get("accuracy", 0.0) or 0.0)
+        allow_geofence = is_pos_valid and (acc <= 80.0 or acc == 0.0)
 
-        entered = curr_geofences - prev_geofences
-        for gf_id in entered:
-            events.append({
-                "id": f"evt-{uuid.uuid4()}",
-                "company_id": company_id,
-                "device_id": device_id,
-                "journey_id": journey_id,
-                "geofence_id": gf_id,
-                "type": EventType.GEOFENCE_ENTER.value,
-                "event_time": event_time,
-                "attributes": {
-                    "geofence_id": gf_id,
-                    "latitude": position.get("latitude"),
-                    "longitude": position.get("longitude"),
-                },
-            })
+        if allow_geofence:
+            curr_geofences: Set[str] = set(position.get("geofence_ids") or [])
+            prev_geofences: Set[str] = set(last_position.get("geofence_ids") or []) if last_position else set()
 
-        exited = prev_geofences - curr_geofences
-        for gf_id in exited:
-            events.append({
-                "id": f"evt-{uuid.uuid4()}",
-                "company_id": company_id,
-                "device_id": device_id,
-                "journey_id": journey_id,
-                "geofence_id": gf_id,
-                "type": EventType.GEOFENCE_EXIT.value,
-                "event_time": event_time,
-                "attributes": {
+            entered = curr_geofences - prev_geofences
+            for gf_id in entered:
+                gf_info = (geofences_map or {}).get(gf_id, {})
+                gf_name = gf_info.get("name") or "Geofence Perimeter"
+                events.append({
+                    "id": str(uuid.uuid4()),
+                    "company_id": company_id,
+                    "device_id": device_id,
+                    "journey_id": journey_id,
                     "geofence_id": gf_id,
-                    "latitude": position.get("latitude"),
-                    "longitude": position.get("longitude"),
-                },
-            })
+                    "geofence_name": gf_name,
+                    "type": EventType.GEOFENCE_ENTER.value,
+                    "event_time": event_time,
+                    "attributes": {
+                        "geofence_id": gf_id,
+                        "geofence_name": gf_name,
+                        "kind": gf_info.get("kind"),
+                        "latitude": position.get("latitude"),
+                        "longitude": position.get("longitude"),
+                    },
+                })
+
+            exited = prev_geofences - curr_geofences
+            for gf_id in exited:
+                gf_info = (geofences_map or {}).get(gf_id, {})
+                gf_name = gf_info.get("name") or "Geofence Perimeter"
+                events.append({
+                    "id": str(uuid.uuid4()),
+                    "company_id": company_id,
+                    "device_id": device_id,
+                    "journey_id": journey_id,
+                    "geofence_id": gf_id,
+                    "geofence_name": gf_name,
+                    "type": EventType.GEOFENCE_EXIT.value,
+                    "event_time": event_time,
+                    "attributes": {
+                        "geofence_id": gf_id,
+                        "geofence_name": gf_name,
+                        "kind": gf_info.get("kind"),
+                        "latitude": position.get("latitude"),
+                        "longitude": position.get("longitude"),
+                    },
+                })
 
         return events

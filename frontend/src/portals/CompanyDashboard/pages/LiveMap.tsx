@@ -18,6 +18,9 @@ import {
   ExternalLink,
   Play,
   Pause,
+  Shield,
+  CheckCircle2,
+  MapPin,
 } from 'lucide-react';
 import { dashboardApi, journeysApi, locationApi, trackingApi } from '../../../services/api';
 import {
@@ -420,7 +423,7 @@ export const LiveMap: React.FC = () => {
         }
       } else if (msg.type === 'VEHICLE_MOVED' || msg.type === 'LOCATION_UPDATE') {
         processLocationUpdate(msg);
-      } else if (msg.type === 'JOURNEY_FINISHED' || msg.type === 'JOURNEY_COMPLETED') {
+      } else if (msg.type === 'JOURNEY_FINISHED' || msg.type === 'JOURNEY_COMPLETED' || msg.type === 'DESTINATION_REACHED') {
         const finishedId = (msg as any).journey_id || (msg as any).id;
         setActiveJourneys((prev) => prev.filter((j) => j.journey_id !== finishedId && (j as any).id !== finishedId));
         setVehicles((prev) =>
@@ -470,12 +473,21 @@ export const LiveMap: React.FC = () => {
     return () => clearInterval(interval);
   }, [loadFleetData, isConnected]);
 
-  // Most critical unread incident across fleet (SOS takes highest precedence)
+  // Most critical unread incident across fleet (SOS, breakdown, geofence, destination reached)
   const criticalAlert = useMemo(() => {
     return recentEvents.find(
       (ev) =>
         !dismissedAlertIds.has(ev.id) &&
-        (ev.event_type === 'SOS' || ev.event_type === 'BREAKDOWN' || ev.event_type === 'BREAK_START')
+        (
+          ev.event_type === 'SOS' ||
+          ev.event_type === 'BREAKDOWN' ||
+          ev.event_type === 'DESTINATION_REACHED' ||
+          ev.event_type === 'GEOFENCE_ENTER' ||
+          ev.event_type === 'geofenceEnter' ||
+          ev.event_type === 'GEOFENCE_EXIT' ||
+          ev.event_type === 'geofenceExit' ||
+          ev.event_type === 'BREAK_START'
+        )
     );
   }, [recentEvents, dismissedAlertIds]);
 
@@ -569,7 +581,7 @@ export const LiveMap: React.FC = () => {
           )}
         </div>
 
-        {/* 2. Critical Incident Alert Banner (SOS / Breakdown / Break) */}
+        {/* 2. Critical Incident Alert Banner (SOS / Breakdown / Geofence / Destination Reached) */}
         {criticalAlert && (
           <div className="absolute top-16 left-4 right-96 z-20 animate-in fade-in slide-in-from-top-3 duration-300 pointer-events-auto">
             <div
@@ -578,6 +590,12 @@ export const LiveMap: React.FC = () => {
                   ? 'bg-rose-950/95 border-rose-500 text-rose-200 animate-pulse ring-2 ring-rose-500/50'
                   : criticalAlert.event_type === 'BREAKDOWN'
                   ? 'bg-amber-950/95 border-amber-500 text-amber-200 ring-1 ring-amber-500/50'
+                  : criticalAlert.event_type === 'DESTINATION_REACHED'
+                  ? 'bg-emerald-950/95 border-emerald-500 text-emerald-200 ring-2 ring-emerald-500/50'
+                  : criticalAlert.event_type === 'GEOFENCE_ENTER' || criticalAlert.event_type === 'geofenceEnter'
+                  ? 'bg-blue-950/95 border-blue-500 text-blue-200 ring-1 ring-blue-500/50'
+                  : criticalAlert.event_type === 'GEOFENCE_EXIT' || criticalAlert.event_type === 'geofenceExit'
+                  ? 'bg-indigo-950/95 border-indigo-500 text-indigo-200'
                   : 'bg-yellow-950/95 border-yellow-500 text-yellow-200'
               }`}
             >
@@ -586,6 +604,12 @@ export const LiveMap: React.FC = () => {
                   <AlertTriangle className="w-5 h-5 text-rose-400 animate-bounce shrink-0" />
                 ) : criticalAlert.event_type === 'BREAKDOWN' ? (
                   <Wrench className="w-5 h-5 text-amber-400 shrink-0" />
+                ) : criticalAlert.event_type === 'DESTINATION_REACHED' ? (
+                  <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+                ) : criticalAlert.event_type === 'GEOFENCE_ENTER' || criticalAlert.event_type === 'geofenceEnter' ? (
+                  <Shield className="w-5 h-5 text-blue-400 shrink-0" />
+                ) : criticalAlert.event_type === 'GEOFENCE_EXIT' || criticalAlert.event_type === 'geofenceExit' ? (
+                  <MapPin className="w-5 h-5 text-indigo-400 shrink-0" />
                 ) : (
                   <Coffee className="w-5 h-5 text-yellow-400 shrink-0" />
                 )}
@@ -595,11 +619,23 @@ export const LiveMap: React.FC = () => {
                       ? '🚨 CRITICAL SOS EMERGENCY BROADCAST'
                       : criticalAlert.event_type === 'BREAKDOWN'
                       ? '⚠️ DRIVER REPORTED VEHICLE BREAKDOWN'
+                      : criticalAlert.event_type === 'DESTINATION_REACHED'
+                      ? '🎯 DESTINATION REACHED — DELIVERY COMPLETED'
+                      : criticalAlert.event_type === 'GEOFENCE_ENTER' || criticalAlert.event_type === 'geofenceEnter'
+                      ? `🛡️ GEOFENCE ENTERED — ${(criticalAlert.metadata_json as any)?.geofence_name || 'GEOFENCE PERIMETER'}`
+                      : criticalAlert.event_type === 'GEOFENCE_EXIT' || criticalAlert.event_type === 'geofenceExit'
+                      ? `🚩 GEOFENCE EXITED — ${(criticalAlert.metadata_json as any)?.geofence_name || 'GEOFENCE PERIMETER'}`
                       : '☕ DRIVER ON REST BREAK'}
                   </strong>
                   <span>
                     Unit <strong>{criticalAlert.vehicle_registration || 'Vehicle'}</strong> • Driver{' '}
                     <strong>{criticalAlert.driver_name || 'Driver'}</strong>
+                    {criticalAlert.event_type === 'DESTINATION_REACHED' && (criticalAlert.metadata_json as any)?.destination_name && (
+                      <span> • Destination: <strong>{(criticalAlert.metadata_json as any)?.destination_name}</strong></span>
+                    )}
+                    {criticalAlert.metadata_json && (criticalAlert.metadata_json as any)?.location && (
+                      <span className="opacity-80"> ({(criticalAlert.metadata_json as any)?.location})</span>
+                    )}
                   </span>
                 </div>
               </div>

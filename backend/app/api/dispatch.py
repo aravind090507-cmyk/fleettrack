@@ -755,6 +755,10 @@ async def complete_delivery_assignment(
     if not asg:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assignment not found.")
 
+    if asg.status == "COMPLETED":
+        # Idempotent completion: already completed safely (e.g. via automatic arrival detection)
+        return _build_assignment_response(asg)
+
     if asg.status != "IN_PROGRESS":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Cannot complete delivery in '{asg.status}' status. Must be IN_PROGRESS.")
 

@@ -211,6 +211,30 @@ export const ActiveJourney: React.FC = () => {
     return () => stopWatching();
   }, [startWatching, stopWatching]);
 
+  // Periodic journey lifecycle sync (detects automatic destination arrival)
+  useEffect(() => {
+    if (!currentJourney?.id) return;
+    const checkStatus = async () => {
+      try {
+        const j = await journeysApi.get(currentJourney.id);
+        if (j && j.status === 'COMPLETED') {
+          setStatusMessage('🎯 Assigned destination reached! Delivery completed.');
+          stopWatching();
+          setTimeout(() => {
+            useDriverStore.getState().setJourney(null);
+          }, 2500);
+        }
+      } catch (e: any) {
+        if (e.response?.status === 404 || e.response?.status === 410) {
+          stopWatching();
+          useDriverStore.getState().setJourney(null);
+        }
+      }
+    };
+    const interval = setInterval(checkStatus, 4000);
+    return () => clearInterval(interval);
+  }, [currentJourney?.id, stopWatching]);
+
   // Start native background tracking when journey is active on Android
   useEffect(() => {
     if (!currentJourney?.id || !isAndroidNative) return;

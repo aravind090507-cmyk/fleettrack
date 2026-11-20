@@ -129,12 +129,14 @@ export const EventsDrawer: React.FC = () => {
                   const isSOS = ev.type === 'SOS';
                   const isBreakdown = ev.type === 'BREAKDOWN';
                   const isOverspeed = ev.type === 'deviceOverspeed';
-                  const isGeofence = ev.type.startsWith('geofence');
+                  const isGeofence = ev.type.startsWith('geofence') || ev.type.startsWith('GEOFENCE');
+                  const isDestination = ev.type === 'DESTINATION_REACHED';
 
                   let badgeColor = 'bg-zinc-100 text-zinc-800 border-zinc-200';
                   if (isSOS) badgeColor = 'bg-rose-50 text-rose-700 border-rose-200 animate-pulse';
                   else if (isBreakdown) badgeColor = 'bg-amber-50 text-amber-800 border-amber-200';
                   else if (isOverspeed) badgeColor = 'bg-orange-50 text-orange-800 border-orange-200';
+                  else if (isDestination) badgeColor = 'bg-emerald-50 text-emerald-800 border-emerald-200';
                   else if (isGeofence) badgeColor = 'bg-blue-50 text-blue-700 border-blue-200';
                   else if (ev.type === 'deviceMoving') badgeColor = 'bg-emerald-50 text-emerald-800 border-emerald-200';
 
